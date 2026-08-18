@@ -1,0 +1,4 @@
+{:paths ["src"]
+ :aliases
+ {:golden {:extra-paths ["golden"]}
+  :gen {:extra-paths ["gen"]}}}

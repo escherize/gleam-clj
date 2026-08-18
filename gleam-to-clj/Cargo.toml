@@ -1,0 +1,11 @@
+[package]
+name = "gleam-to-clj"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gleam-core = { path = "../../gleam/compiler-core" }
+camino = "1"
+
+[profile.dev]
+debug = 0

@@ -1,0 +1,772 @@
+//! gleam-to-clj: parse a Gleam module with gleam-core and emit readable Clojure.
+//!
+//! v0: parse-only (untyped AST). Known limitations, each panics loudly:
+//! - pipes assume first-argument insertion (matches `->`)
+//! - labelled call args assumed to be in positional order
+//! - single-subject case expressions only
+//! - constructors limited to the prelude (Ok/Error/Nil/True/False)
+//! - line comments are dropped (doc comments become docstrings)
+
+use std::collections::HashMap;
+use std::fmt::Write as _;
+
+use gleam_core::ast::{
+    ArgNames, AssignmentKind, BinOp, CallArg, Clause, Definition, Function, Pattern, Publicity,
+    Statement, UntypedClauseGuard, UntypedExpr, UntypedModule, UntypedPattern,
+    UntypedStatement,
+};
+use gleam_core::parse;
+use gleam_core::warning::WarningEmitter;
+
+const WIDTH: usize = 78;
+
+/// java.lang simple names that a defrecord/import would collide with.
+const JAVA_LANG: &[&str] = &[
+    "Error", "String", "Integer", "Long", "Double", "Float", "Boolean", "Byte", "Short",
+    "Character", "Object", "Class", "Thread", "Process", "Exception", "Number", "Iterable",
+    "Comparable", "Runnable", "Math", "System", "Void", "Enum", "Record",
+];
+
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 2 {
+        eprintln!("usage: gleam-to-clj <input.gleam> [output.clj]");
+        std::process::exit(2);
+    }
+    let input = &args[1];
+    let src = std::fs::read_to_string(input).expect("read input");
+    let path = camino::Utf8PathBuf::from(input);
+    let parsed =
+        parse::parse_module(path.clone(), &src, &WarningEmitter::null()).unwrap_or_else(|e| {
+            eprintln!("parse error: {e:?}");
+            std::process::exit(1);
+        });
+    let stem = path.file_stem().expect("file stem").to_string();
+    let file_name = path.file_name().expect("file name").to_string();
+    let out = emit_module(&parsed.module, &stem, &file_name, &src);
+    match args.get(2) {
+        Some(out_path) => std::fs::write(out_path, out).expect("write output"),
+        None => print!("{out}"),
+    }
+}
+
+fn sp(n: usize) -> String {
+    " ".repeat(n)
+}
+
+fn kebab(s: &str) -> String {
+    s.replace('_', "-")
+}
+
+struct Ctx {
+    /// alias -> full gleam module name, e.g. "dict" -> "gleam/dict"
+    aliases: HashMap<String, String>,
+    /// constructor name -> (field names, defined in this module?)
+    constructors: HashMap<String, (Vec<String>, bool)>,
+    /// source file name, for echo location prefixes
+    file: String,
+    /// byte offset of each line start, for byte-offset -> line-number lookup
+    line_starts: Vec<u32>,
+}
+
+impl Ctx {
+    /// 1-based line number for a byte offset.
+    fn line_of(&self, byte: u32) -> usize {
+        self.line_starts.partition_point(|&s| s <= byte)
+    }
+
+    /// Module function reference, applying the clojure.core-collision rename table.
+    fn module_fn(&self, alias: &str, label: &str) -> String {
+        let module = self.aliases.get(alias).cloned().unwrap_or_default();
+        match (module.as_str(), label) {
+            ("gleam/int", "min") => "min".into(),
+            ("gleam/int", "max") => "max".into(),
+            ("gleam/int", "range") => format!("{alias}/fold-range"),
+            ("gleam/list", "reduce") => format!("{alias}/reduce1"),
+            ("gleam/list", "map") => format!("{alias}/map-over"),
+            ("gleam/dict", "get") => format!("{alias}/lookup"),
+            _ => format!("{alias}/{}", kebab(label)),
+        }
+    }
+}
+
+/// Class reference for a prelude variant, fully qualified when the simple
+/// name collides with an auto-imported java.lang class.
+fn class_ref(name: &str) -> String {
+    if JAVA_LANG.contains(&name) {
+        format!("gleam.prelude.{name}")
+    } else {
+        name.to_string()
+    }
+}
+
+fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -> String {
+    let mut line_starts = vec![0u32];
+    for (i, b) in src.bytes().enumerate() {
+        if b == b'\n' {
+            line_starts.push(i as u32 + 1);
+        }
+    }
+    let mut constructors = HashMap::new();
+    constructors.insert("Ok".to_string(), (vec!["value".to_string()], false));
+    constructors.insert("Error".to_string(), (vec!["value".to_string()], false));
+    for def in &module.definitions {
+        if let Definition::CustomType(t) = &def.definition {
+            for c in &t.constructors {
+                let n = c.arguments.len();
+                let fields: Vec<String> = c
+                    .arguments
+                    .iter()
+                    .enumerate()
+                    .map(|(i, a)| match &a.label {
+                        Some((_, l)) => kebab(l.as_str()),
+                        None if n == 1 => "value".to_string(),
+                        None => format!("f{i}"),
+                    })
+                    .collect();
+                constructors.insert(c.name.to_string(), (fields, true));
+            }
+        }
+    }
+
+    let mut ctx = Ctx {
+        aliases: HashMap::new(),
+        constructors,
+        file: file_name.to_string(),
+        line_starts,
+    };
+    let mut requires: Vec<(String, String)> = Vec::new(); // (clj ns, alias)
+
+    for def in &module.definitions {
+        if let Definition::Import(import) = &def.definition {
+            let alias = match import.used_name() {
+                Some(a) => a.to_string(),
+                None => continue,
+            };
+            ctx.aliases.insert(alias.clone(), import.module.to_string());
+            requires.push((kebab(&import.module.replace("/", ".")), alias));
+        }
+    }
+    requires.push(("gleam.prelude".into(), "p".into()));
+    requires.sort();
+
+    let mut out = String::new();
+    let _ = writeln!(out, "(ns {}", kebab(stem));
+    let _ = writeln!(out, "  (:require");
+    for (i, (ns, alias)) in requires.iter().enumerate() {
+        let end = if i + 1 == requires.len() { ")" } else { "" };
+        let _ = writeln!(out, "   [{ns} :as {alias}]{end}");
+    }
+    let _ = writeln!(out, "  (:import (gleam.prelude Ok)))");
+
+    for def in &module.definitions {
+        if let Definition::CustomType(t) = &def.definition {
+            let _ = write!(out, "\n;; type {}\n", t.name);
+            for c in &t.constructors {
+                if JAVA_LANG.contains(&c.name.as_str()) {
+                    let _ = writeln!(out, "(ns-unmap *ns* '{})", c.name);
+                }
+                let (fields, _) = &ctx.constructors[c.name.as_str()];
+                let _ = writeln!(out, "(defrecord {} [{}])", c.name, fields.join(" "));
+            }
+        }
+    }
+
+    // Gleam allows definitions in any order; Clojure needs forward declarations.
+    let fn_names: Vec<String> = module
+        .definitions
+        .iter()
+        .filter_map(|def| match &def.definition {
+            Definition::Function(f) => {
+                f.name.as_ref().map(|(_, n)| kebab(n.as_str()))
+            }
+            _ => None,
+        })
+        .collect();
+    if fn_names.len() > 1 {
+        let _ = writeln!(out, "\n(declare {})", fn_names.join(" "));
+    }
+
+    let mut has_pub_main = false;
+    for def in &module.definitions {
+        if let Definition::Function(f) = &def.definition {
+            out.push('\n');
+            out.push_str(&emit_function(&ctx, f));
+            if f.publicity == Publicity::Public
+                && f.name.as_ref().is_some_and(|(_, n)| n.as_str() == "main")
+            {
+                has_pub_main = true;
+            }
+        }
+    }
+    if has_pub_main {
+        out.push_str("\n(defn -main [& _]\n  (main))\n");
+    }
+    out
+}
+
+fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
+    let name = kebab(f.name.as_ref().expect("function name").1.as_str());
+    let defn = if f.publicity == Publicity::Public { "defn" } else { "defn-" };
+    let args: Vec<String> = f
+        .arguments
+        .iter()
+        .map(|a| match &a.names {
+            ArgNames::Named { name, .. } | ArgNames::NamedLabelled { name, .. } => {
+                kebab(name.as_str())
+            }
+            ArgNames::Discard { .. } | ArgNames::LabelledDiscard { .. } => "_".into(),
+        })
+        .collect();
+
+    let mut out = format!("({defn} {name}");
+    if let Some((_, doc)) = &f.documentation {
+        let text: Vec<String> = doc.lines().map(|l| l.trim().replace('"', "\\\"")).collect();
+        let _ = write!(out, "\n  \"{}\"", text.join("\n  ").trim_end());
+    }
+    let _ = write!(out, "\n  [{}]\n  ", args.join(" "));
+    let stmts: Vec<&UntypedStatement> = f.body.iter().collect();
+    out.push_str(&emit_body(ctx, &stmts, 2));
+    out.push_str(")\n");
+    out
+}
+
+/// Emit a statement sequence as one or more forms separated by newlines at `ind`.
+fn emit_body(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize) -> String {
+    if stmts.is_empty() {
+        return "nil".into();
+    }
+    match stmts[0] {
+        Statement::Assignment(a) => match &a.kind {
+            AssignmentKind::Let | AssignmentKind::Generated => {
+                // Gather a run of consecutive plain `let name = ...` into one binding vector.
+                let mut binds: Vec<(String, String)> = Vec::new();
+                let mut i = 0;
+                while i < stmts.len() {
+                    let Statement::Assignment(a2) = stmts[i] else { break };
+                    let ok_kind =
+                        matches!(a2.kind, AssignmentKind::Let | AssignmentKind::Generated);
+                    let Pattern::Variable { name, .. } = &a2.pattern else { break };
+                    if !ok_kind {
+                        break;
+                    }
+                    let n = kebab(name.as_str());
+                    let val_ind = ind + 6 + n.len() + 1; // col of value in "(let [n "
+                    binds.push((n, emit_expr(ctx, &a2.value, val_ind)));
+                    i += 1;
+                }
+                if binds.is_empty() {
+                    panic!("unsupported let pattern (destructuring let not implemented in v0)");
+                }
+                let rest = emit_body(ctx, &stmts[i..], ind + 2);
+                let bind_ind = ind + 6;
+                let binds_str = binds
+                    .iter()
+                    .map(|(n, v)| format!("{n} {v}"))
+                    .collect::<Vec<_>>()
+                    .join(&format!("\n{}", sp(bind_ind)));
+                format!("(let [{binds_str}]\n{}{rest})", sp(ind + 2))
+            }
+            AssignmentKind::Assert { message, .. } => {
+                let form = emit_assert(ctx, &a.value, &a.pattern, message.as_ref(), ind);
+                if stmts.len() == 1 {
+                    form
+                } else {
+                    format!("{form}\n{}{}", sp(ind), emit_body(ctx, &stmts[1..], ind))
+                }
+            }
+        },
+        Statement::Expression(e) => {
+            let s = emit_expr(ctx, e, ind);
+            if stmts.len() == 1 {
+                s
+            } else {
+                format!("{s}\n{}{}", sp(ind), emit_body(ctx, &stmts[1..], ind))
+            }
+        }
+        Statement::Use(_) => panic!("unsupported: use expressions (v0)"),
+        Statement::Assert(_) => panic!("unsupported: bool assert (v0)"),
+    }
+}
+
+fn emit_assert(
+    ctx: &Ctx,
+    value: &UntypedExpr,
+    pattern: &UntypedPattern,
+    message: Option<&UntypedExpr>,
+    ind: usize,
+) -> String {
+    let (tests, binds) = pattern_cond(ctx, pattern, "v");
+    if !binds.is_empty() {
+        panic!("unsupported: let assert patterns that bind variables (v0)");
+    }
+    let val = emit_expr(ctx, value, ind + 8);
+    let msg = match message {
+        Some(m) => emit_expr(ctx, m, 0),
+        None => "\"let assert failed\"".into(),
+    };
+    let test = and_join(&tests);
+    format!(
+        "(let [v {val}]\n{i2}(when-not {test}\n{i4}(throw (ex-info {msg} {{:value v}}))))",
+        i2 = sp(ind + 2),
+        i4 = sp(ind + 4),
+    )
+}
+
+fn and_join(tests: &[String]) -> String {
+    match tests.len() {
+        0 => "true".into(),
+        1 => tests[0].clone(),
+        _ => format!("(and {})", tests.join(" ")),
+    }
+}
+
+/// Compile a pattern against subject expr `subj` into (tests, bindings).
+fn pattern_cond(
+    ctx: &Ctx,
+    pattern: &UntypedPattern,
+    subj: &str,
+) -> (Vec<String>, Vec<(String, String)>) {
+    let mut tests = Vec::new();
+    let mut binds = Vec::new();
+    pattern_cond_inner(ctx, pattern, subj, &mut tests, &mut binds);
+    (tests, binds)
+}
+
+fn pattern_cond_inner(
+    ctx: &Ctx,
+    pattern: &UntypedPattern,
+    subj: &str,
+    tests: &mut Vec<String>,
+    binds: &mut Vec<(String, String)>,
+) {
+    match pattern {
+        Pattern::Int { value, .. } => tests.push(format!("(= {subj} {})", int_lit(value))),
+        Pattern::Float { value, .. } => tests.push(format!("(= {subj} {value})")),
+        Pattern::String { value, .. } => tests.push(format!("(= {subj} \"{value}\")")),
+        Pattern::Variable { name, .. } => binds.push((kebab(name.as_str()), subj.to_string())),
+        Pattern::Discard { .. } => {}
+        Pattern::Tuple { elements, .. } => {
+            for (i, el) in elements.iter().enumerate() {
+                pattern_cond_inner(ctx, el, &format!("(nth {subj} {i})"), tests, binds);
+            }
+        }
+        Pattern::Constructor { name, arguments, .. } => match name.as_str() {
+            "Nil" => tests.push(format!("(nil? {subj})")),
+            "True" => tests.push(subj.to_string()),
+            "False" => tests.push(format!("(not {subj})")),
+            n => {
+                let Some((fields, local)) = ctx.constructors.get(n) else {
+                    panic!("unknown constructor in pattern (v0): {n}");
+                };
+                let cls = if *local { n.to_string() } else { class_ref(n) };
+                tests.push(format!("(instance? {cls} {subj})"));
+                let mut pos = 0;
+                for arg in arguments {
+                    let field = match &arg.label {
+                        Some(l) => kebab(l.as_str()),
+                        None => {
+                            let f = fields
+                                .get(pos)
+                                .unwrap_or_else(|| panic!("too many pattern args for {n}"))
+                                .clone();
+                            pos += 1;
+                            f
+                        }
+                    };
+                    pattern_cond_inner(
+                        ctx,
+                        &arg.value,
+                        &format!("(:{field} {subj})"),
+                        tests,
+                        binds,
+                    );
+                }
+            }
+        },
+        Pattern::List { elements, tail, .. } => {
+            let n = elements.len();
+            match tail {
+                None if n == 0 => tests.push(format!("(empty? {subj})")),
+                None => {
+                    tests.push(format!("(= (count {subj}) {n})"));
+                }
+                Some(_) if n == 1 => tests.push(format!("(seq {subj})")),
+                Some(_) => tests.push(format!("(<= {n} (count {subj}))")),
+            }
+            for (i, el) in elements.iter().enumerate() {
+                let access = if i == 0 {
+                    format!("(first {subj})")
+                } else {
+                    format!("(nth {subj} {i})")
+                };
+                pattern_cond_inner(ctx, el, &access, tests, binds);
+            }
+            if let Some(t) = tail {
+                let access = if n == 1 {
+                    format!("(rest {subj})")
+                } else {
+                    format!("(nthrest {subj} {n})")
+                };
+                pattern_cond_inner(ctx, &t.pattern, &access, tests, binds);
+            }
+        }
+        other => panic!("unsupported pattern (v0): {other:?}"),
+    }
+}
+
+fn int_lit(value: &str) -> String {
+    value.replace('_', "")
+}
+
+fn binop(op: &BinOp) -> &'static str {
+    match op {
+        BinOp::And => "and",
+        BinOp::Or => "or",
+        BinOp::Eq => "=",
+        BinOp::NotEq => "not=",
+        BinOp::LtInt | BinOp::LtFloat => "<",
+        BinOp::LtEqInt | BinOp::LtEqFloat => "<=",
+        BinOp::GtInt | BinOp::GtFloat => ">",
+        BinOp::GtEqInt | BinOp::GtEqFloat => ">=",
+        BinOp::AddInt | BinOp::AddFloat => "+",
+        BinOp::SubInt | BinOp::SubFloat => "-",
+        BinOp::MultInt | BinOp::MultFloat => "*",
+        BinOp::DivInt => "quot",
+        BinOp::DivFloat => "/",
+        BinOp::RemainderInt => "rem",
+        BinOp::Concatenate => "str",
+    }
+}
+
+fn emit_expr(ctx: &Ctx, e: &UntypedExpr, ind: usize) -> String {
+    match e {
+        UntypedExpr::Int { value, .. } => int_lit(value),
+        UntypedExpr::Float { value, .. } => value.to_string(),
+        UntypedExpr::String { value, .. } => format!("\"{}\"", value.replace("\"", "\\\"")),
+        UntypedExpr::Var { name, .. } => match name.as_str() {
+            "Nil" => "nil".into(),
+            "True" => "true".into(),
+            "False" => "false".into(),
+            n if n.starts_with(char::is_uppercase) => match ctx.constructors.get(n) {
+                // A zero-field variant used as a value IS the constructed value.
+                Some((fields, _)) if fields.is_empty() => format!("(->{n})"),
+                Some((_, true)) => format!("->{n}"),
+                Some((_, false)) => format!("p/->{n}"),
+                None => panic!("unknown constructor (v0): {n}"),
+            },
+            n => kebab(n),
+        },
+        UntypedExpr::FieldAccess { container, label, .. } => {
+            if let UntypedExpr::Var { name, .. } = container.as_ref() {
+                if ctx.aliases.contains_key(name.as_str()) {
+                    return ctx.module_fn(name.as_str(), label.as_str());
+                }
+            }
+            // record field access
+            format!(
+                "(:{} {})",
+                kebab(label.as_str()),
+                emit_expr(ctx, container, ind)
+            )
+        }
+        UntypedExpr::Tuple { elements, .. } => {
+            let parts: Vec<String> =
+                elements.iter().map(|el| emit_expr(ctx, el, ind + 1)).collect();
+            format!("[{}]", parts.join(" "))
+        }
+        UntypedExpr::TupleIndex { tuple, index, .. } => {
+            format!("(nth {} {index})", emit_expr(ctx, tuple, ind))
+        }
+        UntypedExpr::List { elements, tail, .. } => {
+            let parts: Vec<String> =
+                elements.iter().map(|el| emit_expr(ctx, el, ind + 6)).collect();
+            match tail {
+                None if parts.is_empty() => "(list)".into(),
+                None => format!("(list {})", parts.join(" ")),
+                Some(t) => format!(
+                    "(list* {} {})",
+                    parts.join(" "),
+                    emit_expr(ctx, t, ind)
+                ),
+            }
+        }
+        UntypedExpr::NegateInt { value, .. } => format!("(- {})", emit_expr(ctx, value, ind)),
+        UntypedExpr::NegateBool { value, .. } => format!("(not {})", emit_expr(ctx, value, ind)),
+        UntypedExpr::BinOp { operator, left, right, .. } => {
+            let op = binop(operator);
+            let l = emit_expr(ctx, left, ind);
+            let r = emit_expr(ctx, right, ind);
+            format!("({op} {l} {r})")
+        }
+        UntypedExpr::Fn { arguments, body, .. } => {
+            let args: Vec<String> = arguments
+                .iter()
+                .map(|a| match &a.names {
+                    ArgNames::Named { name, .. } | ArgNames::NamedLabelled { name, .. } => {
+                        kebab(name.as_str())
+                    }
+                    _ => "_".into(),
+                })
+                .collect();
+            let head = format!("(fn [{}] ", args.join(" "));
+            let stmts: Vec<&UntypedStatement> = body.iter().collect();
+            let inline_body = emit_body(ctx, &stmts, ind + head.len());
+            let inline = format!("{head}{inline_body})");
+            if fits(&inline, ind) {
+                inline
+            } else {
+                let b = emit_body(ctx, &stmts, ind + 2);
+                format!("(fn [{}]\n{}{b})", args.join(" "), sp(ind + 2))
+            }
+        }
+        UntypedExpr::Call { fun, arguments, .. } => emit_call(ctx, fun, arguments, ind),
+        UntypedExpr::PipeLine { expressions } => {
+            let exprs: Vec<&UntypedExpr> = expressions.iter().collect();
+            let first = emit_expr(ctx, exprs[0], ind + 4);
+            let steps: Vec<String> = exprs[1..]
+                .iter()
+                .map(|step| match step {
+                    UntypedExpr::Call { fun, arguments, .. } => {
+                        emit_call(ctx, fun, arguments, ind + 4)
+                    }
+                    other => emit_expr(ctx, other, ind + 4),
+                })
+                .collect();
+            let inline = format!("(-> {first} {})", steps.join(" "));
+            if fits(&inline, ind) {
+                inline
+            } else {
+                format!("(-> {first}\n{}{})", sp(ind + 4), steps.join(&format!("\n{}", sp(ind + 4))))
+            }
+        }
+        UntypedExpr::Case { subjects, clauses, .. } => {
+            emit_case(ctx, subjects, clauses.as_deref().unwrap_or_default(), ind)
+        }
+        UntypedExpr::Block { statements, .. } => {
+            let stmts: Vec<&UntypedStatement> = statements.iter().collect();
+            let body = emit_body(ctx, &stmts, ind);
+            // A block whose body reduces to a single form needs no `do`.
+            if stmts.len() == 1 || body.starts_with("(let ") {
+                body
+            } else {
+                let b = emit_body(ctx, &stmts, ind + 4);
+                format!("(do {b})")
+            }
+        }
+        UntypedExpr::Echo { expression, message, location, .. } => {
+            // `|> echo` (no expression) threads as a bare fn reference.
+            let Some(expr) = expression else { return "p/echo".into() };
+            let prefix = match message {
+                Some(m) => emit_expr(ctx, m, ind),
+                None => format!("\"{}:{}\"", ctx.file, ctx.line_of(location.start)),
+            };
+            let inner = emit_expr(ctx, expr, ind + 8);
+            format!("(p/echo {inner} {prefix})")
+        }
+        UntypedExpr::Todo { message, .. } => {
+            let msg = message
+                .as_ref()
+                .map(|m| emit_expr(ctx, m, ind))
+                .unwrap_or_else(|| "\"todo\"".into());
+            format!("(throw (ex-info {msg} {{:gleam/todo true}}))")
+        }
+        UntypedExpr::Panic { message, .. } => {
+            let msg = message
+                .as_ref()
+                .map(|m| emit_expr(ctx, m, ind))
+                .unwrap_or_else(|| "\"panic\"".into());
+            format!("(throw (ex-info {msg} {{:gleam/panic true}}))")
+        }
+        other => panic!("unsupported expression (v0): {other:?}"),
+    }
+}
+
+fn emit_call(ctx: &Ctx, fun: &UntypedExpr, arguments: &[CallArg<UntypedExpr>], ind: usize) -> String {
+    let head = match fun {
+        UntypedExpr::Var { name, .. } if name.starts_with(char::is_uppercase) => {
+            match ctx.constructors.get(name.as_str()) {
+                Some((_, true)) => format!("->{name}"),
+                Some((_, false)) => format!("p/->{name}"),
+                None => panic!("unknown constructor (v0): {name}"),
+            }
+        }
+        _ => emit_expr(ctx, fun, ind),
+    };
+    let arg_ind = ind + 1 + head.len() + 1;
+    let args: Vec<String> = arguments
+        .iter()
+        .map(|a| emit_expr(ctx, &a.value, arg_ind))
+        .collect();
+    let inline = format!("({head} {})", args.join(" "));
+    if fits(&inline, ind) || args.is_empty() {
+        if args.is_empty() {
+            format!("({head})")
+        } else {
+            inline
+        }
+    } else {
+        format!("({head} {})", args.join(&format!("\n{}", sp(arg_ind))))
+    }
+}
+
+fn emit_case(
+    ctx: &Ctx,
+    subjects: &[UntypedExpr],
+    clauses: &[Clause<UntypedExpr, ()>],
+    ind: usize,
+) -> String {
+    if subjects.len() != 1 {
+        panic!("unsupported: multi-subject case (v0)");
+    }
+    let subj = emit_expr(ctx, &subjects[0], ind);
+    if subj.contains(' ') {
+        panic!("unsupported: complex case subject (v0) — bind it with let first");
+    }
+
+    // (test, bindings-used-by-body, body-expr)
+    let mut branches: Vec<(String, Vec<(String, String)>, &UntypedExpr)> = Vec::new();
+    for clause in clauses {
+        if !clause.alternative_patterns.is_empty() {
+            panic!("unsupported: alternative patterns `|` (v0)");
+        }
+        let pattern = &clause.pattern[0];
+        let (mut tests, binds) = pattern_cond(ctx, pattern, &subj);
+        let env: HashMap<String, String> = binds.iter().cloned().collect();
+        if let Some(guard) = &clause.guard {
+            tests.push(emit_guard(ctx, guard, &env));
+        }
+        let used: Vec<(String, String)> = binds
+            .into_iter()
+            .filter(|(n, _)| expr_uses_var(&clause.then, n))
+            .collect();
+        branches.push((and_join(&tests), used, &clause.then));
+    }
+
+    let emit_branch_body =
+        |used: &[(String, String)], then: &UntypedExpr, body_ind: usize| -> String {
+            if used.is_empty() {
+                emit_expr(ctx, then, body_ind)
+            } else {
+                let binds_str = used
+                    .iter()
+                    .map(|(n, v)| format!("{n} {v}"))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let inner = emit_expr(ctx, then, body_ind + 2);
+                format!("(let [{binds_str}]\n{}{inner})", sp(body_ind + 2))
+            }
+        };
+
+    // Two branches -> `if` (Gleam exhaustiveness means clause 2 covers the rest).
+    if branches.len() == 2 {
+        let (t, used1, then1) = &branches[0];
+        let (_, used2, then2) = &branches[1];
+        let b1 = emit_branch_body(used1, then1, ind + 2);
+        let b2 = emit_branch_body(used2, then2, ind + 2);
+        let inline = format!("(if {t} {b1} {b2})");
+        if fits(&inline, ind) {
+            return inline;
+        }
+        return format!("(if {t}\n{i2}{b1}\n{i2}{b2})", i2 = sp(ind + 2));
+    }
+
+    let mut out = String::from("(cond\n");
+    let n = branches.len();
+    for (i, (test, used, then)) in branches.iter().enumerate() {
+        let last = i + 1 == n;
+        let test = if last && test == "true" { ":else".to_string() } else { test.clone() };
+        let body = emit_branch_body(used, then, ind + 2 + test.len() + 1);
+        let _ = write!(out, "{}{test} {}", sp(ind + 2), body);
+        out.push_str(if last { ")" } else { "\n" });
+    }
+    out
+}
+
+fn emit_guard(ctx: &Ctx, guard: &UntypedClauseGuard, env: &HashMap<String, String>) -> String {
+    use gleam_core::ast::ClauseGuard as G;
+    match guard {
+        G::Block { value, .. } => emit_guard(ctx, value, env),
+        G::Not { expression, .. } => format!("(not {})", emit_guard(ctx, expression, env)),
+        G::BinaryOperator { operator, left, right, .. } => format!(
+            "({} {} {})",
+            binop(operator),
+            emit_guard(ctx, left, env),
+            emit_guard(ctx, right, env)
+        ),
+        G::Var { name, .. } => {
+            let n = kebab(name.as_str());
+            env.get(&n).cloned().unwrap_or(n)
+        }
+        G::Constant(c) => emit_constant(c),
+        other => panic!("unsupported guard (v0): {other:?}"),
+    }
+}
+
+fn emit_constant(c: &gleam_core::ast::Constant<()>) -> String {
+    use gleam_core::ast::Constant as C;
+    match c {
+        C::Int { value, .. } => int_lit(value),
+        C::Float { value, .. } => value.to_string(),
+        C::String { value, .. } => format!("\"{value}\""),
+        other => panic!("unsupported constant in guard (v0): {other:?}"),
+    }
+}
+
+fn fits(s: &str, ind: usize) -> bool {
+    !s.contains('\n') && ind + s.len() <= WIDTH
+}
+
+/// Does this expression reference variable `name` (in kebab form)?
+fn expr_uses_var(e: &UntypedExpr, name: &str) -> bool {
+    match e {
+        UntypedExpr::Var { name: n, .. } => kebab(n.as_str()) == name,
+        UntypedExpr::Int { .. }
+        | UntypedExpr::Float { .. }
+        | UntypedExpr::String { .. }
+        | UntypedExpr::Todo { .. }
+        | UntypedExpr::Panic { .. } => false,
+        UntypedExpr::Block { statements, .. } => {
+            statements.iter().any(|s| stmt_uses_var(s, name))
+        }
+        UntypedExpr::Fn { body, .. } => body.iter().any(|s| stmt_uses_var(s, name)),
+        UntypedExpr::List { elements, tail, .. } => {
+            elements.iter().any(|el| expr_uses_var(el, name))
+                || tail.as_ref().is_some_and(|t| expr_uses_var(t, name))
+        }
+        UntypedExpr::Call { fun, arguments, .. } => {
+            expr_uses_var(fun, name)
+                || arguments.iter().any(|a| expr_uses_var(&a.value, name))
+        }
+        UntypedExpr::BinOp { left, right, .. } => {
+            expr_uses_var(left, name) || expr_uses_var(right, name)
+        }
+        UntypedExpr::PipeLine { expressions } => {
+            expressions.iter().any(|x| expr_uses_var(x, name))
+        }
+        UntypedExpr::Case { subjects, clauses, .. } => {
+            subjects.iter().any(|s| expr_uses_var(s, name))
+                || clauses.as_ref().is_some_and(|cs| {
+                    cs.iter().any(|c| expr_uses_var(&c.then, name))
+                })
+        }
+        UntypedExpr::FieldAccess { container, .. } => expr_uses_var(container, name),
+        UntypedExpr::Tuple { elements, .. } => {
+            elements.iter().any(|el| expr_uses_var(el, name))
+        }
+        UntypedExpr::TupleIndex { tuple, .. } => expr_uses_var(tuple, name),
+        UntypedExpr::NegateBool { value, .. } | UntypedExpr::NegateInt { value, .. } => {
+            expr_uses_var(value, name)
+        }
+        // Conservative: unknown node shapes count as "uses it".
+        _ => true,
+    }
+}
+
+fn stmt_uses_var(s: &UntypedStatement, name: &str) -> bool {
+    match s {
+        Statement::Expression(e) => expr_uses_var(e, name),
+        Statement::Assignment(a) => expr_uses_var(&a.value, name),
+        _ => true,
+    }
+}
