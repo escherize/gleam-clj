@@ -226,13 +226,24 @@ fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
     }
     let _ = write!(out, "\n  [{}]\n  ", args.join(" "));
     let stmts: Vec<&UntypedStatement> = f.body.iter().collect();
-    out.push_str(&emit_body(ctx, &stmts, 2));
+    let tail = Tail { name: name.clone() };
+    out.push_str(&emit_body_t(ctx, &stmts, 2, Some(&tail)));
     out.push_str(")\n");
     out
 }
 
-/// Emit a statement sequence as one or more forms separated by newlines at `ind`.
+/// Tail-position context: the enclosing function, for self-tail-call -> recur.
+struct Tail {
+    name: String,
+}
+
 fn emit_body(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize) -> String {
+    emit_body_t(ctx, stmts, ind, None)
+}
+
+/// Emit a statement sequence as one or more forms separated by newlines at `ind`.
+/// `tail` is the enclosing function when the sequence ends in tail position.
+fn emit_body_t(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize, tail: Option<&Tail>) -> String {
     if stmts.is_empty() {
         return "nil".into();
     }
@@ -258,7 +269,7 @@ fn emit_body(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize) -> String {
                 if binds.is_empty() {
                     panic!("unsupported let pattern (destructuring let not implemented in v0)");
                 }
-                let rest = emit_body(ctx, &stmts[i..], ind + 2);
+                let rest = emit_body_t(ctx, &stmts[i..], ind + 2, tail);
                 let bind_ind = ind + 6;
                 let binds_str = binds
                     .iter()
@@ -272,16 +283,16 @@ fn emit_body(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize) -> String {
                 if stmts.len() == 1 {
                     form
                 } else {
-                    format!("{form}\n{}{}", sp(ind), emit_body(ctx, &stmts[1..], ind))
+                    format!("{form}\n{}{}", sp(ind), emit_body_t(ctx, &stmts[1..], ind, tail))
                 }
             }
         },
         Statement::Expression(e) => {
-            let s = emit_expr(ctx, e, ind);
             if stmts.len() == 1 {
-                s
+                emit_expr_t(ctx, e, ind, tail)
             } else {
-                format!("{s}\n{}{}", sp(ind), emit_body(ctx, &stmts[1..], ind))
+                let s = emit_expr(ctx, e, ind);
+                format!("{s}\n{}{}", sp(ind), emit_body_t(ctx, &stmts[1..], ind, tail))
             }
         }
         Statement::Use(_) => panic!("unsupported: use expressions (v0)"),
@@ -440,6 +451,10 @@ fn binop(op: &BinOp) -> &'static str {
 }
 
 fn emit_expr(ctx: &Ctx, e: &UntypedExpr, ind: usize) -> String {
+    emit_expr_t(ctx, e, ind, None)
+}
+
+fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> String {
     match e {
         UntypedExpr::Int { value, .. } => int_lit(value),
         UntypedExpr::Float { value, .. } => value.to_string(),
@@ -520,7 +535,7 @@ fn emit_expr(ctx: &Ctx, e: &UntypedExpr, ind: usize) -> String {
                 format!("(fn [{}]\n{}{b})", args.join(" "), sp(ind + 2))
             }
         }
-        UntypedExpr::Call { fun, arguments, .. } => emit_call(ctx, fun, arguments, ind),
+        UntypedExpr::Call { fun, arguments, .. } => emit_call_t(ctx, fun, arguments, ind, tail),
         UntypedExpr::PipeLine { expressions } => {
             let exprs: Vec<&UntypedExpr> = expressions.iter().collect();
             let first = emit_expr(ctx, exprs[0], ind + 4);
@@ -541,16 +556,16 @@ fn emit_expr(ctx: &Ctx, e: &UntypedExpr, ind: usize) -> String {
             }
         }
         UntypedExpr::Case { subjects, clauses, .. } => {
-            emit_case(ctx, subjects, clauses.as_deref().unwrap_or_default(), ind)
+            emit_case(ctx, subjects, clauses.as_deref().unwrap_or_default(), ind, tail)
         }
         UntypedExpr::Block { statements, .. } => {
             let stmts: Vec<&UntypedStatement> = statements.iter().collect();
-            let body = emit_body(ctx, &stmts, ind);
+            let body = emit_body_t(ctx, &stmts, ind, tail);
             // A block whose body reduces to a single form needs no `do`.
             if stmts.len() == 1 || body.starts_with("(let ") {
                 body
             } else {
-                let b = emit_body(ctx, &stmts, ind + 4);
+                let b = emit_body_t(ctx, &stmts, ind + 4, tail);
                 format!("(do {b})")
             }
         }
@@ -583,6 +598,26 @@ fn emit_expr(ctx: &Ctx, e: &UntypedExpr, ind: usize) -> String {
 }
 
 fn emit_call(ctx: &Ctx, fun: &UntypedExpr, arguments: &[CallArg<UntypedExpr>], ind: usize) -> String {
+    emit_call_t(ctx, fun, arguments, ind, None)
+}
+
+fn emit_call_t(
+    ctx: &Ctx,
+    fun: &UntypedExpr,
+    arguments: &[CallArg<UntypedExpr>],
+    ind: usize,
+    tail: Option<&Tail>,
+) -> String {
+    // Self-call in tail position -> recur (constant stack, matches BEAM TCO).
+    if let (Some(t), UntypedExpr::Var { name, .. }) = (tail, fun) {
+        if !name.starts_with(char::is_uppercase) && kebab(name.as_str()) == t.name {
+            let args: Vec<String> = arguments
+                .iter()
+                .map(|a| emit_expr(ctx, &a.value, ind + 7))
+                .collect();
+            return format!("(recur {})", args.join(" "));
+        }
+    }
     let head = match fun {
         UntypedExpr::Var { name, .. } if name.starts_with(char::is_uppercase) => {
             match ctx.constructors.get(name.as_str()) {
@@ -615,6 +650,7 @@ fn emit_case(
     subjects: &[UntypedExpr],
     clauses: &[Clause<UntypedExpr, ()>],
     ind: usize,
+    tail: Option<&Tail>,
 ) -> String {
     if subjects.len() != 1 {
         panic!("unsupported: multi-subject case (v0)");
@@ -646,14 +682,14 @@ fn emit_case(
     let emit_branch_body =
         |used: &[(String, String)], then: &UntypedExpr, body_ind: usize| -> String {
             if used.is_empty() {
-                emit_expr(ctx, then, body_ind)
+                emit_expr_t(ctx, then, body_ind, tail)
             } else {
                 let binds_str = used
                     .iter()
                     .map(|(n, v)| format!("{n} {v}"))
                     .collect::<Vec<_>>()
                     .join(" ");
-                let inner = emit_expr(ctx, then, body_ind + 2);
+                let inner = emit_expr_t(ctx, then, body_ind + 2, tail);
                 format!("(let [{binds_str}]\n{}{inner})", sp(body_ind + 2))
             }
         };

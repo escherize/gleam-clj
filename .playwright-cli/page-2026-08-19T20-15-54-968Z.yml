@@ -1,0 +1,500 @@
+- generic [active] [ref=e1]:
+  - 'region "Sheet 1: general description" [ref=e2]':
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - img "Empty-Set Semiconductor logo" [ref=e5]
+        - generic [ref=e9]:
+          - generic [ref=e10]:
+            - text: Empty-Set
+            - text: Semiconductor
+          - generic [ref=e11]: LANGUAGE SEARCH DIVISION · EST. EVERY FEW YEARS
+      - generic [ref=e12]:
+        - text: LANG-8 FAMILY
+        - text: ADVANCE INFORMATION
+        - text: REV 2026-08 · SUPERSEDES ALL HOPE
+    - generic [ref=e13]:
+      - heading "LANG-8" [level=1] [ref=e14]
+      - paragraph [ref=e15]: "General-purpose programming language family: eight-parameter selection guide"
+      - note [ref=e16]:
+        - text: No part in this family
+        - text: meets all eight parameters
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - heading "Features REQUIRED, ALL EIGHT" [level=2] [ref=e20]:
+          - text: Features
+          - generic [ref=e21]: REQUIRED, ALL EIGHT
+        - list [ref=e22]:
+          - listitem [ref=e23]:
+            - generic [ref=e24]: P1
+            - generic [ref=e25]: Good type system
+          - listitem [ref=e26]:
+            - generic [ref=e27]: P2
+            - generic [ref=e28]: Good async support
+          - listitem [ref=e29]:
+            - generic [ref=e30]: P3
+            - generic [ref=e31]: Good error messages
+          - listitem [ref=e32]:
+            - generic [ref=e33]: P4
+            - generic [ref=e34]: Fast compiles
+          - listitem [ref=e35]:
+            - generic [ref=e36]: P5
+            - generic [ref=e37]: Good performance
+          - listitem [ref=e38]:
+            - generic [ref=e39]: P6
+            - generic [ref=e40]: Low memory overhead
+          - listitem [ref=e41]:
+            - generic [ref=e42]: P7
+            - generic [ref=e43]: Quick startup
+          - listitem [ref=e44]:
+            - generic [ref=e45]: P8
+            - generic [ref=e46]: Large ecosystem
+        - heading "General description" [level=2] [ref=e47]
+        - paragraph [ref=e48]:
+          - text: The LANG-8 family covers nine widely deployed general-purpose parts. Each is qualified against the eight input parameters at left. As of this revision,
+          - strong [ref=e49]: the eight-way intersection is empty
+          - text: ": every part in the family fails at least one parameter (see Selection Guide, sheet 2)."
+        - paragraph [ref=e50]:
+          - text: "Device selection therefore reduces to a derating exercise: choose which parameter to waive, then read off the surviving parts. Waiver guidance is given on sheet 4. Parameter 8 (ecosystem) exhibits two distinct failure modes,"
+          - emphasis [ref=e51]: reach
+          - text: and
+          - emphasis [ref=e52]: ergonomics
+          - text: ", characterized on sheet 3."
+      - generic [ref=e53]:
+        - heading "Pin configuration FIGURE 1" [level=2] [ref=e54]:
+          - text: Pin configuration
+          - generic [ref=e55]: FIGURE 1
+        - figure "IDEAL-8 PACKAGE. NOT IN PRODUCTION. NO KNOWN DIE DRIVES ALL EIGHT INPUTS HIGH. ¹ RESERVED FOR PARAMETER 9, WHATEVER IT TURNS OUT TO BE." [ref=e56]:
+          - 'img "DIP-16 package diagram: pins 1 through 8 are the eight required parameters; the package is marked not in production" [ref=e57]':
+            - generic [ref=e58]:
+              - generic [ref=e61]: IDEAL-8
+              - generic [ref=e63]:
+                - generic [ref=e64]: TYPES 1
+                - generic [ref=e65]: ASYNC 2
+                - generic [ref=e66]: ERRMSG 3
+                - generic [ref=e67]: COMPILE 4
+                - generic [ref=e68]: PERF 5
+                - generic [ref=e69]: MEMORY 6
+                - generic [ref=e70]: STARTUP 7
+                - generic [ref=e71]: ECOSYS 8
+              - generic [ref=e73]:
+                - generic [ref=e74]: 16 VCC
+                - generic [ref=e75]: 15 NC¹
+                - generic [ref=e76]: 14 NC¹
+                - generic [ref=e77]: 13 NC¹
+                - generic [ref=e78]: 12 NC¹
+                - generic [ref=e79]: 11 NC¹
+                - generic [ref=e80]: 10 SHIP
+                - generic [ref=e81]: 9 GND
+          - generic [ref=e82]:
+            - text: IDEAL-8 PACKAGE. NOT IN PRODUCTION. NO KNOWN DIE DRIVES ALL EIGHT INPUTS HIGH.
+            - text: ¹ RESERVED FOR PARAMETER 9, WHATEVER IT TURNS OUT TO BE.
+    - generic [ref=e83]:
+      - generic [ref=e84]: EMPTY-SET SEMICONDUCTOR
+      - generic [ref=e85]: LANG-8 · REV 2026-08
+      - generic [ref=e86]: SHEET 1 OF 4
+  - 'region "Sheet 2: selection guide" [ref=e87]':
+    - heading "Selection guide TABLE 1 · INTERACTIVE" [level=2] [ref=e88]:
+      - text: Selection guide
+      - generic [ref=e89]: TABLE 1 · INTERACTIVE
+    - generic [ref=e90]:
+      - paragraph [ref=e91]: "Derating control: click a parameter heading to waive it. Parts whose only failures fall on waived parameters are stamped as qualifying. Click again to reinstate."
+      - paragraph [ref=e92]:
+        - text: "PARAMETERS WAIVED: 0"
+        - text: "QUALIFYING PARTS: 0 OF 9"
+    - table [ref=e94]:
+      - rowgroup [ref=e95]:
+        - row "Part Types Async Err msg Compile Perf Memory Startup Ecosys Critical fault" [ref=e96]:
+          - columnheader "Part" [ref=e97]
+          - columnheader "Types" [ref=e98]:
+            - button "Types" [ref=e99] [cursor=pointer]
+          - columnheader "Async" [ref=e100]:
+            - button "Async" [ref=e101] [cursor=pointer]
+          - columnheader "Err msg" [ref=e102]:
+            - button "Err msg" [ref=e103] [cursor=pointer]
+          - columnheader "Compile" [ref=e104]:
+            - button "Compile" [ref=e105] [cursor=pointer]
+          - columnheader "Perf" [ref=e106]:
+            - button "Perf" [ref=e107] [cursor=pointer]
+          - columnheader "Memory" [ref=e108]:
+            - button "Memory" [ref=e109] [cursor=pointer]
+          - columnheader "Startup" [ref=e110]:
+            - button "Startup" [ref=e111] [cursor=pointer]
+          - columnheader "Ecosys" [ref=e112]:
+            - button "Ecosys" [ref=e113] [cursor=pointer]
+          - columnheader "Critical fault" [ref=e114]
+      - rowgroup [ref=e115]:
+        - row "GO-12 Go 1 No sum types; nil; clunky generics" [ref=e116]:
+          - rowheader "GO-12 Go" [ref=e117]:
+            - generic [ref=e118]: GO-12
+            - text: Go
+          - cell "1" [ref=e119]:
+            - img [ref=e120]
+            - superscript [ref=e122]: "1"
+          - cell [ref=e123]:
+            - img [ref=e124]
+          - cell [ref=e126]:
+            - img [ref=e127]
+          - cell [ref=e129]:
+            - img [ref=e130]
+          - cell [ref=e132]:
+            - img [ref=e133]
+          - cell [ref=e135]:
+            - img [ref=e136]
+          - cell [ref=e138]:
+            - img [ref=e139]
+          - cell [ref=e141]:
+            - img [ref=e142]
+          - cell "No sum types; nil; clunky generics" [ref=e144]
+        - row "RS-15 Rust 2 3 Compile time; async ergonomics" [ref=e145]:
+          - rowheader "RS-15 Rust" [ref=e146]:
+            - generic [ref=e147]: RS-15
+            - text: Rust
+          - cell [ref=e148]:
+            - img [ref=e149]
+          - cell "2" [ref=e151]:
+            - img [ref=e152]
+            - superscript [ref=e154]: "2"
+          - cell [ref=e155]:
+            - img [ref=e156]
+          - cell "3" [ref=e158]:
+            - img [ref=e159]
+            - superscript [ref=e161]: "3"
+          - cell [ref=e162]:
+            - img [ref=e163]
+          - cell [ref=e165]:
+            - img [ref=e166]
+          - cell [ref=e168]:
+            - img [ref=e169]
+          - cell [ref=e171]:
+            - img [ref=e172]
+          - cell "Compile time; async ergonomics" [ref=e174]
+        - row "OC-96 OCaml 4 5 Ecosystem" [ref=e175]:
+          - rowheader "OC-96 OCaml" [ref=e176]:
+            - generic [ref=e177]: OC-96
+            - text: OCaml
+          - cell [ref=e178]:
+            - img [ref=e179]
+          - cell "4" [ref=e181]:
+            - img [ref=e182]
+            - superscript [ref=e184]: "4"
+          - cell [ref=e185]:
+            - img [ref=e186]
+          - cell [ref=e188]:
+            - img [ref=e189]
+          - cell [ref=e191]:
+            - img [ref=e192]
+          - cell [ref=e194]:
+            - img [ref=e195]
+          - cell [ref=e197]:
+            - img [ref=e198]
+          - cell "5" [ref=e200]:
+            - img [ref=e201]
+            - superscript [ref=e203]: "5"
+          - cell "Ecosystem" [ref=e204]
+        - row "GL-E24 Gleam→Erlang 6 7 Ecosystem ergonomics (untyped FFI)" [ref=e205]:
+          - rowheader "GL-E24 Gleam→Erlang" [ref=e206]:
+            - generic [ref=e207]: GL-E24
+            - text: Gleam→Erlang
+          - cell [ref=e208]:
+            - img [ref=e209]
+          - cell [ref=e211]:
+            - img [ref=e212]
+          - cell [ref=e214]:
+            - img [ref=e215]
+          - cell [ref=e217]:
+            - img [ref=e218]
+          - cell "6" [ref=e220]:
+            - img [ref=e221]
+            - superscript [ref=e223]: "6"
+          - cell [ref=e224]:
+            - img [ref=e225]
+          - cell [ref=e227]:
+            - img [ref=e228]
+          - cell "7" [ref=e230]:
+            - img [ref=e231]
+            - superscript [ref=e233]: "7"
+          - cell "Ecosystem ergonomics (untyped FFI)" [ref=e234]
+        - row "GL-J24 Gleam→JS 8 9 10 Trades BEAM away; JS heap" [ref=e235]:
+          - rowheader "GL-J24 Gleam→JS" [ref=e236]:
+            - generic [ref=e237]: GL-J24
+            - text: Gleam→JS
+          - cell [ref=e238]:
+            - img [ref=e239]
+          - cell "8" [ref=e241]:
+            - img [ref=e242]
+            - superscript [ref=e244]: "8"
+          - cell [ref=e245]:
+            - img [ref=e246]
+          - cell [ref=e248]:
+            - img [ref=e249]
+          - cell [ref=e251]:
+            - img [ref=e252]
+          - cell "9" [ref=e254]:
+            - img [ref=e255]
+            - superscript [ref=e257]: "9"
+          - cell [ref=e258]:
+            - img [ref=e259]
+          - cell "10" [ref=e261]:
+            - img [ref=e262]
+            - superscript [ref=e264]: "10"
+          - cell "Trades BEAM away; JS heap" [ref=e265]
+        - row "KT-16 Kotlin 11 11 JVM startup + heap floor" [ref=e266]:
+          - rowheader "KT-16 Kotlin" [ref=e267]:
+            - generic [ref=e268]: KT-16
+            - text: Kotlin
+          - cell [ref=e269]:
+            - img [ref=e270]
+          - cell [ref=e272]:
+            - img [ref=e273]
+          - cell [ref=e275]:
+            - img [ref=e276]
+          - cell [ref=e278]:
+            - img [ref=e279]
+          - cell [ref=e281]:
+            - img [ref=e282]
+          - cell "11" [ref=e284]:
+            - img [ref=e285]
+            - superscript [ref=e287]: "11"
+          - cell "11" [ref=e288]:
+            - img [ref=e289]
+            - superscript [ref=e291]: "11"
+          - cell [ref=e292]:
+            - img [ref=e293]
+          - cell "JVM startup + heap floor" [ref=e295]
+        - row "TS-12 TypeScript 12 13 13 Runtime cost; unsound types" [ref=e296]:
+          - rowheader "TS-12 TypeScript" [ref=e297]:
+            - generic [ref=e298]: TS-12
+            - text: TypeScript
+          - cell "12" [ref=e299]:
+            - img [ref=e300]
+            - superscript [ref=e302]: "12"
+          - cell [ref=e303]:
+            - img [ref=e304]
+          - cell [ref=e306]:
+            - img [ref=e307]
+          - cell [ref=e309]:
+            - img [ref=e310]
+          - cell "13" [ref=e312]:
+            - img [ref=e313]
+            - superscript [ref=e315]: "13"
+          - cell "13" [ref=e316]:
+            - img [ref=e317]
+            - superscript [ref=e319]: "13"
+          - cell [ref=e320]:
+            - img [ref=e321]
+          - cell [ref=e323]:
+            - img [ref=e324]
+          - cell "Runtime cost; unsound types" [ref=e326]
+        - row "EX-14 Elixir 14 6 Static types still landing" [ref=e327]:
+          - rowheader "EX-14 Elixir" [ref=e328]:
+            - generic [ref=e329]: EX-14
+            - text: Elixir
+          - cell "14" [ref=e330]:
+            - img [ref=e331]
+            - superscript [ref=e333]: "14"
+          - cell [ref=e334]:
+            - img [ref=e335]
+          - cell [ref=e337]:
+            - img [ref=e338]
+          - cell [ref=e340]:
+            - img [ref=e341]
+          - cell "6" [ref=e343]:
+            - img [ref=e344]
+            - superscript [ref=e346]: "6"
+          - cell [ref=e347]:
+            - img [ref=e348]
+          - cell [ref=e350]:
+            - img [ref=e351]
+          - cell [ref=e353]:
+            - img [ref=e354]
+          - cell "Static types still landing" [ref=e356]
+        - row "CS-02 C# / F# 15 15 Startup + memory (AOT trade)" [ref=e357]:
+          - rowheader "CS-02 C# / F#" [ref=e358]:
+            - generic [ref=e359]: CS-02
+            - text: C# / F#
+          - cell [ref=e360]:
+            - img [ref=e361]
+          - cell [ref=e363]:
+            - img [ref=e364]
+          - cell [ref=e366]:
+            - img [ref=e367]
+          - cell [ref=e369]:
+            - img [ref=e370]
+          - cell [ref=e372]:
+            - img [ref=e373]
+          - cell "15" [ref=e375]:
+            - img [ref=e376]
+            - superscript [ref=e378]: "15"
+          - cell "15" [ref=e379]:
+            - img [ref=e380]
+            - superscript [ref=e382]: "15"
+          - cell [ref=e383]:
+            - img [ref=e384]
+          - cell "Startup + memory (AOT trade)" [ref=e386]
+    - generic "Legend" [ref=e387]:
+      - generic [ref=e388]:
+        - img [ref=e389]
+        - text: meets parameter
+      - generic [ref=e391]:
+        - img [ref=e392]
+        - text: acceptable with reservations (see note)
+      - generic [ref=e394]:
+        - img [ref=e395]
+        - text: fails parameter
+      - generic [ref=e397]: Qualification requires no unwaived failure.
+    - heading "Notes" [level=2] [ref=e398]
+    - list [ref=e399]:
+      - listitem [ref=e400]: No sum types; nil pointers; generics arrived late and clunky.
+      - listitem [ref=e401]: "Async works; ergonomics painful: function coloring, Pin, executor fragmentation."
+      - listitem [ref=e402]: Borrow checking + monomorphization. Incremental builds and cargo check soften it, never fix it.
+      - listitem [ref=e403]: Effects/eio arriving; story is recent.
+      - listitem [ref=e404]: opam is small; thin outside web and systems niches.
+      - listitem [ref=e405]: BEAM trades raw throughput for latency, isolation, and supervision.
+      - listitem [ref=e406]:
+        - text: hex is
+        - emphasis [ref=e407]: reachable
+        - text: ", not"
+        - emphasis [ref=e408]: ergonomic
+        - text: ": every Erlang/Elixir lib arrives untyped; hand-written FFI shims; types leak at the boundary. Strong for web/OTP; thin for ML, GUI, scientific. See sheet 3."
+      - listitem [ref=e409]: "Event loop only, no OTP: the async that justified the BEAM target is gone."
+      - listitem [ref=e410]: JS runtime heap floor.
+      - listitem [ref=e411]: npm reachable (largest that exists) with the same FFI tax; binding coverage years behind DefinitelyTyped. See sheet 3.
+      - listitem [ref=e412]: JVM warm-up and heap floor.
+      - listitem [ref=e413]: Structural and unsound by design; any and friends.
+      - listitem [ref=e414]: Interpreter + JIT pipeline; GC heap.
+      - listitem [ref=e415]: Set-theoretic types in progress; not landed.
+      - listitem [ref=e416]: .NET AOT fixes both and shrinks the usable ecosystem.
+    - paragraph [ref=e417]: Ratings are one engineer’s qualitative assessment, 2026-08. No benchmarks were harmed.
+    - generic [ref=e418]:
+      - generic [ref=e419]: EMPTY-SET SEMICONDUCTOR
+      - generic [ref=e420]: LANG-8 · REV 2026-08
+      - generic [ref=e421]: SHEET 2 OF 4
+  - 'region "Sheet 3: parameter 8 characteristics" [ref=e422]':
+    - 'heading "Parameter 8: Ecosystem characteristics FIGURE 2" [level=2] [ref=e423]':
+      - text: "Parameter 8: Ecosystem characteristics"
+      - generic [ref=e424]: FIGURE 2
+    - paragraph [ref=e425]:
+      - text: “Large ecosystem” is two parameters wearing one name.
+      - strong [ref=e426]: Reach
+      - text: ": can the part call the libraries at all."
+      - strong [ref=e427]: Ergonomics
+      - text: ": do types survive the boundary, and are bindings maintained. A typed language on an untyped host scores high on reach and low on ergonomics: the value proposition leaks at every FFI call."
+    - generic [ref=e428]:
+      - 'figure "FIGURE 2: REACH VS TYPE-BOUNDARY ERGONOMICS, BY PACKAGE UNIVERSE AND CALLER. ONLY ~6 UNIVERSES QUALIFY AS LARGE: JS, JVM, .NET, PYTHON, GO, C/C++. NONE OF THEIR NATIVE PARTS PASS THE OTHER SEVEN PARAMETERS." [ref=e429]':
+        - 'img "Scatter chart: ecosystem reach against type-boundary ergonomics. The top-right region, large and typed, is unpopulated." [ref=e430]':
+          - generic [ref=e431]:
+            - generic [ref=e434]: ECOSYSTEM REACH →
+            - generic [ref=e435]: TYPES SURVIVE THE BOUNDARY →
+            - generic [ref=e436]: SMALL
+            - generic [ref=e437]: HUGE
+            - generic [ref=e439]: REGION
+            - generic [ref=e440]: UNPOPULATED
+            - generic [ref=e441]:
+              - generic [ref=e443]: OPAM (OCAML)
+              - generic [ref=e445]: CRATES.IO (RUST)
+              - generic [ref=e447]: GO MODULES
+              - generic [ref=e449]: NUGET (C#/F#)
+              - generic [ref=e451]: MAVEN (KOTLIN)
+              - generic [ref=e453]: HEX (ELIXIR)
+              - generic [ref=e455]: HEX (GLEAM→ERL)
+              - generic [ref=e457]: NPM (TS + DEFINITELYTYPED)
+              - generic [ref=e459]: NPM (GLEAM→JS)
+        - generic [ref=e460]:
+          - text: "FIGURE 2: REACH VS TYPE-BOUNDARY ERGONOMICS, BY PACKAGE UNIVERSE AND CALLER."
+          - text: "ONLY ~6 UNIVERSES QUALIFY AS LARGE: JS, JVM, .NET, PYTHON, GO, C/C++. NONE OF THEIR NATIVE PARTS PASS THE OTHER SEVEN PARAMETERS."
+      - generic [ref=e461]:
+        - heading "Boundary detail FIGURE 3" [level=2] [ref=e462]:
+          - text: Boundary detail
+          - generic [ref=e463]: FIGURE 3
+        - 'figure "FIGURE 3: EVERY IMPORT CROSSES THIS LINE. INVARIANTS DO NOT." [ref=e464]':
+          - img "Diagram of the FFI boundary between a typed core and an untyped host, with a magnified call-out showing that types are asserted, never checked" [ref=e465]:
+            - generic [ref=e466]:
+              - generic [ref=e468]: TYPED CORE
+              - generic [ref=e469]: (GLEAM)
+              - generic [ref=e471]: UNTYPED HOST
+              - generic [ref=e472]: (ERLANG / JS)
+              - generic [ref=e477]:
+                - generic [ref=e482]: DETAIL A · SCALE 1:1
+                - generic [ref=e483]: "@external(erlang, \"lists\", \"map\")"
+                - generic [ref=e484]: "fn map(l: List(a), f: fn(a) -> b) -> List(b)"
+                - generic [ref=e485]: TYPES ASSERTED HERE, NEVER CHECKED.
+          - generic [ref=e486]: "FIGURE 3: EVERY IMPORT CROSSES THIS LINE. INVARIANTS DO NOT."
+        - heading "Typed-layer precedent" [level=2] [ref=e487]
+        - table [ref=e488]:
+          - rowgroup [ref=e489]:
+            - row "Caller Reach Ergonomics" [ref=e490]:
+              - columnheader "Caller" [ref=e491]
+              - columnheader "Reach" [ref=e492]
+              - columnheader "Ergonomics" [ref=e493]
+          - rowgroup [ref=e494]:
+            - 'row "TS→npm MAX MID: DefinitelyTyped, community-scale typings" [ref=e495]':
+              - cell "TS→npm" [ref=e496]
+              - cell "MAX" [ref=e497]
+              - 'cell "MID: DefinitelyTyped, community-scale typings" [ref=e498]'
+            - 'row "GL→npm MAX LOW: hand shims; years behind" [ref=e499]':
+              - cell "GL→npm" [ref=e500]
+              - cell "MAX" [ref=e501]
+              - 'cell "LOW: hand shims; years behind" [ref=e502]'
+            - 'row "GL→hex MID LOW: hand shims; strong web/OTP only" [ref=e503]':
+              - cell "GL→hex" [ref=e504]
+              - cell "MID" [ref=e505]
+              - 'cell "LOW: hand shims; strong web/OTP only" [ref=e506]'
+            - 'row "KT→maven MAX MID-HIGH: JVM interop designed-in" [ref=e507]':
+              - cell "KT→maven" [ref=e508]
+              - cell "MAX" [ref=e509]
+              - 'cell "MID-HIGH: JVM interop designed-in" [ref=e510]'
+        - paragraph [ref=e511]: TypeScript proves the typed-layer-over-untyped-host model works at scale; it took a community the size of DefinitelyTyped to make the boundary livable.
+    - generic [ref=e512]:
+      - generic [ref=e513]: EMPTY-SET SEMICONDUCTOR
+      - generic [ref=e514]: LANG-8 · REV 2026-08
+      - generic [ref=e515]: SHEET 3 OF 4
+  - 'region "Sheet 4: derating guidance and application note" [ref=e516]':
+    - heading "Derating guidance TABLE 2" [level=2] [ref=e517]:
+      - text: Derating guidance
+      - generic [ref=e518]: TABLE 2
+    - paragraph [ref=e519]:
+      - text: No waiver, no part. The selection question is not
+      - emphasis [ref=e520]: which language
+      - text: but
+      - emphasis [ref=e521]: which parameter you relax
+      - text: "; the family behaves like a structure under tension: slacken one member and load redistributes onto the rest."
+    - table [ref=e523]:
+      - rowgroup [ref=e524]:
+        - row "Waived parameter Substitute part(s) What you get Residual load" [ref=e525]:
+          - columnheader "Waived parameter" [ref=e526]
+          - columnheader "Substitute part(s)" [ref=e527]
+          - columnheader "What you get" [ref=e528]
+          - columnheader "Residual load" [ref=e529]
+      - rowgroup [ref=e530]:
+        - row "Type system GO-12, EX-14 Everything else on the list is home turf nil / runtime type errors move into review and tests" [ref=e531]:
+          - cell "Type system" [ref=e532]
+          - cell "GO-12, EX-14" [ref=e533]
+          - cell "Everything else on the list is home turf" [ref=e534]
+          - cell "nil / runtime type errors move into review and tests" [ref=e535]
+        - row "Compile speed RS-15 Types, perf, memory, startup at full spec Iteration loop pays the borrow checker forever" [ref=e536]:
+          - cell "Compile speed" [ref=e537]
+          - cell "RS-15" [ref=e538]
+          - cell "Types, perf, memory, startup at full spec" [ref=e539]
+          - cell "Iteration loop pays the borrow checker forever" [ref=e540]
+        - row "Ecosystem GL-E24, OC-96 The other seven, near-clean sweep You write the missing libraries, or the FFI shims" [ref=e541]:
+          - cell "Ecosystem" [ref=e542]
+          - cell "GL-E24, OC-96" [ref=e543]
+          - cell "The other seven, near-clean sweep" [ref=e544]
+          - cell "You write the missing libraries, or the FFI shims" [ref=e545]
+        - row "Memory + startup KT-16, CS-02 Mature runtime, huge inherited ecosystem Heap floor and warm-up ride along on every deploy" [ref=e546]:
+          - cell "Memory + startup" [ref=e547]
+          - cell "KT-16, CS-02" [ref=e548]
+          - cell "Mature runtime, huge inherited ecosystem" [ref=e549]
+          - cell "Heap floor and warm-up ride along on every deploy" [ref=e550]
+    - paragraph [ref=e551]: "Verify against Table 1: the waiver control on sheet 2 computes this table live. Waiving Parameter 8 alone qualifies exactly the parts this vendor keeps coming back to."
+    - generic [ref=e552]:
+      - 'heading "AN-001 · Application note: the third host runtime" [level=3] [ref=e555]'
+      - paragraph [ref=e556]:
+        - text: "Every part that scores well on parameters 1–7 solves parameter 8 the same way: it borrows a host. Gleam borrows the BEAM and JS. Elm borrowed JS. OCaml stands alone and pays for it. The pattern suggests the fix is not a new language but a new"
+        - emphasis [ref=e557]: backend
+        - text: ": keep the typed front end, point it at the ecosystem you already live in."
+      - paragraph [ref=e558]: "This vendor’s current experiment: gleam-clj, a Gleam→Clojure compiler: a third host, aimed at the JVM universe. The search continues; the intersection remains empty; the stamp on sheet 1 stands until further notice."
+    - generic [ref=e559]:
+      - generic [ref=e560]: EMPTY-SET SEMICONDUCTOR
+      - generic [ref=e561]: LANG-8 · REV 2026-08 · PRINTED IN A TERMINAL
+      - generic [ref=e562]: SHEET 4 OF 4

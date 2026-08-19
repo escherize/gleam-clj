@@ -53,3 +53,16 @@ scratch project, drop the file in `src/`, `gleam run`).
 
 Variant classes whose simple name collides with java.lang (e.g. `Error`)
 are `ns-unmap`ped at definition and referenced fully qualified.
+
+## Tail calls
+
+Self-calls in tail position emit `recur` (constant stack, matches BEAM TCO);
+non-tail self-calls stay plain calls. Mutual recursion is stack-bounded on
+the JVM — deliberately not trampolined, since that would poison every return
+value at the interop boundary.
+
+## Tests
+
+`cargo test` in `gleam-to-clj/` snapshot-checks emitter output against the
+checked-in `gen/*.clj`. On intentional output changes, regenerate the gen
+files and commit them.
