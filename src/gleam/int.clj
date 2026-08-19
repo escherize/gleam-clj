@@ -14,10 +14,16 @@
 (defn sum [lst] (reduce + 0 lst))
 (defn product [lst] (reduce * 1 lst))
 (defn bitwise-and [a b] (bit-and a b))
+(defn bitwise-exclusive-or [a b] (bit-xor a b))
 (defn bitwise-or [a b] (bit-or a b))
 (defn bitwise-shift-left [n b] (bit-shift-left n b))
 (defn bitwise-shift-right [n b] (bit-shift-right n b))
 (defn random [n] (rand-int n))
+
+(defn divide
+  "Truncated division; Error(Nil) on zero divisor."
+  [a b]
+  (if (zero? b) (p/->Error nil) (p/->Ok (quot a b))))
 
 (defn parse [s]
   (try (p/->Ok (Long/parseLong s))
@@ -38,3 +44,5 @@
   [start stop acc reducer]
   (let [step (if (< start stop) 1 -1)]
     (reduce reducer acc (range start stop step))))
+
+(defn subtract [a b] (-' a b))

@@ -6,6 +6,8 @@
 
 (defn insert [s x] (conj s x))
 
+(defn delete [s x] (disj s x))
+
 (defn contains [s x] (contains? s x))
 
 (defn from-list [lst] (set lst))

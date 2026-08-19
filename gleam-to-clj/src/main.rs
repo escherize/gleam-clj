@@ -133,9 +133,11 @@ impl Ctx {
             ("gleam/list", "last") => format!("{alias}/final"),
             ("gleam/list", "count") => format!("{alias}/count-if"),
             ("gleam/list", "partition") => format!("{alias}/separate"),
+            ("gleam/list", "reverse") => format!("{alias}/reversed"),
             ("gleam/dict", "get") => format!("{alias}/lookup"),
             ("gleam/string", "repeat") => format!("{alias}/repeat-str"),
             ("gleam/result", "map") => format!("{alias}/map-ok"),
+            ("gleam/result", "try") => format!("{alias}/attempt"),
             ("gleam/io", "println") => format!("{alias}/print-line"),
             ("gleam/io", "print") => format!("{alias}/write"),
             ("gleam/io", "println_error") => format!("{alias}/print-line-error"),
@@ -434,7 +436,34 @@ fn emit_body_t(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize, tail: Option<
                 format!("{s}\n{}{}", sp(ind), emit_body_t(ctx, &stmts[1..], ind, tail))
             }
         }
-        Statement::Use(_) => panic!("unsupported: use expressions (v0)"),
+        Statement::Use(_) => {
+            // Collect consecutive `use` lines into one flat with-use form.
+            let mut pairs: Vec<(String, String)> = Vec::new();
+            let mut i = 0;
+            let bind_ind = ind + 13; // col after "(p/with-use ["
+            while i < stmts.len() {
+                let Statement::Use(u) = stmts[i] else { break };
+                let params: Vec<String> = u
+                    .assignments
+                    .iter()
+                    .map(|a| {
+                        destructure_binding(ctx, &a.pattern)
+                            .unwrap_or_else(|| panic!("unsupported use pattern: {:?}", a.pattern))
+                    })
+                    .collect();
+                let params = format!("[{}]", params.join(" "));
+                let call = emit_expr(ctx, &u.call, bind_ind + params.len() + 1);
+                pairs.push((params, call));
+                i += 1;
+            }
+            let body = emit_body_t(ctx, &stmts[i..], ind + 2, None);
+            let pairs_str = pairs
+                .iter()
+                .map(|(p, c)| format!("{p} {c}"))
+                .collect::<Vec<_>>()
+                .join(&format!("\n{}", sp(bind_ind)));
+            format!("(p/with-use [{pairs_str}]\n{}{body})", sp(ind + 2))
+        }
         Statement::Assert(a) => {
             let val = emit_expr(ctx, &a.value, ind + 10);
             let msg = match &a.message {
@@ -938,13 +967,30 @@ fn emit_case(
     // (test, bindings-used-by-body, body-expr)
     let mut branches: Vec<(String, Vec<(String, String)>, &UntypedExpr)> = Vec::new();
     for clause in clauses {
-        if !clause.alternative_patterns.is_empty() {
-            panic!("unsupported: alternative patterns `|` (v0)");
-        }
         let mut tests = Vec::new();
         let mut binds = Vec::new();
         for (pattern, subj) in clause.pattern.iter().zip(&subjs) {
             pattern_cond_inner(ctx, pattern, subj, &mut tests, &mut binds);
+        }
+        // `a | b` alternatives: OR the tests. Only bind-free alternatives are
+        // supported — bindings could come from different positions per branch.
+        if !clause.alternative_patterns.is_empty() {
+            if !binds.is_empty() {
+                panic!("unsupported: alternative patterns that bind variables");
+            }
+            let mut alts = vec![and_join(&tests)];
+            for alt in &clause.alternative_patterns {
+                let mut t = Vec::new();
+                let mut b = Vec::new();
+                for (pattern, subj) in alt.iter().zip(&subjs) {
+                    pattern_cond_inner(ctx, pattern, subj, &mut t, &mut b);
+                }
+                if !b.is_empty() {
+                    panic!("unsupported: alternative patterns that bind variables");
+                }
+                alts.push(and_join(&t));
+            }
+            tests = vec![format!("(or {})", alts.join(" "))];
         }
         let env: HashMap<String, String> = binds.iter().cloned().collect();
         if let Some(guard) = &clause.guard {

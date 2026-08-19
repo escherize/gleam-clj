@@ -8,6 +8,11 @@
   [r default]
   (if (instance? Ok r) (:value r) default))
 
+(defn attempt
+  "Shim for gleam/result.try (rename: try is a Clojure special form)."
+  [r fun]
+  (if (instance? Ok r) (fun (:value r)) r))
+
 (defn map-ok
   "Shim for gleam/result.map (rename: map collides with clojure.core)."
   [r fun]

@@ -11,10 +11,20 @@
 (defn fold [lst initial fun]
   (reduce fun initial lst))
 
+(defn scan
+  "Accumulator state after each element (initial state excluded)."
+  [lst initial fun]
+  (doall (rest (reductions fun initial lst))))
+
 (defn map-over
   "Shim for gleam/list.map (eager)."
   [lst fun]
   (doall (map fun lst)))
+
+(defn map2
+  "Pairwise map over two lists, stopping at the shorter."
+  [a b fun]
+  (doall (map fun a b)))
 
 (defn filter-map
   "Keep the unwrapped values of Ok results."
@@ -34,6 +44,11 @@
     (p/->Ok (reduce fun lst))))
 
 (defn length [lst] (count lst))
+
+(defn reversed
+  "Shim for gleam/list.reverse."
+  [lst]
+  (reverse lst))
 
 (defn append [a b] (doall (concat a b)))
 

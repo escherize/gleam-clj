@@ -160,8 +160,8 @@
   "status": "ref_fail"
  },
  "gosper_s_hack": {
-  "detail": "unsupported: use expressions (v0)",
-  "status": "emit_fail"
+  "detail": "",
+  "status": "pass"
  },
  "greatest_common_divisor": {
   "detail": "",
@@ -200,20 +200,20 @@
   "status": "pass"
  },
  "mcnuggets_problem": {
-  "detail": "unsupported: use expressions (v0)",
-  "status": "emit_fail"
+  "detail": "",
+  "status": "pass"
  },
  "minimum_multiple_of_m_where_digital_sum_equals_m": {
   "detail": "",
   "status": "pass"
  },
  "multiplication_tables": {
-  "detail": "unsupported: use expressions (v0)",
-  "status": "emit_fail"
+  "detail": "",
+  "status": "pass"
  },
  "n_th": {
-  "detail": "unsupported: alternative patterns `|` (v0)",
-  "status": "emit_fail"
+  "detail": "",
+  "status": "pass"
  },
  "numeric_separator_syntax": {
   "detail": "",
@@ -316,7 +316,7 @@
   "status": "pass"
  },
  "water_collected_between_towers": {
-  "detail": "unsupported: use expressions (v0)",
-  "status": "emit_fail"
+  "detail": "",
+  "status": "pass"
  }
 }
