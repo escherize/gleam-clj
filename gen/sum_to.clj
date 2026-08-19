@@ -8,7 +8,7 @@
 (defn- sum-to
   "Sum 1..n with a tail-recursive accumulator."
   [n acc]
-  (if (= n 0) acc (recur (- n 1) (+ acc n))))
+  (if (= n 0) acc (recur (-' n 1) (+' acc n))))
 
 (defn main []
   (p/let-assert 55 (sum-to 10 0))

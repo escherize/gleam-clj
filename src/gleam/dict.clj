@@ -18,3 +18,8 @@
 
 (defn insert [d k v]
   (assoc d k v))
+
+(defn new [] {})
+
+(defn has-key [d k]
+  (contains? d k))

@@ -15,7 +15,7 @@
     (= amount 0) (p/->Ok 0)
     (< amount 0) (p/->Error nil)
     :else (-> (int/fold-range 1
-                              (+ amount 1)
+                              (+' amount 1)
                               (dict/from-list (list [0 0]))
                               (fn [table a] (step coins table a)))
               (dict/lookup amount))))
@@ -23,11 +23,11 @@
 (defn- step [coins table a]
   (p/echo ["step" "a: " a ", table: " table] "coin_change.gleam:20")
   (let [best (-> coins
-                 (list/filter-map (fn [c] (dict/lookup table (- a c))))
+                 (list/filter-map (fn [c] (dict/lookup table (-' a c))))
                  (list/reduce1 min))]
     (if (instance? Ok best)
       (let [b (:value best)]
-        (dict/insert table a (+ b 1)))
+        (dict/insert table a (+' b 1)))
       table)))
 
 (defn main []

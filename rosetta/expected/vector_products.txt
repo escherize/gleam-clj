@@ -1,0 +1,4 @@
+dot_product(a, b) = 49.0
+cross_product(a, b) = (5.0, 5.0, -7.0)
+scalar_triple_product(a, b) = 6.0
+vector_triple_product(a, b) = (-267.0, 204.0, -3.0)

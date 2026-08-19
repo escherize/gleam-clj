@@ -58,11 +58,51 @@ fn kebab(s: &str) -> String {
     s.replace('_', "-")
 }
 
+/// Where a constructor's record class lives.
+enum Origin {
+    Local,
+    Prelude,
+    Module(&'static str),
+}
+
+/// Clojure special forms: a top-level Gleam fn with one of these names gets
+/// a `*` suffix, since e.g. `(new 1)` would hit the special form, not the var.
+const SPECIAL_FORMS: &[&str] = &[
+    "new", "do", "if", "let", "fn", "def", "loop", "recur", "quote", "var", "throw", "try",
+    "catch", "finally",
+];
+
+/// clojure.core names the emitter itself emits bare (list literals, pattern
+/// accessors, int.min/max). A user variable with one of these names would
+/// shadow them, so it gets a `'` suffix everywhere.
+const CORE_SHADOW: &[&str] = &[
+    "list", "min", "max", "nth", "first", "rest", "count", "seq", "str", "quot", "rem", "abs",
+    "nthrest",
+];
+
+fn local_fn_name(kebab_name: &str) -> String {
+    if SPECIAL_FORMS.contains(&kebab_name) {
+        format!("{kebab_name}*")
+    } else {
+        user_var(kebab_name)
+    }
+}
+
+fn user_var(kebab_name: &str) -> String {
+    if CORE_SHADOW.contains(&kebab_name) {
+        format!("{kebab_name}'")
+    } else {
+        kebab_name.to_string()
+    }
+}
+
 struct Ctx {
     /// alias -> full gleam module name, e.g. "dict" -> "gleam/dict"
     aliases: HashMap<String, String>,
-    /// constructor name -> (field names, defined in this module?)
-    constructors: HashMap<String, (Vec<String>, bool)>,
+    /// constructor name -> (field names, origin)
+    constructors: HashMap<String, (Vec<String>, Origin)>,
+    /// kebab-case names of this module's top-level functions
+    local_fns: std::collections::HashSet<String>,
     /// source file name, for echo location prefixes
     file: String,
     /// byte offset of each line start, for byte-offset -> line-number lookup
@@ -82,9 +122,24 @@ impl Ctx {
             ("gleam/int", "min") => "min".into(),
             ("gleam/int", "max") => "max".into(),
             ("gleam/int", "range") => format!("{alias}/fold-range"),
+            ("gleam/int", "compare") => format!("{alias}/cmp"),
+            ("gleam/float", "compare") => format!("{alias}/cmp"),
             ("gleam/list", "reduce") => format!("{alias}/reduce1"),
             ("gleam/list", "map") => format!("{alias}/map-over"),
+            ("gleam/list", "filter") => format!("{alias}/keep-if"),
+            ("gleam/list", "sort") => format!("{alias}/sort-with"),
+            ("gleam/list", "max") => format!("{alias}/largest"),
+            ("gleam/list", "first") => format!("{alias}/head"),
+            ("gleam/list", "last") => format!("{alias}/final"),
+            ("gleam/list", "count") => format!("{alias}/count-if"),
+            ("gleam/list", "partition") => format!("{alias}/separate"),
             ("gleam/dict", "get") => format!("{alias}/lookup"),
+            ("gleam/string", "repeat") => format!("{alias}/repeat-str"),
+            ("gleam/result", "map") => format!("{alias}/map-ok"),
+            ("gleam/io", "println") => format!("{alias}/print-line"),
+            ("gleam/io", "print") => format!("{alias}/write"),
+            ("gleam/io", "println_error") => format!("{alias}/print-line-error"),
+            ("gleam/io", "print_error") => format!("{alias}/write-error"),
             _ => format!("{alias}/{}", kebab(label)),
         }
     }
@@ -100,6 +155,36 @@ fn class_ref(name: &str) -> String {
     }
 }
 
+impl Ctx {
+    /// Constructor function reference, e.g. `->Circle`, `p/->Ok`, `order/->Lt`.
+    fn ctor_ref(&self, name: &str) -> String {
+        match self.constructors.get(name) {
+            Some((_, Origin::Local)) => format!("->{name}"),
+            Some((_, Origin::Prelude)) => format!("p/->{name}"),
+            Some((_, Origin::Module(m))) => {
+                let alias = self
+                    .aliases
+                    .iter()
+                    .find(|(_, v)| v.as_str() == *m)
+                    .map(|(k, _)| k.clone())
+                    .unwrap_or_else(|| panic!("constructor {name} needs an import of {m}"));
+                format!("{alias}/->{name}")
+            }
+            None => panic!("unknown constructor (v0): {name}"),
+        }
+    }
+
+    /// Record class reference for instance? checks.
+    fn ctor_class(&self, name: &str) -> String {
+        match self.constructors.get(name) {
+            Some((_, Origin::Local)) => name.to_string(),
+            Some((_, Origin::Prelude)) => class_ref(name),
+            Some((_, Origin::Module(m))) => format!("{}.{name}", m.replace("/", ".")),
+            None => panic!("unknown constructor in pattern (v0): {name}"),
+        }
+    }
+}
+
 fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -> String {
     let mut line_starts = vec![0u32];
     for (i, b) in src.bytes().enumerate() {
@@ -108,30 +193,46 @@ fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -
         }
     }
     let mut constructors = HashMap::new();
-    constructors.insert("Ok".to_string(), (vec!["value".to_string()], false));
-    constructors.insert("Error".to_string(), (vec!["value".to_string()], false));
+    let val = || vec!["value".to_string()];
+    constructors.insert("Ok".to_string(), (val(), Origin::Prelude));
+    constructors.insert("Error".to_string(), (val(), Origin::Prelude));
+    for c in ["Lt", "Eq", "Gt"] {
+        constructors.insert(c.to_string(), (vec![], Origin::Module("gleam/order")));
+    }
+    constructors.insert("Some".to_string(), (val(), Origin::Module("gleam/option")));
+    constructors.insert("None".to_string(), (vec![], Origin::Module("gleam/option")));
+    let mut local_fns = std::collections::HashSet::new();
     for def in &module.definitions {
-        if let Definition::CustomType(t) = &def.definition {
-            for c in &t.constructors {
-                let n = c.arguments.len();
-                let fields: Vec<String> = c
-                    .arguments
-                    .iter()
-                    .enumerate()
-                    .map(|(i, a)| match &a.label {
-                        Some((_, l)) => kebab(l.as_str()),
-                        None if n == 1 => "value".to_string(),
-                        None => format!("f{i}"),
-                    })
-                    .collect();
-                constructors.insert(c.name.to_string(), (fields, true));
+        match &def.definition {
+            Definition::CustomType(t) => {
+                for c in &t.constructors {
+                    let n = c.arguments.len();
+                    let fields: Vec<String> = c
+                        .arguments
+                        .iter()
+                        .enumerate()
+                        .map(|(i, a)| match &a.label {
+                            Some((_, l)) => kebab(l.as_str()),
+                            None if n == 1 => "value".to_string(),
+                            None => format!("f{i}"),
+                        })
+                        .collect();
+                    constructors.insert(c.name.to_string(), (fields, Origin::Local));
+                }
             }
+            Definition::Function(f) => {
+                if let Some((_, n)) = &f.name {
+                    local_fns.insert(kebab(n.as_str()));
+                }
+            }
+            _ => {}
         }
     }
 
     let mut ctx = Ctx {
         aliases: HashMap::new(),
         constructors,
+        local_fns,
         file: file_name.to_string(),
         line_starts,
     };
@@ -178,7 +279,7 @@ fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -
         .iter()
         .filter_map(|def| match &def.definition {
             Definition::Function(f) => {
-                f.name.as_ref().map(|(_, n)| kebab(n.as_str()))
+                f.name.as_ref().map(|(_, n)| local_fn_name(&kebab(n.as_str())))
             }
             _ => None,
         })
@@ -206,14 +307,14 @@ fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -
 }
 
 fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
-    let name = kebab(f.name.as_ref().expect("function name").1.as_str());
+    let name = local_fn_name(&kebab(f.name.as_ref().expect("function name").1.as_str()));
     let defn = if f.publicity == Publicity::Public { "defn" } else { "defn-" };
     let args: Vec<String> = f
         .arguments
         .iter()
         .map(|a| match &a.names {
             ArgNames::Named { name, .. } | ArgNames::NamedLabelled { name, .. } => {
-                kebab(name.as_str())
+                user_var(&kebab(name.as_str()))
             }
             ArgNames::Discard { .. } | ArgNames::LabelledDiscard { .. } => "_".into(),
         })
@@ -256,24 +357,25 @@ fn emit_body_t(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize, tail: Option<
     match stmts[0] {
         Statement::Assignment(a) => match &a.kind {
             AssignmentKind::Let | AssignmentKind::Generated => {
-                // Gather a run of consecutive plain `let name = ...` into one binding vector.
+                // Gather a run of consecutive `let <irrefutable pattern> = ...`
+                // into one binding vector, using Clojure destructuring.
                 let mut binds: Vec<(String, String)> = Vec::new();
                 let mut i = 0;
                 while i < stmts.len() {
                     let Statement::Assignment(a2) = stmts[i] else { break };
-                    let ok_kind =
-                        matches!(a2.kind, AssignmentKind::Let | AssignmentKind::Generated);
-                    let Pattern::Variable { name, .. } = &a2.pattern else { break };
-                    if !ok_kind {
+                    if !matches!(a2.kind, AssignmentKind::Let | AssignmentKind::Generated) {
                         break;
                     }
-                    let n = kebab(name.as_str());
-                    let val_ind = ind + 6 + n.len() + 1; // col of value in "(let [n "
-                    binds.push((n, emit_expr(ctx, &a2.value, val_ind)));
+                    let Some(form) = destructure_binding(ctx, &a2.pattern) else { break };
+                    let val_ind = ind + 6 + form.len() + 1; // col of value in "(let [form "
+                    binds.push((form, emit_expr(ctx, &a2.value, val_ind)));
                     i += 1;
                 }
                 if binds.is_empty() {
-                    panic!("unsupported let pattern (destructuring let not implemented in v0)");
+                    panic!(
+                        "unsupported let pattern (refutable pattern in plain let?): {:?}",
+                        stmts[0]
+                    );
                 }
                 let rest = emit_body_t(ctx, &stmts[i..], ind + 2, tail);
                 let bind_ind = ind + 6;
@@ -285,11 +387,42 @@ fn emit_body_t(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize, tail: Option<
                 format!("(let [{binds_str}]\n{}{rest})", sp(ind + 2))
             }
             AssignmentKind::Assert { message, .. } => {
-                let form = emit_assert(ctx, &a.value, &a.pattern, message.as_ref(), ind);
-                if stmts.len() == 1 {
-                    form
+                let (_, binds) = pattern_cond(ctx, &a.pattern, "v");
+                if binds.is_empty() {
+                    let form = emit_assert(ctx, &a.value, &a.pattern, message.as_ref(), ind);
+                    if stmts.len() == 1 {
+                        form
+                    } else {
+                        format!(
+                            "{form}\n{}{}",
+                            sp(ind),
+                            emit_body_t(ctx, &stmts[1..], ind, tail)
+                        )
+                    }
                 } else {
-                    format!("{form}\n{}{}", sp(ind), emit_body_t(ctx, &stmts[1..], ind, tail))
+                    // Binding pattern: check, then destructure for the rest.
+                    let (tests, binds) = pattern_cond(ctx, &a.pattern, "v");
+                    let val = emit_expr(ctx, &a.value, ind + 8);
+                    let msg = match message {
+                        Some(m) => emit_expr(ctx, m, 0),
+                        None => "\"let assert failed\"".into(),
+                    };
+                    let test = and_join(&tests);
+                    let binds_str = binds
+                        .iter()
+                        .map(|(n, v)| format!("{n} {v}"))
+                        .collect::<Vec<_>>()
+                        .join(&format!("\n{}", sp(ind + 8)));
+                    let rest = if stmts.len() == 1 {
+                        "v".to_string()
+                    } else {
+                        emit_body_t(ctx, &stmts[1..], ind + 4, tail)
+                    };
+                    format!(
+                        "(let [v {val}]\n{i2}(when-not {test}\n{i4}(throw (ex-info {msg} {{:value v}})))\n{i2}(let [{binds_str}]\n{i4}{rest}))",
+                        i2 = sp(ind + 2),
+                        i4 = sp(ind + 4),
+                    )
                 }
             }
         },
@@ -302,7 +435,58 @@ fn emit_body_t(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize, tail: Option<
             }
         }
         Statement::Use(_) => panic!("unsupported: use expressions (v0)"),
-        Statement::Assert(_) => panic!("unsupported: bool assert (v0)"),
+        Statement::Assert(a) => {
+            let val = emit_expr(ctx, &a.value, ind + 10);
+            let msg = match &a.message {
+                Some(m) => emit_expr(ctx, m, 0),
+                None => "\"assert failed\"".into(),
+            };
+            let form = format!(
+                "(when-not {val}\n{}(throw (ex-info {msg} {{:gleam/assert true}})))",
+                sp(ind + 2)
+            );
+            if stmts.len() == 1 {
+                form
+            } else {
+                format!("{form}\n{}{}", sp(ind), emit_body_t(ctx, &stmts[1..], ind, tail))
+            }
+        }
+    }
+}
+
+/// Clojure binding form for an irrefutable pattern (plain `let`), or None
+/// when the pattern could fail to match.
+fn destructure_binding(ctx: &Ctx, pattern: &UntypedPattern) -> Option<String> {
+    match pattern {
+        Pattern::Variable { name, .. } => Some(user_var(&kebab(name.as_str()))),
+        Pattern::Discard { .. } => Some("_".into()),
+        Pattern::Tuple { elements, .. } => {
+            let parts: Option<Vec<String>> =
+                elements.iter().map(|el| destructure_binding(ctx, el)).collect();
+            Some(format!("[{}]", parts?.join(" ")))
+        }
+        // Single-variant custom type (Gleam checked exhaustiveness): map destructure.
+        Pattern::Constructor { name, arguments, .. } => {
+            let (fields, _) = ctx.constructors.get(name.as_str())?;
+            if arguments.is_empty() {
+                return Some("_".into());
+            }
+            let mut parts = Vec::new();
+            let mut pos = 0;
+            for arg in arguments {
+                let field = match &arg.label {
+                    Some(l) => kebab(l.as_str()),
+                    None => {
+                        let f = fields.get(pos)?.clone();
+                        pos += 1;
+                        f
+                    }
+                };
+                parts.push(format!("{} :{field}", destructure_binding(ctx, &arg.value)?));
+            }
+            Some(format!("{{{}}}", parts.join(" ")))
+        }
+        _ => None,
     }
 }
 
@@ -353,7 +537,7 @@ fn emit_assert(
 fn pattern_literal(ctx: &Ctx, pattern: &UntypedPattern) -> Option<String> {
     match pattern {
         Pattern::Int { value, .. } => Some(int_lit(value)),
-        Pattern::Float { value, .. } => Some(value.to_string()),
+        Pattern::Float { value, .. } => Some(int_lit(value)),
         Pattern::String { value, .. } => Some(format!("\"{}\"", value.replace("\"", "\\\""))),
         Pattern::Constructor { name, arguments, spread, .. } => match name.as_str() {
             "Nil" => Some("nil".into()),
@@ -363,14 +547,14 @@ fn pattern_literal(ctx: &Ctx, pattern: &UntypedPattern) -> Option<String> {
                 if spread.is_some() {
                     return None;
                 }
-                let (fields, local) = ctx.constructors.get(n)?;
+                let (fields, _) = ctx.constructors.get(n)?;
                 // Positional-only and fully saturated, so field order is right.
                 if arguments.iter().any(|a| a.label.is_some())
                     || arguments.len() != fields.len()
                 {
                     return None;
                 }
-                let ctor = if *local { format!("->{n}") } else { format!("p/->{n}") };
+                let ctor = ctx.ctor_ref(n);
                 let mut parts = Vec::new();
                 for arg in arguments {
                     parts.push(pattern_literal(ctx, &arg.value)?);
@@ -430,9 +614,11 @@ fn pattern_cond_inner(
 ) {
     match pattern {
         Pattern::Int { value, .. } => tests.push(format!("(= {subj} {})", int_lit(value))),
-        Pattern::Float { value, .. } => tests.push(format!("(= {subj} {value})")),
+        Pattern::Float { value, .. } => tests.push(format!("(= {subj} {})", int_lit(value))),
         Pattern::String { value, .. } => tests.push(format!("(= {subj} \"{value}\")")),
-        Pattern::Variable { name, .. } => binds.push((kebab(name.as_str()), subj.to_string())),
+        Pattern::Variable { name, .. } => {
+            binds.push((user_var(&kebab(name.as_str())), subj.to_string()))
+        }
         Pattern::Discard { .. } => {}
         Pattern::Tuple { elements, .. } => {
             for (i, el) in elements.iter().enumerate() {
@@ -444,11 +630,10 @@ fn pattern_cond_inner(
             "True" => tests.push(subj.to_string()),
             "False" => tests.push(format!("(not {subj})")),
             n => {
-                let Some((fields, local)) = ctx.constructors.get(n) else {
+                let Some((fields, _)) = ctx.constructors.get(n) else {
                     panic!("unknown constructor in pattern (v0): {n}");
                 };
-                let cls = if *local { n.to_string() } else { class_ref(n) };
-                tests.push(format!("(instance? {cls} {subj})"));
+                tests.push(format!("(instance? {} {subj})", ctx.ctor_class(n)));
                 let mut pos = 0;
                 for arg in arguments {
                     let field = match &arg.label {
@@ -517,9 +702,12 @@ fn binop(op: &BinOp) -> &'static str {
         BinOp::LtEqInt | BinOp::LtEqFloat => "<=",
         BinOp::GtInt | BinOp::GtFloat => ">",
         BinOp::GtEqInt | BinOp::GtEqFloat => ">=",
-        BinOp::AddInt | BinOp::AddFloat => "+",
-        BinOp::SubInt | BinOp::SubFloat => "-",
-        BinOp::MultInt | BinOp::MultFloat => "*",
+        BinOp::AddInt => "+'",
+        BinOp::AddFloat => "+",
+        BinOp::SubInt => "-'",
+        BinOp::SubFloat => "-",
+        BinOp::MultInt => "*'",
+        BinOp::MultFloat => "*",
         BinOp::DivInt => "quot",
         BinOp::DivFloat => "/",
         BinOp::RemainderInt => "rem",
@@ -534,7 +722,7 @@ fn emit_expr(ctx: &Ctx, e: &UntypedExpr, ind: usize) -> String {
 fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> String {
     match e {
         UntypedExpr::Int { value, .. } => int_lit(value),
-        UntypedExpr::Float { value, .. } => value.to_string(),
+        UntypedExpr::Float { value, .. } => int_lit(value),
         UntypedExpr::String { value, .. } => format!("\"{}\"", value.replace("\"", "\\\"")),
         UntypedExpr::Var { name, .. } => match name.as_str() {
             "Nil" => "nil".into(),
@@ -542,12 +730,14 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
             "False" => "false".into(),
             n if n.starts_with(char::is_uppercase) => match ctx.constructors.get(n) {
                 // A zero-field variant used as a value IS the constructed value.
-                Some((fields, _)) if fields.is_empty() => format!("(->{n})"),
-                Some((_, true)) => format!("->{n}"),
-                Some((_, false)) => format!("p/->{n}"),
+                Some((fields, _)) if fields.is_empty() => format!("({})", ctx.ctor_ref(n)),
+                Some(_) => ctx.ctor_ref(n),
                 None => panic!("unknown constructor (v0): {n}"),
             },
-            n => kebab(n),
+            n => {
+                let k = kebab(n);
+                if ctx.local_fns.contains(&k) { local_fn_name(&k) } else { user_var(&k) }
+            }
         },
         UntypedExpr::FieldAccess { container, label, .. } => {
             if let UntypedExpr::Var { name, .. } = container.as_ref() {
@@ -687,7 +877,8 @@ fn emit_call_t(
 ) -> String {
     // Self-call in tail position -> recur (constant stack, matches BEAM TCO).
     if let (Some(t), UntypedExpr::Var { name, .. }) = (tail, fun) {
-        if !name.starts_with(char::is_uppercase) && kebab(name.as_str()) == t.name {
+        if !name.starts_with(char::is_uppercase) && local_fn_name(&kebab(name.as_str())) == t.name
+        {
             let args: Vec<String> = arguments
                 .iter()
                 .map(|a| emit_expr(ctx, &a.value, ind + 7))
@@ -697,11 +888,7 @@ fn emit_call_t(
     }
     let head = match fun {
         UntypedExpr::Var { name, .. } if name.starts_with(char::is_uppercase) => {
-            match ctx.constructors.get(name.as_str()) {
-                Some((_, true)) => format!("->{name}"),
-                Some((_, false)) => format!("p/->{name}"),
-                None => panic!("unknown constructor (v0): {name}"),
-            }
+            ctx.ctor_ref(name.as_str())
         }
         _ => emit_expr(ctx, fun, ind),
     };
@@ -729,13 +916,24 @@ fn emit_case(
     ind: usize,
     tail: Option<&Tail>,
 ) -> String {
-    if subjects.len() != 1 {
-        panic!("unsupported: multi-subject case (v0)");
+    // Complex subjects get bound to temporaries; the whole case wraps in a let.
+    let mut subj_lets: Vec<(String, String)> = Vec::new();
+    let mut subjs: Vec<String> = Vec::new();
+    for (i, s) in subjects.iter().enumerate() {
+        let e = emit_expr(ctx, s, ind + 2);
+        if e.contains(' ') || e.contains('\n') {
+            let name = if subjects.len() == 1 {
+                "subject".to_string()
+            } else {
+                format!("s{i}")
+            };
+            subj_lets.push((name.clone(), e));
+            subjs.push(name);
+        } else {
+            subjs.push(e);
+        }
     }
-    let subj = emit_expr(ctx, &subjects[0], ind);
-    if subj.contains(' ') {
-        panic!("unsupported: complex case subject (v0) — bind it with let first");
-    }
+    let ind = if subj_lets.is_empty() { ind } else { ind + 2 };
 
     // (test, bindings-used-by-body, body-expr)
     let mut branches: Vec<(String, Vec<(String, String)>, &UntypedExpr)> = Vec::new();
@@ -743,8 +941,11 @@ fn emit_case(
         if !clause.alternative_patterns.is_empty() {
             panic!("unsupported: alternative patterns `|` (v0)");
         }
-        let pattern = &clause.pattern[0];
-        let (mut tests, binds) = pattern_cond(ctx, pattern, &subj);
+        let mut tests = Vec::new();
+        let mut binds = Vec::new();
+        for (pattern, subj) in clause.pattern.iter().zip(&subjs) {
+            pattern_cond_inner(ctx, pattern, subj, &mut tests, &mut binds);
+        }
         let env: HashMap<String, String> = binds.iter().cloned().collect();
         if let Some(guard) = &clause.guard {
             tests.push(emit_guard(ctx, guard, &env));
@@ -772,28 +973,40 @@ fn emit_case(
         };
 
     // Two branches -> `if` (Gleam exhaustiveness means clause 2 covers the rest).
-    if branches.len() == 2 {
+    let core = if branches.len() == 2 {
         let (t, used1, then1) = &branches[0];
         let (_, used2, then2) = &branches[1];
         let b1 = emit_branch_body(used1, then1, ind + 2);
         let b2 = emit_branch_body(used2, then2, ind + 2);
         let inline = format!("(if {t} {b1} {b2})");
         if fits(&inline, ind) {
-            return inline;
+            inline
+        } else {
+            format!("(if {t}\n{i2}{b1}\n{i2}{b2})", i2 = sp(ind + 2))
         }
-        return format!("(if {t}\n{i2}{b1}\n{i2}{b2})", i2 = sp(ind + 2));
-    }
+    } else {
+        let mut out = String::from("(cond\n");
+        let n = branches.len();
+        for (i, (test, used, then)) in branches.iter().enumerate() {
+            let last = i + 1 == n;
+            let test = if last && test == "true" { ":else".to_string() } else { test.clone() };
+            let body = emit_branch_body(used, then, ind + 2 + test.len() + 1);
+            let _ = write!(out, "{}{test} {}", sp(ind + 2), body);
+            out.push_str(if last { ")" } else { "\n" });
+        }
+        out
+    };
 
-    let mut out = String::from("(cond\n");
-    let n = branches.len();
-    for (i, (test, used, then)) in branches.iter().enumerate() {
-        let last = i + 1 == n;
-        let test = if last && test == "true" { ":else".to_string() } else { test.clone() };
-        let body = emit_branch_body(used, then, ind + 2 + test.len() + 1);
-        let _ = write!(out, "{}{test} {}", sp(ind + 2), body);
-        out.push_str(if last { ")" } else { "\n" });
+    if subj_lets.is_empty() {
+        core
+    } else {
+        let binds_str = subj_lets
+            .iter()
+            .map(|(n, v)| format!("{n} {v}"))
+            .collect::<Vec<_>>()
+            .join(&format!("\n{}", sp(ind + 4)));
+        format!("(let [{binds_str}]\n{}{core})", sp(ind))
     }
-    out
 }
 
 fn emit_guard(ctx: &Ctx, guard: &UntypedClauseGuard, env: &HashMap<String, String>) -> String {
@@ -808,7 +1021,7 @@ fn emit_guard(ctx: &Ctx, guard: &UntypedClauseGuard, env: &HashMap<String, Strin
             emit_guard(ctx, right, env)
         ),
         G::Var { name, .. } => {
-            let n = kebab(name.as_str());
+            let n = user_var(&kebab(name.as_str()));
             env.get(&n).cloned().unwrap_or(n)
         }
         G::Constant(c) => emit_constant(c),
@@ -820,7 +1033,7 @@ fn emit_constant(c: &gleam_core::ast::Constant<()>) -> String {
     use gleam_core::ast::Constant as C;
     match c {
         C::Int { value, .. } => int_lit(value),
-        C::Float { value, .. } => value.to_string(),
+        C::Float { value, .. } => int_lit(value),
         C::String { value, .. } => format!("\"{value}\""),
         other => panic!("unsupported constant in guard (v0): {other:?}"),
     }
@@ -833,7 +1046,7 @@ fn fits(s: &str, ind: usize) -> bool {
 /// Does this expression reference variable `name` (in kebab form)?
 fn expr_uses_var(e: &UntypedExpr, name: &str) -> bool {
     match e {
-        UntypedExpr::Var { name: n, .. } => kebab(n.as_str()) == name,
+        UntypedExpr::Var { name: n, .. } => user_var(&kebab(n.as_str())) == name,
         UntypedExpr::Int { .. }
         | UntypedExpr::Float { .. }
         | UntypedExpr::String { .. }

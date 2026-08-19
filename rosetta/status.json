@@ -1,0 +1,322 @@
+{
+ "abstract_type": {
+  "detail": "",
+  "status": "pass"
+ },
+ "ackermann_function": {
+  "detail": "",
+  "status": "pass"
+ },
+ "apply_a_callback_to_an_array": {
+  "detail": "",
+  "status": "pass"
+ },
+ "arithmetic_integer": {
+  "detail": "error: Unknown module; error: Unknown module; error: Unknown module; error: Unknown module; error: Unknown module; error",
+  "status": "ref_fail"
+ },
+ "array_concatenation": {
+  "detail": "",
+  "status": "pass"
+ },
+ "array_length": {
+  "detail": "",
+  "status": "pass"
+ },
+ "assertions": {
+  "detail": "",
+  "status": "pass"
+ },
+ "associative_array_creation": {
+  "detail": "",
+  "status": "pass"
+ },
+ "bernoulli_s_triangle": {
+  "detail": "",
+  "status": "pass"
+ },
+ "binary_digits": {
+  "detail": "error: Unknown module; error: Unknown module",
+  "status": "ref_fail"
+ },
+ "catamorphism": {
+  "detail": "",
+  "status": "pass"
+ },
+ "comments": {
+  "detail": "error: Module does not have a main function",
+  "status": "ref_fail"
+ },
+ "compare_a_list_of_strings": {
+  "detail": "error: Unknown module; error: Unknown module; error: Unknown module; error: Unknown module; error: Unknown module; error",
+  "status": "ref_fail"
+ },
+ "compound_data_type": {
+  "detail": "",
+  "status": "pass"
+ },
+ "conditional_structures": {
+  "detail": "",
+  "status": "pass"
+ },
+ "copy_a_string": {
+  "detail": "error: Syntax error",
+  "status": "ref_fail"
+ },
+ "count_in_octal": {
+  "detail": "timeout",
+  "status": "ref_fail"
+ },
+ "date_format": {
+  "detail": "error: Unknown module; error: Unknown module; error: Unknown module; error: Unknown module; error: Unknown module",
+  "status": "ref_fail"
+ },
+ "delete_a_file": {
+  "detail": "error: Unknown module; error: Unknown module; error: Unknown module; error: Unknown module; error: Unknown module",
+  "status": "ref_fail"
+ },
+ "detect_division_by_zero": {
+  "detail": "",
+  "status": "pass"
+ },
+ "determine_if_a_string_is_numeric": {
+  "detail": "",
+  "status": "pass"
+ },
+ "dice_game_probabilities": {
+  "detail": "nondet: exit-0 only",
+  "status": "pass"
+ },
+ "digital_root": {
+  "detail": "",
+  "status": "pass"
+ },
+ "dot_product": {
+  "detail": "",
+  "status": "pass"
+ },
+ "empty_directory": {
+  "detail": "error: Unknown module; error: Unknown module",
+  "status": "ref_fail"
+ },
+ "empty_string": {
+  "detail": "",
+  "status": "pass"
+ },
+ "ethiopian_multiplication": {
+  "detail": "",
+  "status": "pass"
+ },
+ "even_or_odd": {
+  "detail": "",
+  "status": "pass"
+ },
+ "factorial": {
+  "detail": "error: Syntax error",
+  "status": "ref_fail"
+ },
+ "fibonacci_sequence": {
+  "detail": "error: Module does not have a main function",
+  "status": "ref_fail"
+ },
+ "filter": {
+  "detail": "",
+  "status": "pass"
+ },
+ "find_words_which_contain_all_the_vowels": {
+  "detail": "error: Unknown module; error: Unknown module; error: Unknown module; 20 \u2502         <> file.describe_error(e),",
+  "status": "ref_fail"
+ },
+ "find_words_which_contains_more_than_3_e_vowels": {
+  "detail": "error: Unknown module; error: Unknown module; error: Unknown module; 19 \u2502         <> file.describe_error(e),",
+  "status": "ref_fail"
+ },
+ "find_words_whose_first_and_last_three_letters_are_equal": {
+  "detail": "error: Unknown module; error: Unknown module; error: Unknown module; 23 \u2502         <> file.describe_error(e),",
+  "status": "ref_fail"
+ },
+ "find_words_with_alternating_vowels_and_consonants": {
+  "detail": "error: Unknown module; error: Unknown module",
+  "status": "ref_fail"
+ },
+ "first_class_functions": {
+  "detail": "error: Unknown module; error: Unknown module; error: Unknown module; error: Unknown module; error: Unknown module; error",
+  "status": "ref_fail"
+ },
+ "fizzbuzz": {
+  "detail": "",
+  "status": "pass"
+ },
+ "function_composition": {
+  "detail": "",
+  "status": "pass"
+ },
+ "function_definition": {
+  "detail": "error: Module does not have a main function",
+  "status": "ref_fail"
+ },
+ "generic_swap": {
+  "detail": "error: Syntax error",
+  "status": "ref_fail"
+ },
+ "gosper_s_hack": {
+  "detail": "unsupported: use expressions (v0)",
+  "status": "emit_fail"
+ },
+ "greatest_common_divisor": {
+  "detail": "",
+  "status": "pass"
+ },
+ "greatest_element_of_a_list": {
+  "detail": "",
+  "status": "pass"
+ },
+ "hello_world_text": {
+  "detail": "",
+  "status": "pass"
+ },
+ "increment_a_numerical_string": {
+  "detail": "",
+  "status": "pass"
+ },
+ "integer_sequence": {
+  "detail": "timeout",
+  "status": "ref_fail"
+ },
+ "jewels_and_stones": {
+  "detail": "",
+  "status": "pass"
+ },
+ "kernighans_large_earthquake_problem": {
+  "detail": "error: Unknown module; error: Unknown module; error: Unknown module; 18 \u2502         \"There was a problem reading data.txt:",
+  "status": "ref_fail"
+ },
+ "look_and_say_sequence": {
+  "detail": "",
+  "status": "pass"
+ },
+ "luhn_test_of_credit_card_numbers": {
+  "detail": "",
+  "status": "pass"
+ },
+ "mcnuggets_problem": {
+  "detail": "unsupported: use expressions (v0)",
+  "status": "emit_fail"
+ },
+ "minimum_multiple_of_m_where_digital_sum_equals_m": {
+  "detail": "",
+  "status": "pass"
+ },
+ "multiplication_tables": {
+  "detail": "unsupported: use expressions (v0)",
+  "status": "emit_fail"
+ },
+ "n_th": {
+  "detail": "unsupported: alternative patterns `|` (v0)",
+  "status": "emit_fail"
+ },
+ "numeric_separator_syntax": {
+  "detail": "",
+  "status": "pass"
+ },
+ "order_by_pair_comparisons": {
+  "detail": "error: Unknown module; error: Unknown module",
+  "status": "ref_fail"
+ },
+ "primality_by_wilson_s_theorem": {
+  "detail": "",
+  "status": "pass"
+ },
+ "quaternion": {
+  "detail": "",
+  "status": "pass"
+ },
+ "repeat": {
+  "detail": "",
+  "status": "pass"
+ },
+ "repeat_a_string": {
+  "detail": "",
+  "status": "pass"
+ },
+ "rpg_attributes_generator": {
+  "detail": "nondet: exit-0 only",
+  "status": "pass"
+ },
+ "set": {
+  "detail": "",
+  "status": "pass"
+ },
+ "solve_equations_with_substitution_method": {
+  "detail": "",
+  "status": "pass"
+ },
+ "sort_an_integer_array": {
+  "detail": "",
+  "status": "pass"
+ },
+ "sorting_algorithms_quicksort": {
+  "detail": "",
+  "status": "pass"
+ },
+ "stack": {
+  "detail": "error: Module does not have a main function",
+  "status": "ref_fail"
+ },
+ "string_append": {
+  "detail": "error: Syntax error",
+  "status": "ref_fail"
+ },
+ "string_length": {
+  "detail": "error: Unknown module",
+  "status": "ref_fail"
+ },
+ "string_prepend": {
+  "detail": "error: Syntax error",
+  "status": "ref_fail"
+ },
+ "sum_and_product_of_an_array": {
+  "detail": "",
+  "status": "pass"
+ },
+ "sum_data_type": {
+  "detail": "",
+  "status": "pass"
+ },
+ "sum_digits_of_an_integer": {
+  "detail": "",
+  "status": "pass"
+ },
+ "sum_multiples_of_3_and_5": {
+  "detail": "error: Unknown module; error: Unknown module",
+  "status": "ref_fail"
+ },
+ "sum_of_squares": {
+  "detail": "",
+  "status": "pass"
+ },
+ "symmetric_difference": {
+  "detail": "",
+  "status": "pass"
+ },
+ "temperature_conversion": {
+  "detail": "",
+  "status": "pass"
+ },
+ "tree_traversal": {
+  "detail": "",
+  "status": "pass"
+ },
+ "variables": {
+  "detail": "",
+  "status": "pass"
+ },
+ "vector_products": {
+  "detail": "",
+  "status": "pass"
+ },
+ "water_collected_between_towers": {
+  "detail": "unsupported: use expressions (v0)",
+  "status": "emit_fail"
+ }
+}

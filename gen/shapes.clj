@@ -24,8 +24,8 @@
 (defn- sum [xs]
   (if (empty? xs)
     0.0
-    (let [x (first xs) rest (rest xs)]
-      (+ x (sum rest)))))
+    (let [x (first xs) rest' (rest xs)]
+      (+ x (sum rest')))))
 
 (defn total-area [shapes]
   (-> shapes (list/map-over area) sum))

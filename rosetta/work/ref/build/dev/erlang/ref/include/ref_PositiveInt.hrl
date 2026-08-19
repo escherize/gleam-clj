@@ -1,0 +1,1 @@
+-record(positive_int, {inner :: integer()}).
