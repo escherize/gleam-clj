@@ -10,14 +10,9 @@
   [n acc]
   (if (= n 0) acc (recur (- n 1) (+ acc n))))
 
-(defn main
-  []
-  (let [v (sum-to 10 0)]
-    (when-not (= v 55)
-      (throw (ex-info "let assert failed" {:value v}))))
-  (let [v (sum-to 1000000 0)]
-    (when-not (= v 500000500000)
-      (throw (ex-info "let assert failed" {:value v})))))
+(defn main []
+  (p/let-assert 55 (sum-to 10 0))
+  (p/let-assert 500000500000 (sum-to 1000000 0)))
 
 (defn -main [& _]
   (main))

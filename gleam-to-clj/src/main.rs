@@ -220,11 +220,17 @@ fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
         .collect();
 
     let mut out = format!("({defn} {name}");
-    if let Some((_, doc)) = &f.documentation {
-        let text: Vec<String> = doc.lines().map(|l| l.trim().replace('"', "\\\"")).collect();
-        let _ = write!(out, "\n  \"{}\"", text.join("\n  ").trim_end());
+    match &f.documentation {
+        Some((_, doc)) => {
+            let text: Vec<String> =
+                doc.lines().map(|l| l.trim().replace('"', "\\\"")).collect();
+            let _ = write!(out, "\n  \"{}\"", text.join("\n  ").trim_end());
+            let _ = write!(out, "\n  [{}]\n  ", args.join(" "));
+        }
+        None => {
+            let _ = write!(out, " [{}]\n  ", args.join(" "));
+        }
     }
-    let _ = write!(out, "\n  [{}]\n  ", args.join(" "));
     let stmts: Vec<&UntypedStatement> = f.body.iter().collect();
     let tail = Tail { name: name.clone() };
     out.push_str(&emit_body_t(ctx, &stmts, 2, Some(&tail)));
@@ -307,6 +313,24 @@ fn emit_assert(
     message: Option<&UntypedExpr>,
     ind: usize,
 ) -> String {
+    // Fully-literal pattern -> compare against the constructed value, one line.
+    if let Some(expected) = pattern_literal(ctx, pattern) {
+        let head = "(p/let-assert ";
+        let val = emit_expr(ctx, value, ind + head.len());
+        let msg = match message {
+            Some(m) => format!(" {}", emit_expr(ctx, m, 0)),
+            None => String::new(),
+        };
+        let inline = format!("{head}{expected} {val}{msg})");
+        if fits(&inline, ind) {
+            return inline;
+        }
+        return format!(
+            "{head}{expected}\n{}{val}{msg})",
+            sp(ind + head.len())
+        );
+    }
+
     let (tests, binds) = pattern_cond(ctx, pattern, "v");
     if !binds.is_empty() {
         panic!("unsupported: let assert patterns that bind variables (v0)");
@@ -322,6 +346,59 @@ fn emit_assert(
         i2 = sp(ind + 2),
         i4 = sp(ind + 4),
     )
+}
+
+/// If the pattern is a pure literal (no bindings, no wildcards), the Clojure
+/// expression that constructs its value.
+fn pattern_literal(ctx: &Ctx, pattern: &UntypedPattern) -> Option<String> {
+    match pattern {
+        Pattern::Int { value, .. } => Some(int_lit(value)),
+        Pattern::Float { value, .. } => Some(value.to_string()),
+        Pattern::String { value, .. } => Some(format!("\"{}\"", value.replace("\"", "\\\""))),
+        Pattern::Constructor { name, arguments, spread, .. } => match name.as_str() {
+            "Nil" => Some("nil".into()),
+            "True" => Some("true".into()),
+            "False" => Some("false".into()),
+            n => {
+                if spread.is_some() {
+                    return None;
+                }
+                let (fields, local) = ctx.constructors.get(n)?;
+                // Positional-only and fully saturated, so field order is right.
+                if arguments.iter().any(|a| a.label.is_some())
+                    || arguments.len() != fields.len()
+                {
+                    return None;
+                }
+                let ctor = if *local { format!("->{n}") } else { format!("p/->{n}") };
+                let mut parts = Vec::new();
+                for arg in arguments {
+                    parts.push(pattern_literal(ctx, &arg.value)?);
+                }
+                if parts.is_empty() {
+                    Some(format!("({ctor})"))
+                } else {
+                    Some(format!("({ctor} {})", parts.join(" ")))
+                }
+            }
+        },
+        Pattern::Tuple { elements, .. } => {
+            let parts: Option<Vec<String>> =
+                elements.iter().map(|el| pattern_literal(ctx, el)).collect();
+            Some(format!("[{}]", parts?.join(" ")))
+        }
+        Pattern::List { elements, tail: None, .. } => {
+            let parts: Option<Vec<String>> =
+                elements.iter().map(|el| pattern_literal(ctx, el)).collect();
+            let parts = parts?;
+            if parts.is_empty() {
+                Some("(list)".into())
+            } else {
+                Some(format!("(list {})", parts.join(" ")))
+            }
+        }
+        _ => None,
+    }
 }
 
 fn and_join(tests: &[String]) -> String {

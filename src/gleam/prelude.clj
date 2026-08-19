@@ -11,6 +11,16 @@
 
 (defn ok? [r] (instance? Ok r))
 
+(defn let-assert
+  "Runtime check for Gleam's `let assert` with a literal pattern:
+  throw unless actual equals expected; return actual."
+  ([expected actual]
+   (let-assert expected actual "let assert failed"))
+  ([expected actual message]
+   (when-not (= expected actual)
+     (throw (ex-info message {:expected expected :actual actual})))
+   actual))
+
 (defn echo
   "Gleam's `echo`: print the value to stderr and return it.
   2-arity gets a location/message prefix from the emitter."

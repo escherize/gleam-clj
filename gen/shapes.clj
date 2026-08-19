@@ -21,34 +21,22 @@
                              (* w h))
     (instance? Point shape) 0.0))
 
-(defn- sum
-  [xs]
+(defn- sum [xs]
   (if (empty? xs)
     0.0
     (let [x (first xs) rest (rest xs)]
       (+ x (sum rest)))))
 
-(defn total-area
-  [shapes]
+(defn total-area [shapes]
   (-> shapes (list/map-over area) sum))
 
-(defn main
-  []
-  (let [v (area (->Circle 2.0))]
-    (when-not (= v 12.0)
-      (throw (ex-info "let assert failed" {:value v}))))
-  (let [v (area (->Rect 2.0 3.0))]
-    (when-not (= v 6.0)
-      (throw (ex-info "let assert failed" {:value v}))))
-  (let [v (area (->Point))]
-    (when-not (= v 0.0)
-      (throw (ex-info "let assert failed" {:value v}))))
-  (let [v (total-area (list (->Circle 2.0) (->Rect 2.0 3.0) (->Point)))]
-    (when-not (= v 18.0)
-      (throw (ex-info "let assert failed" {:value v}))))
-  (let [v (total-area (list))]
-    (when-not (= v 0.0)
-      (throw (ex-info "let assert failed" {:value v})))))
+(defn main []
+  (p/let-assert 12.0 (area (->Circle 2.0)))
+  (p/let-assert 6.0 (area (->Rect 2.0 3.0)))
+  (p/let-assert 0.0 (area (->Point)))
+  (p/let-assert 18.0
+                (total-area (list (->Circle 2.0) (->Rect 2.0 3.0) (->Point))))
+  (p/let-assert 0.0 (total-area (list))))
 
 (defn -main [& _]
   (main))

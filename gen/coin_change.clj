@@ -20,8 +20,7 @@
                               (fn [table a] (step coins table a)))
               (dict/lookup amount))))
 
-(defn- step
-  [coins table a]
+(defn- step [coins table a]
   (p/echo ["step" "a: " a ", table: " table] "coin_change.gleam:20")
   (let [best (-> coins
                  (list/filter-map (fn [c] (dict/lookup table (- a c))))
@@ -31,29 +30,14 @@
         (dict/insert table a (+ b 1)))
       table)))
 
-(defn main
-  []
-  (let [v (min-coins (list 1 5 10) 0)]
-    (when-not (and (instance? Ok v) (= (:value v) 0))
-      (throw (ex-info "let assert failed" {:value v}))))
-  (let [v (min-coins (list 1 5 10) 10)]
-    (when-not (and (instance? Ok v) (= (:value v) 1))
-      (throw (ex-info "let assert failed" {:value v}))))
-  (let [v (min-coins (list 1 5 10) 15)]
-    (when-not (and (instance? Ok v) (= (:value v) 2))
-      (throw (ex-info "let assert failed" {:value v}))))
-  (let [v (min-coins (list 1 5 10) 13)]
-    (when-not (and (instance? Ok v) (= (:value v) 4))
-      (throw (ex-info "let assert failed" {:value v}))))
-  (let [v (min-coins (list 1 3 4) 6)]
-    (when-not (and (instance? Ok v) (= (:value v) 2))
-      (throw (ex-info "let assert failed" {:value v}))))
-  (let [v (min-coins (list 5 10) 3)]
-    (when-not (and (instance? gleam.prelude.Error v) (nil? (:value v)))
-      (throw (ex-info "let assert failed" {:value v}))))
-  (let [v (min-coins (list) 7)]
-    (when-not (and (instance? gleam.prelude.Error v) (nil? (:value v)))
-      (throw (ex-info "let assert failed" {:value v})))))
+(defn main []
+  (p/let-assert (p/->Ok 0) (min-coins (list 1 5 10) 0))
+  (p/let-assert (p/->Ok 1) (min-coins (list 1 5 10) 10))
+  (p/let-assert (p/->Ok 2) (min-coins (list 1 5 10) 15))
+  (p/let-assert (p/->Ok 4) (min-coins (list 1 5 10) 13))
+  (p/let-assert (p/->Ok 2) (min-coins (list 1 3 4) 6))
+  (p/let-assert (p/->Error nil) (min-coins (list 5 10) 3))
+  (p/let-assert (p/->Error nil) (min-coins (list) 7)))
 
 (defn -main [& _]
   (main))
