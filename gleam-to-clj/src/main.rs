@@ -53,7 +53,15 @@ fn main() {
     let file_name = path.file_name().expect("file name").to_string();
     let mut global = stdlib_registry();
     register_module(&mut global, &stem, &parsed.module);
-    let out = emit_module(&parsed.module, &stem, &file_name, &src, &global, false);
+    let out = emit_module(
+        &parsed.module,
+        &stem,
+        &file_name,
+        &src,
+        &global,
+        false,
+        &HashMap::new(),
+    );
     match args.get(2) {
         Some(out_path) => std::fs::write(out_path, out).expect("write output"),
         None => print!("{out}"),
@@ -219,10 +227,44 @@ fn build_project(proj: &str, out_dir: &str) {
         parsed_modules.push((module_path, file, src, parsed, is_dep));
     }
 
+    // Optional user externals map: lines of `module fn clojure.ns/var`.
+    let mut externals: HashMap<(String, String), String> = HashMap::new();
+    let map_path = std::path::Path::new(proj).join("clojure-externals.txt");
+    if map_path.exists() {
+        for line in std::fs::read_to_string(&map_path).expect("read externals map").lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            let [module, fun, target] = parts[..] else {
+                panic!("bad clojure-externals.txt line (want `module fn ns/var`): {line}");
+            };
+            let known = global
+                .get(module)
+                .is_some_and(|m| m.fn_labels.contains_key(fun));
+            if !known {
+                panic!(
+                    "clojure-externals.txt maps {module}.{fun}, but no such fn \
+                     exists in this build"
+                );
+            }
+            externals.insert((module.to_string(), fun.to_string()), target.to_string());
+        }
+    }
+
     parsed_modules.sort_by(|a, b| a.0.cmp(&b.0));
     for (module_path, file, src, parsed, is_dep) in &parsed_modules {
         let file_name = file.file_name().expect("file name").to_string_lossy().to_string();
-        let code = emit_module(&parsed.module, module_path, &file_name, src, &global, *is_dep);
+        let code = emit_module(
+            &parsed.module,
+            module_path,
+            &file_name,
+            src,
+            &global,
+            *is_dep,
+            &externals,
+        );
         let out_path = std::path::Path::new(out_dir).join(format!("{module_path}.clj"));
         std::fs::create_dir_all(out_path.parent().expect("parent")).expect("mkdir");
         std::fs::write(&out_path, code).expect("write output");
@@ -244,6 +286,8 @@ enum Origin {
     Local,
     Prelude,
     Module(String),
+    /// Imported with `as`: (module, original constructor name)
+    ModuleAs(String, String),
 }
 
 /// Clojure special forms: a top-level Gleam fn with one of these names gets
@@ -297,6 +341,8 @@ struct Ctx<'a> {
     module_path: String,
     /// dependency modules use Gleam bodies as external fallbacks
     is_dep: bool,
+    /// user-supplied externals map: (module, gleam fn) -> clojure var
+    externals: &'a HashMap<(String, String), String>,
     /// every known module's public shape
     global: &'a HashMap<String, ModuleInfo>,
     /// source file name, for echo location prefixes
@@ -344,7 +390,15 @@ impl Ctx<'_> {
             ("gleam/io", "print") => format!("{alias}/write"),
             ("gleam/io", "println_error") => format!("{alias}/print-line-error"),
             ("gleam/io", "print_error") => format!("{alias}/write-error"),
-            _ => format!("{alias}/{}", kebab(label)),
+            _ => {
+                // Compiled (non-shim) modules apply the same defn rename rules
+                // the target module itself used.
+                if !module.starts_with("gleam") && self.global.contains_key(&module) {
+                    format!("{alias}/{}", local_fn_name(&kebab(label)))
+                } else {
+                    format!("{alias}/{}", kebab(label))
+                }
+            }
         }
     }
 }
@@ -381,16 +435,23 @@ impl Ctx<'_> {
             Some((_, Origin::Local)) => format!("->{name}"),
             Some((_, Origin::Prelude)) => format!("p/->{name}"),
             Some((_, Origin::Module(m))) => {
-                let alias = self
-                    .aliases
-                    .iter()
-                    .find(|(_, v)| v.as_str() == m.as_str())
-                    .map(|(k, _)| k.clone())
-                    .unwrap_or_else(|| panic!("constructor {name} needs an import of {m}"));
+                let alias = self.alias_of(m, name);
                 format!("{alias}/->{name}")
+            }
+            Some((_, Origin::ModuleAs(m, orig))) => {
+                let alias = self.alias_of(m, name);
+                format!("{alias}/->{orig}")
             }
             None => panic!("unknown constructor (v0): {name}"),
         }
+    }
+
+    fn alias_of(&self, module: &str, ctor: &str) -> String {
+        self.aliases
+            .iter()
+            .find(|(_, v)| v.as_str() == module)
+            .map(|(k, _)| k.clone())
+            .unwrap_or_else(|| panic!("constructor {ctor} needs an import of {module}"))
     }
 
     /// Record class reference for instance? checks.
@@ -399,6 +460,9 @@ impl Ctx<'_> {
             Some((_, Origin::Local)) => name.to_string(),
             Some((_, Origin::Prelude)) => class_ref(name),
             Some((_, Origin::Module(m))) => format!("{}.{name}", m.replace("/", ".")),
+            Some((_, Origin::ModuleAs(m, orig))) => {
+                format!("{}.{orig}", m.replace("/", "."))
+            }
             None => panic!("unknown constructor in pattern (v0): {name}"),
         }
     }
@@ -411,6 +475,7 @@ fn emit_module(
     src: &str,
     global: &HashMap<String, ModuleInfo>,
     is_dep: bool,
+    externals: &HashMap<(String, String), String>,
 ) -> String {
     let mut line_starts = vec![0u32];
     for (i, b) in src.bytes().enumerate() {
@@ -447,6 +512,7 @@ fn emit_module(
         unqualified_fns: HashMap::new(),
         module_path: module_path.to_string(),
         is_dep,
+        externals,
         global,
         file: file_name.to_string(),
         line_starts,
@@ -460,11 +526,21 @@ fn emit_module(
         .iter()
         .filter_map(|def| match &def.definition {
             Definition::Function(f) => {
+                let name = f.name.as_ref().map(|(_, n)| n.to_string())?;
+                if let Some(target) =
+                    externals.get(&(module_path.to_string(), name))
+                {
+                    // Mapped external: require the target var's namespace.
+                    return target.split('/').next().map(String::from);
+                }
+                if is_dep {
+                    return None;
+                }
                 f.external_javascript.as_ref().map(|(m, _, _)| m.to_string())
             }
             _ => None,
         })
-        .filter(|m| m.contains('.'))
+        .filter(|m| !m.contains('/'))
         .collect();
     external_nses.sort();
     external_nses.dedup();
@@ -478,23 +554,24 @@ fn emit_module(
             ctx.aliases.insert(alias.clone(), import.module.to_string());
             let is_prelude_import = import.module.as_str() == "gleam";
             for uv in &import.unqualified_values {
-                if uv.as_name.is_some() {
-                    panic!("unsupported: `as` rename in unqualified import of {}", uv.name);
-                }
-                let name = uv.name.as_str();
                 if is_prelude_import {
                     // Prelude values (Ok/Error/Nil/...) are already known.
                     continue;
                 }
+                let name = uv.name.as_str();
+                let local = uv.as_name.as_ref().map(|n| n.as_str()).unwrap_or(name);
                 if name.starts_with(char::is_uppercase) {
                     let fields = ctx.imported_ctor_fields(&alias, name).clone();
-                    ctx.constructors.insert(
-                        name.to_string(),
-                        (fields, Origin::Module(import.module.to_string())),
-                    );
+                    let origin = match &uv.as_name {
+                        Some(_) => {
+                            Origin::ModuleAs(import.module.to_string(), name.to_string())
+                        }
+                        None => Origin::Module(import.module.to_string()),
+                    };
+                    ctx.constructors.insert(local.to_string(), (fields, origin));
                 } else {
                     ctx.unqualified_fns
-                        .insert(kebab(name), (alias.clone(), name.to_string()));
+                        .insert(kebab(local), (alias.clone(), name.to_string()));
                 }
             }
             if !is_prelude_import {
@@ -623,6 +700,12 @@ fn emit_module(
 
 fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
     let name = local_fn_name(&kebab(f.name.as_ref().expect("function name").1.as_str()));
+    if let Some(target) = ctx.externals.get(&(
+        ctx.module_path.clone(),
+        f.name.as_ref().expect("function name").1.to_string(),
+    )) {
+        return format!("(def {name} {target})\n");
+    }
     if let Some((module, fun, _)) = &f.external_javascript {
         if ctx.is_dep {
             // Dependency externals target real JS; use the Gleam fallback
@@ -630,7 +713,8 @@ fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
             if f.body.is_empty() {
                 panic!(
                     "dependency module {} fn {name} requires a native external \
-                     ({module}/{fun}) and has no Gleam fallback body",
+                     ({module}/{fun}) and has no Gleam fallback body — supply a \
+                     Clojure implementation via clojure-externals.txt",
                     ctx.module_path
                 );
             }
@@ -660,8 +744,10 @@ fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
     let mut out = format!("({defn} {name}");
     match &f.documentation {
         Some((_, doc)) => {
-            let text: Vec<String> =
-                doc.lines().map(|l| l.trim().replace('"', "\\\"")).collect();
+            let text: Vec<String> = doc
+                .lines()
+                .map(|l| l.trim().replace('\\', "\\\\").replace('"', "\\\""))
+                .collect();
             let _ = write!(out, "\n  \"{}\"", text.join("\n  ").trim_end());
             let _ = write!(out, "\n  [{}]\n  ", args.join(" "));
         }
@@ -1609,40 +1695,37 @@ fn emit_case(
     // (test, bindings-used-by-body, body-expr)
     let mut branches: Vec<(String, Vec<(String, String)>, &UntypedExpr)> = Vec::new();
     for clause in clauses {
-        let mut tests = Vec::new();
-        let mut binds = Vec::new();
-        for (pattern, subj) in clause.pattern.iter().zip(&subjs) {
-            pattern_cond_inner(ctx, pattern, subj, &mut tests, &mut binds);
-        }
-        // `a | b` alternatives: OR the tests. Only bind-free alternatives are
-        // supported — bindings could come from different positions per branch.
-        if !clause.alternative_patterns.is_empty() {
-            if !binds.is_empty() {
-                panic!("unsupported: alternative patterns that bind variables");
+        // `a | b` alternatives expand to one branch each (bindings may come
+        // from different positions per alternative); bind-free alternatives
+        // collapse back into a single or-joined test.
+        let mut pattern_sets: Vec<&Vec<UntypedPattern>> = vec![&clause.pattern];
+        pattern_sets.extend(clause.alternative_patterns.iter());
+
+        let mut expanded: Vec<(Vec<String>, Vec<(String, String)>)> = Vec::new();
+        for patterns in &pattern_sets {
+            let mut tests = Vec::new();
+            let mut binds = Vec::new();
+            for (pattern, subj) in patterns.iter().zip(&subjs) {
+                pattern_cond_inner(ctx, pattern, subj, &mut tests, &mut binds);
             }
-            let mut alts = vec![and_join(&tests)];
-            for alt in &clause.alternative_patterns {
-                let mut t = Vec::new();
-                let mut b = Vec::new();
-                for (pattern, subj) in alt.iter().zip(&subjs) {
-                    pattern_cond_inner(ctx, pattern, subj, &mut t, &mut b);
-                }
-                if !b.is_empty() {
-                    panic!("unsupported: alternative patterns that bind variables");
-                }
-                alts.push(and_join(&t));
+            expanded.push((tests, binds));
+        }
+        if expanded.len() > 1 && expanded.iter().all(|(_, b)| b.is_empty()) {
+            let alts: Vec<String> = expanded.iter().map(|(t, _)| and_join(t)).collect();
+            expanded = vec![(vec![format!("(or {})", alts.join(" "))], vec![])];
+        }
+
+        for (mut tests, binds) in expanded {
+            let env: HashMap<String, String> = binds.iter().cloned().collect();
+            if let Some(guard) = &clause.guard {
+                tests.push(emit_guard(ctx, guard, &env));
             }
-            tests = vec![format!("(or {})", alts.join(" "))];
+            let used: Vec<(String, String)> = binds
+                .into_iter()
+                .filter(|(n, _)| expr_uses_var(&clause.then, n))
+                .collect();
+            branches.push((and_join(&tests), used, &clause.then));
         }
-        let env: HashMap<String, String> = binds.iter().cloned().collect();
-        if let Some(guard) = &clause.guard {
-            tests.push(emit_guard(ctx, guard, &env));
-        }
-        let used: Vec<(String, String)> = binds
-            .into_iter()
-            .filter(|(n, _)| expr_uses_var(&clause.then, n))
-            .collect();
-        branches.push((and_join(&tests), used, &clause.then));
     }
 
     let emit_branch_body =

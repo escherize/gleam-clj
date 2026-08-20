@@ -1,10 +1,34 @@
 (ns gleam.string
   "Shims for gleam/string. Renames for clojure.core collisions:
   repeat -> repeat-str. Graphemes are approximated by chars (v0)."
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [gleam.prelude :as p]))
 
 (defn length [s]
   (count s))
+
+(defn byte-size [^String s]
+  (alength (.getBytes s "UTF-8")))
+
+(defn pop-grapheme
+  "First grapheme (approximated by code point) and the rest, as a Result."
+  [^String s]
+  (if (.isEmpty s)
+    (p/->Error nil)
+    (let [n (Character/charCount (.codePointAt s 0))]
+      (p/->Ok [(subs s 0 n) (subs s n)]))))
+
+(defn utf-codepoint
+  "Validate an int as a codepoint (no surrogates), as a Result."
+  [v]
+  (if (and (<= 0 v 0x10FFFF) (not (<= 0xD800 v 0xDFFF)))
+    (p/->Ok v)
+    (p/->Error nil)))
+
+(defn from-utf-codepoints [cps]
+  (let [sb (StringBuilder.)]
+    (doseq [cp cps] (.appendCodePoint sb (int cp)))
+    (str sb)))
 
 (defn append [a b]
   (str a b))
