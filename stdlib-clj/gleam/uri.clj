@@ -512,3 +512,15 @@
                             (:fragment relative))]
         (p/->Ok resolved)))
     (p/->Error nil)))
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'merge [:=> [:cat [:fn (partial instance? gleam.uri.Uri)] [:fn (partial instance? gleam.uri.Uri)]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'origin [:=> [:cat [:fn (partial instance? gleam.uri.Uri)]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'parse [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'parse-query [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'path-segments [:=> [:cat :string] [:sequential :string]]
+   'percent-decode [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'percent-encode [:=> [:cat :string] :string]
+   'query-to-string [:=> [:cat [:sequential [:tuple :string :string]]] :string]
+   'to-string [:=> [:cat [:fn (partial instance? gleam.uri.Uri)]] :string]})

@@ -352,3 +352,26 @@
         (fn [nil' member]
           (fun member)
           nil')))
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'contains [:=> [:cat [:fn (partial instance? gleam.set.Set)] :any] :boolean]
+   'delete [:=> [:cat [:fn (partial instance? gleam.set.Set)] :any] [:fn (partial instance? gleam.set.Set)]]
+   'difference [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] [:fn (partial instance? gleam.set.Set)]]
+   'drop [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:sequential :any]] [:fn (partial instance? gleam.set.Set)]]
+   'each [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:=> [:cat :any] :any]] :nil]
+   'filter [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:=> [:cat :any] :boolean]] [:fn (partial instance? gleam.set.Set)]]
+   'fold [:=> [:cat [:fn (partial instance? gleam.set.Set)] :any [:=> [:cat :any :any] :any]] :any]
+   'from-list [:=> [:cat [:sequential :any]] [:fn (partial instance? gleam.set.Set)]]
+   'insert [:=> [:cat [:fn (partial instance? gleam.set.Set)] :any] [:fn (partial instance? gleam.set.Set)]]
+   'intersection [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] [:fn (partial instance? gleam.set.Set)]]
+   'is-disjoint [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] :boolean]
+   'is-empty [:=> [:cat [:fn (partial instance? gleam.set.Set)]] :boolean]
+   'is-subset [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] :boolean]
+   'map [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:=> [:cat :any] :any]] [:fn (partial instance? gleam.set.Set)]]
+   'new* [:=> [:cat] [:fn (partial instance? gleam.set.Set)]]
+   'size [:=> [:cat [:fn (partial instance? gleam.set.Set)]] :int]
+   'symmetric-difference [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] [:fn (partial instance? gleam.set.Set)]]
+   'take [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:sequential :any]] [:fn (partial instance? gleam.set.Set)]]
+   'to-list [:=> [:cat [:fn (partial instance? gleam.set.Set)]] [:sequential :any]]
+   'union [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] [:fn (partial instance? gleam.set.Set)]]})

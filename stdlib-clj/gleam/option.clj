@@ -286,3 +286,19 @@
   ```"
   [options]
   (values-loop options (list)))
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'all [:=> [:cat [:sequential [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]
+   'flatten [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]
+   'from-result [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]
+   'is-none [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]] :boolean]
+   'is-some [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]] :boolean]
+   'lazy-or [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] [:=> [:cat] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]
+   'lazy-unwrap [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] [:=> [:cat] :any]] :any]
+   'map [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] [:=> [:cat :any] :any]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]
+   'or [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]
+   'then [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] [:=> [:cat :any] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]
+   'to-result [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] :any] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'unwrap [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] :any] :any]
+   'values [:=> [:cat [:sequential [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]] [:sequential :any]]})

@@ -434,3 +434,33 @@
     (if subject (p/->Error nil) (p/->Ok (do-log x)))))
 
 (def exponential gleam-ffi/f-exp)
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'absolute-value [:=> [:cat :double] :double]
+   'add [:=> [:cat :double :double] :double]
+   'ceiling [:=> [:cat :double] :double]
+   'clamp [:=> [:cat :double :double :double] :double]
+   'compare [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
+   'divide [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'exponential [:=> [:cat :double] :double]
+   'floor [:=> [:cat :double] :double]
+   'logarithm [:=> [:cat :double] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'loosely-compare [:=> [:cat :double :double :double] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
+   'loosely-equals [:=> [:cat :double :double :double] :boolean]
+   'max' [:=> [:cat :double :double] :double]
+   'min' [:=> [:cat :double :double] :double]
+   'modulo [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'multiply [:=> [:cat :double :double] :double]
+   'negate [:=> [:cat :double] :double]
+   'parse [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'power [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'product [:=> [:cat [:sequential :double]] :double]
+   'random [:=> [:cat] :double]
+   'round [:=> [:cat :double] :int]
+   'square-root [:=> [:cat :double] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'subtract [:=> [:cat :double :double] :double]
+   'sum [:=> [:cat [:sequential :double]] :double]
+   'to-precision [:=> [:cat :double :int] :double]
+   'to-string [:=> [:cat :double] :string]
+   'truncate [:=> [:cat :double] :int]})

@@ -24,3 +24,7 @@
 
 (defn -main [& _]
   (main))
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'main [:=> [:cat] :nil]})

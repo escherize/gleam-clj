@@ -94,3 +94,24 @@
 (def compare gleam-ffi/ba-compare)
 
 (def starts-with gleam-ffi/ba-starts-with)
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'append [:=> [:cat [:vector :int] [:vector :int]] [:vector :int]]
+   'base16-decode [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'base16-encode [:=> [:cat [:vector :int]] :string]
+   'base64-decode [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'base64-encode [:=> [:cat [:vector :int] :boolean] :string]
+   'base64-url-decode [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'base64-url-encode [:=> [:cat [:vector :int] :boolean] :string]
+   'bit-size [:=> [:cat [:vector :int]] :int]
+   'byte-size [:=> [:cat [:vector :int]] :int]
+   'compare [:=> [:cat [:vector :int] [:vector :int]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
+   'concat [:=> [:cat [:sequential [:vector :int]]] [:vector :int]]
+   'from-string [:=> [:cat :string] [:vector :int]]
+   'inspect [:=> [:cat [:vector :int]] :string]
+   'is-utf8 [:=> [:cat [:vector :int]] :boolean]
+   'pad-to-bytes [:=> [:cat [:vector :int]] [:vector :int]]
+   'slice [:=> [:cat [:vector :int] :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'starts-with [:=> [:cat [:vector :int] [:vector :int]] :boolean]
+   'to-string [:=> [:cat [:vector :int]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]})

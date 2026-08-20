@@ -639,3 +639,25 @@
                  ((:function decoder) data)))))
 
 (def bool (->Decoder decode-bool))
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'at [:=> [:cat [:sequential :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'collapse-errors [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] :string] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'decode-error [:=> [:cat :string [:or ]] [:sequential [:fn (partial instance? gleam.dynamic.decode.DecodeError)]]]
+   'dict [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'failure [:=> [:cat :any :string] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'field [:=> [:cat :any [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'list' [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'map [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat :any] :any]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'map-errors [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat [:sequential [:fn (partial instance? gleam.dynamic.decode.DecodeError)]]] [:sequential [:fn (partial instance? gleam.dynamic.decode.DecodeError)]]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'new-primitive-decoder [:=> [:cat :string [:=> [:cat [:or ]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'one-of [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:sequential [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'optional [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'optional-field [:=> [:cat :any :any [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'optionally-at [:=> [:cat [:sequential :any] :any [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'recursive [:=> [:cat [:=> [:cat] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'run [:=> [:cat [:or ] [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'subfield [:=> [:cat [:sequential :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'success [:=> [:cat :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]
+   'then [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]})

@@ -8,3 +8,7 @@
   "Takes a single argument and always returns its input value."
   [x]
   x)
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'identity [:=> [:cat :any] :any]})

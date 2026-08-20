@@ -38,3 +38,9 @@
 
 (defn -main [& _]
   (main))
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'area [:=> [:cat [:or [:fn (partial instance? shapes.Circle)] [:fn (partial instance? shapes.Rect)] [:fn (partial instance? shapes.Point)]]] :double]
+   'main [:=> [:cat] :double]
+   'total-area [:=> [:cat [:sequential [:or [:fn (partial instance? shapes.Circle)] [:fn (partial instance? shapes.Rect)] [:fn (partial instance? shapes.Point)]]]] :double]})

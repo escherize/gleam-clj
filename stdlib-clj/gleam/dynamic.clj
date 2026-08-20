@@ -42,3 +42,16 @@
   `undefined`."
   []
   (cast nil))
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'array [:=> [:cat [:sequential [:or ]]] [:or ]]
+   'bit-array [:=> [:cat [:vector :int]] [:or ]]
+   'bool [:=> [:cat :boolean] [:or ]]
+   'classify [:=> [:cat [:or ]] :string]
+   'float [:=> [:cat :double] [:or ]]
+   'int [:=> [:cat :int] [:or ]]
+   'list' [:=> [:cat [:sequential [:or ]]] [:or ]]
+   'nil' [:=> [:cat] [:or ]]
+   'properties [:=> [:cat [:sequential [:tuple [:or ] [:or ]]]] [:or ]]
+   'string [:=> [:cat :string] [:or ]]})

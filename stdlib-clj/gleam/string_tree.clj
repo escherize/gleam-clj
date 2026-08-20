@@ -116,3 +116,24 @@
   ```"
   [tree]
   (= (from-string "") tree))
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'append [:=> [:cat [:or ] :string] [:or ]]
+   'append-tree [:=> [:cat [:or ] [:or ]] [:or ]]
+   'byte-size [:=> [:cat [:or ]] :int]
+   'concat [:=> [:cat [:sequential [:or ]]] [:or ]]
+   'from-string [:=> [:cat :string] [:or ]]
+   'from-strings [:=> [:cat [:sequential :string]] [:or ]]
+   'is-empty [:=> [:cat [:or ]] :boolean]
+   'is-equal [:=> [:cat [:or ] [:or ]] :boolean]
+   'join [:=> [:cat [:sequential [:or ]] :string] [:or ]]
+   'lowercase [:=> [:cat [:or ]] [:or ]]
+   'new* [:=> [:cat] [:or ]]
+   'prepend [:=> [:cat [:or ] :string] [:or ]]
+   'prepend-tree [:=> [:cat [:or ] [:or ]] [:or ]]
+   'replace [:=> [:cat [:or ] :string :string] [:or ]]
+   'reverse [:=> [:cat [:or ]] [:or ]]
+   'split [:=> [:cat [:or ] :string] [:sequential [:or ]]]
+   'to-string [:=> [:cat [:or ]] :string]
+   'uppercase [:=> [:cat [:or ]] [:or ]]})

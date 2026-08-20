@@ -23,6 +23,8 @@ use crate::{
 /// Constructor field names for every analyzed module, keyed (module, ctor).
 pub struct TypedGlobal {
     pub ctor_fields: HashMap<(String, String), Vec<String>>,
+    /// (module, type name) -> constructor names
+    pub type_variants: HashMap<(String, String), Vec<String>>,
 }
 
 pub fn constructor_field_names(c: &gleam_core::ast::RecordConstructor<std::sync::Arc<gleam_core::type_::Type>>) -> Vec<String> {
@@ -48,8 +50,13 @@ pub fn build_typed_global(modules: &[AnalyzedModule]) -> TypedGlobal {
         ("gleam".to_string(), "Error".to_string()),
         vec!["value".to_string()],
     );
+    let mut type_variants = HashMap::new();
     for m in modules {
         for t in &m.module.definitions.custom_types {
+            let _ = type_variants.insert(
+                (m.path.clone(), t.name.to_string()),
+                t.constructors.iter().map(|c| c.name.to_string()).collect(),
+            );
             for c in &t.constructors {
                 let _ = ctor_fields.insert(
                     (m.path.clone(), c.name.to_string()),
@@ -58,7 +65,7 @@ pub fn build_typed_global(modules: &[AnalyzedModule]) -> TypedGlobal {
             }
         }
     }
-    TypedGlobal { ctor_fields }
+    TypedGlobal { ctor_fields, type_variants }
 }
 
 struct Emit<'a> {
@@ -264,7 +271,123 @@ pub fn emit_module(
     if has_pub_main {
         out.push_str("\n(defn -main [& _]\n  (main))\n");
     }
+
+    // Malli schemas for the public fns, derived from the checked types. Pure
+    // data plus instance? predicates; malli itself is only needed by callers
+    // who choose to instrument.
+    let pub_fns: Vec<&&TypedFunction> = fn_by_name
+        .values()
+        .filter(|f| !matches!(f.publicity, Publicity::Private))
+        .collect();
+    if !pub_fns.is_empty() {
+        let mut entries: Vec<(String, String)> = pub_fns
+            .iter()
+            .map(|f| {
+                let name = local_fn_name(&kebab(f.name.as_ref().expect("name").1.as_str()));
+                let args: Vec<String> = f
+                    .arguments
+                    .iter()
+                    .map(|a| malli_type(&ctx, &a.type_))
+                    .collect();
+                let cat = if args.is_empty() {
+                    "[:cat]".to_string()
+                } else {
+                    format!("[:cat {}]", args.join(" "))
+                };
+                let schema = format!("[:=> {cat} {}]", malli_type(&ctx, &f.return_type));
+                (name, schema)
+            })
+            .collect();
+        entries.sort();
+        out.push_str("\n(def malli-schemas\n  \"Malli schemas for this module's public fns, derived from Gleam's types.\"\n  {");
+        let mut first = true;
+        for (name, schema) in entries {
+            if !first {
+                out.push_str("\n   ");
+            }
+            first = false;
+            let _ = write!(out, "'{name} {schema}");
+        }
+        out.push_str("})\n");
+    }
     out
+}
+
+/// Gleam type -> malli schema (as emitted Clojure code; custom types become
+/// instance? predicates over their variant record classes).
+fn malli_type(ctx: &Emit, t: &gleam_core::type_::Type) -> String {
+    use gleam_core::type_::{Type, TypeVar};
+    match t {
+        Type::Var { type_ } => match &*type_.borrow() {
+            TypeVar::Link { type_ } => malli_type(ctx, type_),
+            _ => ":any".into(),
+        },
+        Type::Tuple { elements } => {
+            let parts: Vec<String> = elements.iter().map(|e| malli_type(ctx, e)).collect();
+            format!("[:tuple {}]", parts.join(" "))
+        }
+        Type::Fn { arguments, return_ } => {
+            let parts: Vec<String> = arguments.iter().map(|a| malli_type(ctx, a)).collect();
+            let cat = if parts.is_empty() {
+                "[:cat]".to_string()
+            } else {
+                format!("[:cat {}]", parts.join(" "))
+            };
+            format!("[:=> {cat} {}]", malli_type(ctx, return_))
+        }
+        Type::Named { module, name, arguments, .. } => {
+            match (module.as_str(), name.as_str()) {
+                ("gleam", "Int") => ":int".into(),
+                ("gleam", "Float") => ":double".into(),
+                ("gleam", "String") => ":string".into(),
+                ("gleam", "Bool") => ":boolean".into(),
+                ("gleam", "Nil") => ":nil".into(),
+                ("gleam", "BitArray") => "[:vector :int]".into(),
+                ("gleam", "UtfCodepoint") => ":int".into(),
+                ("gleam", "List") => {
+                    let inner = arguments
+                        .first()
+                        .map(|a| malli_type(ctx, a))
+                        .unwrap_or_else(|| ":any".into());
+                    format!("[:sequential {inner}]")
+                }
+                ("gleam", "Result") => {
+                    "[:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]"
+                        .into()
+                }
+                ("gleam/dict", "Dict") => {
+                    let k = arguments
+                        .first()
+                        .map(|a| malli_type(ctx, a))
+                        .unwrap_or_else(|| ":any".into());
+                    let v = arguments
+                        .get(1)
+                        .map(|a| malli_type(ctx, a))
+                        .unwrap_or_else(|| ":any".into());
+                    format!("[:map-of {k} {v}]")
+                }
+                (m, n) => {
+                    let Some(variants) = ctx
+                        .global
+                        .type_variants
+                        .get(&(m.to_string(), n.to_string()))
+                    else {
+                        return ":any".into();
+                    };
+                    let pkg = m.replace("/", ".");
+                    let checks: Vec<String> = variants
+                        .iter()
+                        .map(|v| format!("[:fn (partial instance? {pkg}.{v})]"))
+                        .collect();
+                    if checks.len() == 1 {
+                        checks.into_iter().next().expect("one variant")
+                    } else {
+                        format!("[:or {}]", checks.join(" "))
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn emit_custom_type(out: &mut String, t: &TypedCustomType) {

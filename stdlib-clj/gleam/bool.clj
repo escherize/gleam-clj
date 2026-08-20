@@ -269,3 +269,16 @@
   ```"
   [requirement consequence alternative]
   (if requirement (consequence) (alternative)))
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'and [:=> [:cat :boolean :boolean] :boolean]
+   'exclusive-nor [:=> [:cat :boolean :boolean] :boolean]
+   'exclusive-or [:=> [:cat :boolean :boolean] :boolean]
+   'guard [:=> [:cat :boolean :any [:=> [:cat] :any]] :any]
+   'lazy-guard [:=> [:cat :boolean [:=> [:cat] :any] [:=> [:cat] :any]] :any]
+   'nand [:=> [:cat :boolean :boolean] :boolean]
+   'negate [:=> [:cat :boolean] :boolean]
+   'nor [:=> [:cat :boolean :boolean] :boolean]
+   'or [:=> [:cat :boolean :boolean] :boolean]
+   'to-string [:=> [:cat :boolean] :string]})

@@ -77,3 +77,12 @@
   ```"
   [first' second]
   [first' second])
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'first' [:=> [:cat [:tuple :any :any]] :any]
+   'map-first [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]] [:tuple :any :any]]
+   'map-second [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]] [:tuple :any :any]]
+   'new* [:=> [:cat :any :any] [:tuple :any :any]]
+   'second [:=> [:cat [:tuple :any :any]] :any]
+   'swap [:=> [:cat [:tuple :any :any]] [:tuple :any :any]]})

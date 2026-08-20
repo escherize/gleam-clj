@@ -431,3 +431,27 @@
 
 (defn group [key list']
   (group-loop (to-transient (new*)) key list'))
+
+(def malli-schemas
+  "Malli schemas for this module's public fns, derived from Gleam's types."
+  {'combine [:=> [:cat [:map-of :any :any] [:map-of :any :any] [:=> [:cat :any :any] :any]] [:map-of :any :any]]
+   'delete [:=> [:cat [:map-of :any :any] :any] [:map-of :any :any]]
+   'drop [:=> [:cat [:map-of :any :any] [:sequential :any]] [:map-of :any :any]]
+   'each [:=> [:cat [:map-of :any :any] [:=> [:cat :any :any] :any]] :nil]
+   'filter [:=> [:cat [:map-of :any :any] [:=> [:cat :any :any] :boolean]] [:map-of :any :any]]
+   'fold [:=> [:cat [:map-of :any :any] :any [:=> [:cat :any :any :any] :any]] :any]
+   'from-list [:=> [:cat [:sequential [:tuple :any :any]]] [:map-of :any :any]]
+   'get [:=> [:cat [:map-of :any :any] :any] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
+   'group [:=> [:cat [:=> [:cat :any] :any] [:sequential :any]] [:map-of :any [:sequential :any]]]
+   'has-key [:=> [:cat [:map-of :any :any] :any] :boolean]
+   'insert [:=> [:cat [:map-of :any :any] :any :any] [:map-of :any :any]]
+   'is-empty [:=> [:cat [:map-of :any :any]] :boolean]
+   'keys [:=> [:cat [:map-of :any :any]] [:sequential :any]]
+   'map-values [:=> [:cat [:map-of :any :any] [:=> [:cat :any :any] :any]] [:map-of :any :any]]
+   'merge [:=> [:cat [:map-of :any :any] [:map-of :any :any]] [:map-of :any :any]]
+   'new* [:=> [:cat] [:map-of :any :any]]
+   'size [:=> [:cat [:map-of :any :any]] :int]
+   'take [:=> [:cat [:map-of :any :any] [:sequential :any]] [:map-of :any :any]]
+   'to-list [:=> [:cat [:map-of :any :any]] [:sequential [:tuple :any :any]]]
+   'upsert [:=> [:cat [:map-of :any :any] :any [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]] :any]] [:map-of :any :any]]
+   'values [:=> [:cat [:map-of :any :any]] [:sequential :any]]})

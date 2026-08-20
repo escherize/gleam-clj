@@ -5,9 +5,12 @@
 A [Gleam](https://gleam.run) -> Clojure/JVM compiler. Not an official Gleam
 project.
 
-**Status: experimental.** Parse-only frontend (the typed-AST integration is
-planned); everything unsupported fails loudly at build time, nothing is
-silently wrong on purpose. Verified by stdout-parity corpora against real
+**Status: experimental.** Compiles from Gleam's own typed AST — every
+module runs through gleam-core's type checker (prelude-seeded, interfaces
+chained in import order) before emission, so name resolution, labelled
+arguments, and pipe semantics come from the checker, not heuristics.
+Everything unsupported fails loudly at build time; nothing is silently
+wrong on purpose. Verified by stdout-parity corpora against real
 `gleam run`: 54/54 runnable Rosetta Code tasks, 58/58 runnable language-tour
 lessons, gleam_stdlib self-hosted, real hex packages (snag, glance) running
 byte-identical on the JVM. CI re-proves this on every push — read any run's
@@ -15,7 +18,21 @@ log for the method and the per-suite SUMMARY verdicts.
 
 Known approximations: dict/set iteration is key-sorted (matches BEAM small
 maps), mutual recursion is JVM-stack-bounded (self tail calls become
-`recur`), int arithmetic auto-promotes via `+'` (bignum parity, boxed).
+`recur`). Int arithmetic uses `+'`/`-'`/`*'` deliberately: Gleam ints are
+arbitrary precision on the BEAM, so unchecked long math would be wrong —
+Clojure's promoting ops fast-path longs and promote on overflow, which is
+exactly Gleam's semantics.
+
+## Malli schemas
+
+Every emitted module ends with `malli-schemas`: a map from public fn name
+to a [malli](https://github.com/metosin/malli) `[:=> ...]` schema derived
+from the checked Gleam types (custom types become `instance?` predicates
+over their variant records). Pure data + predicates — malli is only needed
+if you choose to validate or instrument:
+
+    (require '[malli.core :as mc])
+    (mc/validate (get coin-change/malli-schemas 'min-coins) ...)
 
 ## Licences and provenance
 
