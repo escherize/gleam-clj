@@ -36,4 +36,6 @@ jobs:
           if ! ls rosetta/tasks/*.gleam >/dev/null 2>&1; then
             python3 rosetta/scrape.py
           fi
+      - name: Fetch glance for the gleam-parser library
+        run: cd libs/gleam-parser/project && gleam build
       - run: ./check.sh

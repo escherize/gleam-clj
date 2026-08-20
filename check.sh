@@ -64,6 +64,18 @@ else
   echo "== clj-kondo not installed, skipping lint"
 fi
 
+echo "== gleam-parser library (compiled glance): build, tests, lint"
+if [ -d libs/gleam-parser/project/build ]; then
+  ./libs/gleam-parser/build.sh >/dev/null
+  (cd libs/gleam-parser && clojure -M:test -m gleam-parser-test >/dev/null 2>&1)     || { echo "GLEAM-PARSER TESTS FAILED"; exit 1; }
+  if command -v clj-kondo >/dev/null; then
+    (cd libs/gleam-parser && clj-kondo --lint src test >/dev/null 2>&1)       || { echo "GLEAM-PARSER LINT FAILED"; exit 1; }
+  fi
+  echo "gleam-parser ok (glance parses its own source on the JVM)"
+else
+  echo "gleam-parser skipped (run: cd libs/gleam-parser/project && gleam build)"
+fi
+
 suite rosetta "Gleam solutions scraped from Rosetta Code (GFDL, fetched locally via rosetta/scrape.py, not redistributed)"
 suite tour "all 63 example programs from the official Gleam language tour"
 

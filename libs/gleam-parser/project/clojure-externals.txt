@@ -1,0 +1,8 @@
+# Clojure implementations for native externals of pure-JS/BEAM deps
+glexer slice_bytes glexer-ffi/slice-bytes
+glexer drop_byte glexer-ffi/drop-byte
+splitter make splitter-ffi/make
+splitter split splitter-ffi/split
+splitter split_before splitter-ffi/split-before
+splitter split_after splitter-ffi/split-after
+splitter would_split splitter-ffi/would-split
