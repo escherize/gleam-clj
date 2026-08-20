@@ -6,7 +6,9 @@
 
 ;; type Option
 (defrecord Some [value])
+(defn Some? [v] (instance? Some v))
 (defrecord None [])
+(defn None? [v] (instance? None v))
 
 (defn- reverse-and-prepend [prefix suffix]
   (if (empty? prefix)
@@ -38,7 +40,8 @@
   ```gleam
   assert option.all([Some(1), None]) == None
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]}
+  {:malli/schema [:=> [:cat [:sequential [:or [:fn Some?] [:fn None?]]]]
+                      [:or [:fn Some?] [:fn None?]]]}
   [list']
   (all-loop list' (list)))
 
@@ -54,7 +57,7 @@
   ```gleam
   assert !option.is_some(None)
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]] :boolean]}
+  {:malli/schema [:=> [:cat [:or [:fn Some?] [:fn None?]]] :boolean]}
   [option]
   (not= option (->None)))
 
@@ -70,7 +73,7 @@
   ```gleam
   assert option.is_none(None)
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]] :boolean]}
+  {:malli/schema [:=> [:cat [:or [:fn Some?] [:fn None?]]] :boolean]}
   [option]
   (= option (->None)))
 
@@ -86,7 +89,8 @@
   ```gleam
   assert option.to_result(None, \"some_error\") == Error(\"some_error\")
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn Some?] [:fn None?]] :any]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [option e]
   (if (instance? Some option)
     (let [a (:value option)]
@@ -105,7 +109,8 @@
   ```gleam
   assert option.from_result(Error(\"some_error\")) == None
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      [:or [:fn Some?] [:fn None?]]]}
   [result]
   (if (instance? Ok result)
     (let [a (:value result)]
@@ -124,7 +129,7 @@
   ```gleam
   assert option.unwrap(None, 0) == 0
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] :any] :any]}
+  {:malli/schema [:=> [:cat [:or [:fn Some?] [:fn None?]] :any] :any]}
   [option default]
   (if (instance? Some option)
     (let [x (:value option)]
@@ -143,7 +148,8 @@
   ```gleam
   assert option.lazy_unwrap(None, fn() { 0 }) == 0
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] [:=> [:cat] :any]] :any]}
+  {:malli/schema [:=> [:cat [:or [:fn Some?] [:fn None?]] [:=> [:cat] :any]]
+                      :any]}
   [option default]
   (if (instance? Some option)
     (let [x (:value option)]
@@ -166,7 +172,8 @@
   ```gleam
   assert option.map(over: None, with: fn(x) { x + 1 }) == None
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] [:=> [:cat :any] :any]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn Some?] [:fn None?]] [:=> [:cat :any] :any]]
+                      [:or [:fn Some?] [:fn None?]]]}
   [option fun]
   (if (instance? Some option)
     (let [x (:value option)]
@@ -189,7 +196,8 @@
   ```gleam
   assert option.flatten(None) == None
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn Some?] [:fn None?]]]
+                      [:or [:fn Some?] [:fn None?]]]}
   [option]
   (if (instance? Some option)
     (let [x (:value option)]
@@ -224,7 +232,8 @@
   ```gleam
   assert option.then(None, fn(x) { Some(x + 1) }) == None
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] [:=> [:cat :any] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn Some?] [:fn None?]] [:=> [:cat :any] [:or [:fn Some?] [:fn None?]]]]
+                      [:or [:fn Some?] [:fn None?]]]}
   [option fun]
   (if (instance? Some option)
     (let [x (:value option)]
@@ -251,7 +260,8 @@
   ```gleam
   assert option.or(None, None) == None
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn Some?] [:fn None?]] [:or [:fn Some?] [:fn None?]]]
+                      [:or [:fn Some?] [:fn None?]]]}
   [first' second]
   (if (instance? Some first') first' second))
 
@@ -275,7 +285,8 @@
   ```gleam
   assert option.lazy_or(None, fn() { None }) == None
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]] [:=> [:cat] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn Some?] [:fn None?]] [:=> [:cat] [:or [:fn Some?] [:fn None?]]]]
+                      [:or [:fn Some?] [:fn None?]]]}
   [first' second]
   (if (instance? Some first') first' (second)))
 
@@ -296,6 +307,7 @@
   ```gleam
   assert option.values([Some(1), None, Some(3)]) == [1, 3]
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential [:or [:fn Some?] [:fn None?]]]]
+                      [:sequential :any]]}
   [options]
   (values-loop options (list)))

@@ -10,6 +10,7 @@
 
 ;; type Uri
 (defrecord Uri [scheme userinfo host port path query fragment])
+(defn Uri? [v] (instance? Uri v))
 
 (def empty (->Uri (option/->None) (option/->None) (option/->None) (option/->None) "" (option/->None) (option/->None)))
 
@@ -265,11 +266,11 @@
   fragment: Some(\"fragment\"),
   ))
   ```"
-  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [uri-string]
   (parse-scheme-loop uri-string uri-string empty 0))
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]} parse-query gleam-ffi/parse-query)
+(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]} parse-query gleam-ffi/parse-query)
 
 (def ^{:malli/schema [:=> [:cat :string] :string]} percent-encode gleam-ffi/percent-encode)
 
@@ -293,7 +294,7 @@
   [query]
   (-> query (list/map query-pair) (string/join "&")))
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]} percent-decode gleam-ffi/percent-decode)
+(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]} percent-decode gleam-ffi/percent-decode)
 
 (defn- remove-dot-segments-loop [input accumulator]
   (if (empty? input)
@@ -330,7 +331,7 @@
   let uri = Uri(..empty, scheme: Some(\"https\"), host: Some(\"example.com\"))
   assert uri.to_string(uri) == \"https://example.com\"
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.uri.Uri)]] :string]}
+  {:malli/schema [:=> [:cat [:fn Uri?]] :string]}
   [uri]
   (let [out (let [subject (:scheme uri)]
               (if (instance? gleam.option.Some subject)
@@ -369,7 +370,7 @@
   let assert Ok(uri) = uri.parse(\"https://example.com/path?foo#bar\")
   assert uri.origin(uri) == Ok(\"https://example.com\")
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.uri.Uri)]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:fn Uri?]] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [uri]
   (let [{scheme :scheme host :host port :port} uri]
     (cond
@@ -396,7 +397,8 @@
   The base URI must be an absolute URI or this function will return an error.
   The algorithm for merging URIs is described in
   [RFC 3986](https://tools.ietf.org/html/rfc3986#section-5.2)."
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.uri.Uri)] [:fn (partial instance? gleam.uri.Uri)]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:fn Uri?] [:fn Uri?]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [base relative]
   (if (and (instance? Uri base) (instance? gleam.option.Some (:scheme base)) (instance? gleam.option.Some (:host base)))
     (if (and (instance? Uri relative) (instance? gleam.option.Some (:host relative)))

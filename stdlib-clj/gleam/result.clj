@@ -17,7 +17,7 @@
   ```gleam
   assert !result.is_ok(Error(Nil))
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]] :boolean]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]]] :boolean]}
   [result]
   (if (instance? gleam.prelude.Error result) false true))
 
@@ -33,7 +33,7 @@
   ```gleam
   assert result.is_error(Error(Nil))
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]] :boolean]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]]] :boolean]}
   [result]
   (if (instance? Ok result) false true))
 
@@ -53,7 +53,8 @@
   ```gleam
   assert result.map(over: Error(1), with: fn(x) { x + 1 }) == Error(1)
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]] [:=> [:cat :any] :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat :any] :any]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [result fun]
   (if (instance? Ok result)
     (let [x (:value result)]
@@ -77,7 +78,8 @@
   ```gleam
   assert result.map_error(over: Ok(1), with: fn(x) { x + 1 }) == Ok(1)
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]] [:=> [:cat :any] :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat :any] :any]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [result fun]
   (if (instance? Ok result)
     (let [x (:value result)]
@@ -101,7 +103,8 @@
   ```gleam
   assert result.flatten(Error(Nil)) == Error(Nil)
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [result]
   (if (instance? Ok result)
     (let [x (:value result)]
@@ -136,7 +139,8 @@
   ```gleam
   assert result.try(Error(Nil), fn(x) { Ok(x + 1) }) == Error(Nil)
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [result fun]
   (if (instance? Ok result)
     (let [x (:value result)]
@@ -157,7 +161,7 @@
   ```gleam
   assert result.unwrap(Error(\"\"), 0) == 0
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]] :any] :any]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] :any] :any]}
   [result default]
   (if (instance? Ok result)
     (let [v (:value result)]
@@ -177,7 +181,8 @@
   ```gleam
   assert result.lazy_unwrap(Error(\"\"), fn() { 0 }) == 0
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]] [:=> [:cat] :any]] :any]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat] :any]]
+                      :any]}
   [result default]
   (if (instance? Ok result)
     (let [v (:value result)]
@@ -197,7 +202,7 @@
   ```gleam
   assert result.unwrap_error(Ok(\"\"), 0) == 0
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]] :any] :any]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] :any] :any]}
   [result default]
   (if (instance? Ok result)
     default
@@ -224,7 +229,8 @@
   ```gleam
   assert result.or(Error(\"Error 1\"), Error(\"Error 2\")) == Error(\"Error 2\")
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [first' second]
   (if (instance? Ok first') first' second))
 
@@ -251,7 +257,8 @@
   assert result.lazy_or(Error(\"Error 1\"), fn() { Error(\"Error 2\") })
   == Error(\"Error 2\")
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]] [:=> [:cat] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [first' second]
   (if (instance? Ok first') first' (second)))
 
@@ -269,7 +276,8 @@
   ```gleam
   assert result.all([Ok(1), Error(\"e\")]) == Error(\"e\")
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [results]
   (list/try-map results (fn [result] result)))
 
@@ -293,7 +301,8 @@
   assert result.partition([Ok(1), Error(\"a\"), Error(\"b\"), Ok(2)])
   == #([2, 1], [\"b\", \"a\"])
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:tuple [:sequential :any] [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:tuple [:sequential :any] [:sequential :any]]]}
   [results]
   (partition-loop results (list) (list)))
 
@@ -309,7 +318,8 @@
   ```gleam
   assert result.replace(Error(1), Nil) == Error(1)
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]] :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] :any]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [result value]
   (if (instance? Ok result)
     (p/->Ok value)
@@ -328,7 +338,8 @@
   ```gleam
   assert result.replace_error(Ok(1), Nil) == Ok(1)
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]] :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] :any]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [result error]
   (if (instance? Ok result)
     (let [x (:value result)]
@@ -343,7 +354,8 @@
   ```gleam
   assert result.values([Ok(1), Error(\"a\"), Ok(3)]) == [1, 3]
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:sequential :any]]}
   [results]
   (list/filter-map results (fn [result] result)))
 
@@ -379,7 +391,8 @@
   |> result.try_recover(with: fn(error) { Error(\"failed to recover\") })
   == Error(\"failed to recover\")
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [result fun]
   (if (instance? Ok result)
     (let [value (:value result)]

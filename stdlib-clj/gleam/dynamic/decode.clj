@@ -14,9 +14,11 @@
 
 ;; type DecodeError
 (defrecord DecodeError [expected found path])
+(defn DecodeError? [v] (instance? DecodeError v))
 
 ;; type Decoder
 (defrecord Decoder [function])
+(defn Decoder? [v] (instance? Decoder v))
 
 (defn- decode-dynamic [data]
   [data (list)])
@@ -38,7 +40,8 @@
   
   decode.run(data, decoder)
   ```"
-  {:malli/schema [:=> [:cat [:or ] [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:or ] [:fn Decoder?]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [data decoder]
   (let [[maybe-invalid-data errors] ((:function decoder) data)]
     (if (empty? errors) (p/->Ok maybe-invalid-data) (p/->Error errors))))
@@ -68,7 +71,8 @@
   let result = decode.run(dynamic.int(1000), decoder)
   assert result == Ok(\"1000\")
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat :any] :any]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:fn Decoder?] [:=> [:cat :any] :any]]
+                      [:fn Decoder?]]}
   [decoder transformer]
   (->Decoder (fn [d]
                (let [[data errors] ((:function decoder) d)]
@@ -127,7 +131,8 @@
   ])
   assert decode.run(dynamic.int(1000), decoder) == Ok(\"1000\")
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:sequential [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:fn Decoder?] [:sequential [:fn Decoder?]]]
+                      [:fn Decoder?]]}
   [first' alternatives]
   (->Decoder (fn [dynamic-data]
                (let [[_ errors :as layer] ((:function first') dynamic-data)]
@@ -170,7 +175,7 @@
   |> decode.run(decode.list(of: decode.int))
   assert result == Ok([1, 2, 3])
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:fn Decoder?]] [:fn Decoder?]]}
   [inner]
   (->Decoder (fn [data]
                (decode-list data
@@ -226,7 +231,8 @@
   let result = decode.run(data, decoder)
   assert result == Ok(SignUp(name: \"Lucy\", email: \"lucy@example.com\"))
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
+                      [:fn Decoder?]]}
   [field-path field-decoder next]
   (->Decoder (fn [data]
                (let [[out errors1] (index field-path
@@ -273,7 +279,8 @@
   |> decode.run(decode.optional(decode.int))
   == Ok(option.None)
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:fn Decoder?]]
+                      [:fn Decoder?]]}
   [path inner]
   (->Decoder (fn [data]
                (index path
@@ -306,13 +313,13 @@
   let result = decode.run(data, decoder)
   assert result == Ok(SignUp(name: \"Lucy\", email: \"lucy@example.com\"))
   ```"
-  {:malli/schema [:=> [:cat :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat :any] [:fn Decoder?]]}
   [data]
   (->Decoder (fn [_] [data (list)])))
 
 (defn decode-error
   "Construct a decode error for some unexpected dynamic data."
-  {:malli/schema [:=> [:cat :string [:or ]] [:sequential [:fn (partial instance? gleam.dynamic.decode.DecodeError)]]]}
+  {:malli/schema [:=> [:cat :string [:or ]] [:sequential [:fn DecodeError?]]]}
   [expected found]
   (list (->DecodeError expected (dynamic/classify found) (list))))
 
@@ -349,7 +356,8 @@
   
   If you wish to return a default in the event that a field is not present,
   see [`optional_field`](#optional_field) and / [`optionally_at`](#optionally_at)."
-  {:malli/schema [:=> [:cat :any [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat :any [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
+                      [:fn Decoder?]]}
   [field-name field-decoder next]
   (subfield (list field-name) field-decoder next))
 
@@ -379,7 +387,8 @@
   let result = decode.run(data, decoder)
   assert result == Ok(SignUp(name: \"Lucy\", email: \"n/a\"))
   ```"
-  {:malli/schema [:=> [:cat :any :any [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat :any :any [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
+                      [:fn Decoder?]]}
   [key default field-decoder next]
   (->Decoder (fn [data]
                (let [[out errors1] (-> (let [subject (bare-index data key)]
@@ -415,7 +424,8 @@
   
   assert decode.run(data, decoder) == Ok(100)
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:fn Decoder?]]
+                      [:fn Decoder?]]}
   [path default inner]
   (->Decoder (fn [data]
                (index path
@@ -463,7 +473,7 @@
   let result = decode.run(values, decode.dict(decode.string, decode.int))
   assert result == Ok(values)
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:fn Decoder?] [:fn Decoder?]] [:fn Decoder?]]}
   [key value]
   (->Decoder (fn [data]
                (let [subject (decode-dict data)]
@@ -503,7 +513,7 @@
   let result = decode.run(dynamic.nil(), decode.optional(decode.int))
   assert result == Ok(option.None)
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:fn Decoder?]] [:fn Decoder?]]}
   [inner]
   (->Decoder (fn [data]
                (let [subject (is-null data)]
@@ -514,7 +524,8 @@
 
 (defn map-errors
   "Apply a transformation function to any errors returned by the decoder."
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat [:sequential [:fn (partial instance? gleam.dynamic.decode.DecodeError)]]] [:sequential [:fn (partial instance? gleam.dynamic.decode.DecodeError)]]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:fn Decoder?] [:=> [:cat [:sequential [:fn DecodeError?]]] [:sequential [:fn DecodeError?]]]]
+                      [:fn Decoder?]]}
   [decoder transformer]
   (->Decoder (fn [d]
                (let [[data errors] ((:function decoder) d)]
@@ -534,7 +545,7 @@
   let result = decode.run(dynamic.int(1000), decoder)
   assert result == Error([DecodeError(\"MyThing\", \"Int\", [])])
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] :string] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:fn Decoder?] :string] [:fn Decoder?]]}
   [decoder name]
   (->Decoder (fn [dynamic-data]
                (let [[data errors :as layer] ((:function decoder) dynamic-data)]
@@ -546,7 +557,8 @@
   "Create a new decoder based upon the value of a previous decoder.
   
   This may be useful to run one previous decoder to use in further decoding."
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.dynamic.decode.Decoder)] [:=> [:cat :any] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
+                      [:fn Decoder?]]}
   [decoder next]
   (->Decoder (fn [dynamic-data]
                (let [[data errors] ((:function decoder) dynamic-data)
@@ -569,7 +581,7 @@
   ```gleam
   decode.failure(User(name: \"\", score: 0, tags: []), expected: \"User\")
   ```"
-  {:malli/schema [:=> [:cat :any :string] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat :any :string] [:fn Decoder?]]}
   [placeholder name]
   (->Decoder (fn [d] [placeholder (decode-error name d)])))
 
@@ -610,7 +622,8 @@
   false -> {error, 0}
   end.
   ```"
-  {:malli/schema [:=> [:cat :string [:=> [:cat [:or ]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat :string [:=> [:cat [:or ]] [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:fn Decoder?]]}
   [name decoding-function]
   (->Decoder (fn [d]
                (let [subject (decoding-function d)]
@@ -643,7 +656,7 @@
   ])
   }
   ```"
-  {:malli/schema [:=> [:cat [:=> [:cat] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]] [:fn (partial instance? gleam.dynamic.decode.Decoder)]]}
+  {:malli/schema [:=> [:cat [:=> [:cat] [:fn Decoder?]]] [:fn Decoder?]]}
   [inner]
   (->Decoder (fn [data]
                (let [decoder (inner)]

@@ -4,7 +4,9 @@
 
 ;; type Fish
 (defrecord Starfish [name favourite-color])
+(defn Starfish? [v] (instance? Starfish v))
 (defrecord Jellyfish [name jiggly])
+(defn Jellyfish? [v] (instance? Jellyfish v))
 
 (defn- describe [fish]
   (cond

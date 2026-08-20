@@ -3,8 +3,11 @@
 
 ;; type Order
 (defrecord Lt [])
+(defn Lt? [v] (instance? Lt v))
 (defrecord Eq [])
+(defn Eq? [v] (instance? Eq v))
 (defrecord Gt [])
+(defn Gt? [v] (instance? Gt v))
 
 (defn negate
   "Inverts an order, so less-than becomes greater-than and greater-than
@@ -23,7 +26,8 @@
   ```gleam
   assert order.negate(Gt) == Lt
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]]]
+                      [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]]]}
   [order]
   (cond
     (instance? Lt order) (->Gt)
@@ -46,7 +50,7 @@
   ```gleam
   assert order.to_int(Gt) == 1
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] :int]}
+  {:malli/schema [:=> [:cat [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]]] :int]}
   [order]
   (cond
     (instance? Lt order) -1
@@ -61,7 +65,8 @@
   ```gleam
   assert order.compare(Eq, with: Lt) == Gt
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]] [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]]]
+                      [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]]]}
   [a b]
   (cond
     (= a b) (->Eq)
@@ -80,7 +85,8 @@
   
   assert list.sort([1, 5, 4], by: order.reverse(int.compare)) == [5, 4, 1]
   ```"
-  {:malli/schema [:=> [:cat [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]]}
+  {:malli/schema [:=> [:cat [:=> [:cat :any :any] [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]]]]
+                      [:=> [:cat :any :any] [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]]]]}
   [orderer]
   (fn [a b] (orderer b a)))
 
@@ -100,7 +106,8 @@
   
   assert order.break_tie(in: int.compare(1, 0), with: Eq) == Gt
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]] [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]]]
+                      [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]]]}
   [order other]
   (if (or (instance? Lt order) (instance? Gt order)) order other))
 
@@ -124,6 +131,7 @@
   
   assert order.lazy_break_tie(in: int.compare(1, 0), with: fn() { Eq }) == Gt
   ```"
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]] [:=> [:cat] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
+  {:malli/schema [:=> [:cat [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]] [:=> [:cat] [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]]]]
+                      [:or [:fn Lt?] [:fn Eq?] [:fn Gt?]]]}
   [order comparison]
   (if (or (instance? Lt order) (instance? Gt order)) order (comparison)))

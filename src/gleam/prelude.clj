@@ -9,7 +9,8 @@
 (ns-unmap *ns* 'Error)
 (defrecord Error [value])
 
-(defn ok? [r] (instance? Ok r))
+(defn Ok? [v] (instance? Ok v))
+(defn Error? [v] (instance? gleam.prelude.Error v))
 
 (defn let-assert
   "Runtime check for Gleam's `let assert` with a literal pattern:

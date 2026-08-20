@@ -49,7 +49,8 @@
   ```gleam
   assert #(1, 2) |> pair.map_first(fn(n) { n * 2 }) == #(2, 2)
   ```"
-  {:malli/schema [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]] [:tuple :any :any]]}
+  {:malli/schema [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]]
+                      [:tuple :any :any]]}
   [pair fun]
   (let [[a b] pair]
     [(fun a) b]))
@@ -63,7 +64,8 @@
   ```gleam
   assert #(1, 2) |> pair.map_second(fn(n) { n * 2 }) == #(1, 4)
   ```"
-  {:malli/schema [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]] [:tuple :any :any]]}
+  {:malli/schema [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]]
+                      [:tuple :any :any]]}
   [pair fun]
   (let [[a b] pair]
     [a (fun b)]))

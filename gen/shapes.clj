@@ -5,12 +5,16 @@
 
 ;; type Shape
 (defrecord Circle [value])
+(defn Circle? [v] (instance? Circle v))
 (defrecord Rect [width height])
+(defn Rect? [v] (instance? Rect v))
 (defrecord Point [])
+(defn Point? [v] (instance? Point v))
 
 (defn area
   "Area with pi = 3.0, engineering approximation."
-  {:malli/schema [:=> [:cat [:or [:fn (partial instance? shapes.Circle)] [:fn (partial instance? shapes.Rect)] [:fn (partial instance? shapes.Point)]]] :double]}
+  {:malli/schema [:=> [:cat [:or [:fn Circle?] [:fn Rect?] [:fn Point?]]]
+                      :double]}
   [shape]
   (cond
     (instance? Circle shape) (let [r (:value shape)]
@@ -26,7 +30,8 @@
       (+ x (sum rest')))))
 
 (defn total-area
-  {:malli/schema [:=> [:cat [:sequential [:or [:fn (partial instance? shapes.Circle)] [:fn (partial instance? shapes.Rect)] [:fn (partial instance? shapes.Point)]]]] :double]}
+  {:malli/schema [:=> [:cat [:sequential [:or [:fn Circle?] [:fn Rect?] [:fn Point?]]]]
+                      :double]}
   [shapes]
   (-> shapes (list/map area) sum))
 

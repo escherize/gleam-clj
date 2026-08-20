@@ -18,7 +18,8 @@
 
 (defn min-coins
   "Fewest coins summing to `amount`. Error(Nil) if unreachable."
-  {:malli/schema [:=> [:cat [:sequential :int] :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :int] :int]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [coins amount]
   (cond
     (= amount 0) (p/->Ok 0)
@@ -30,7 +31,7 @@
               (dict/get amount))))
 
 (defn main
-  {:malli/schema [:=> [:cat] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   []
   (p/let-assert (p/->Ok 0) (min-coins (list 1 5 10) 0))
   (p/let-assert (p/->Ok 1) (min-coins (list 1 5 10) 10))

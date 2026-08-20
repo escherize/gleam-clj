@@ -3,7 +3,6 @@
   (:require
    [gleam-ffi]
    [gleam.option :as option]
-   #_{:clj-kondo/ignore [:unused-namespace]}
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
@@ -60,7 +59,8 @@
   })
   == \"abc\"
   ```"
-  {:malli/schema [:=> [:cat [:map-of :any :any] :any [:=> [:cat :any :any :any] :any]] :any]}
+  {:malli/schema [:=> [:cat [:map-of :any :any] :any [:=> [:cat :any :any :any] :any]]
+                      :any]}
   [dict initial fun]
   (let [fun (fn [key value acc] (fun acc key value))]
     (do-fold fun initial dict)))
@@ -90,7 +90,8 @@
   |> dict.to_list
   == [#(\"a\", 0), #(\"b\", 1), #(\"c\", 2)]
   ```"
-  {:malli/schema [:=> [:cat [:map-of :any :any]] [:sequential [:tuple :any :any]]]}
+  {:malli/schema [:=> [:cat [:map-of :any :any]]
+                      [:sequential [:tuple :any :any]]]}
   [dict]
   (fold dict (list) (fn [acc key value] (list* [key value] acc))))
 
@@ -109,7 +110,8 @@
   
   If two tuples have the same key the last one in the list will be the one
   that is present in the dict."
-  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]]] [:map-of :any :any]]}
+  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]]]
+                      [:map-of :any :any]]}
   [list']
   (from-list-loop (to-transient (new*)) list'))
 
@@ -131,7 +133,7 @@
   [dict key]
   (do-has-key key dict))
 
-(def ^{:malli/schema [:=> [:cat [:map-of :any :any] :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]} get gleam-ffi/dict-get)
+(def ^{:malli/schema [:=> [:cat [:map-of :any :any] :any] [:or [:fn p/Ok?] [:fn p/Error?]]]} get gleam-ffi/dict-get)
 
 (def do-insert gleam-ffi/dict-insert)
 
@@ -151,7 +153,8 @@
   assert dict.new() |> dict.insert(\"a\", 0) |> dict.insert(\"a\", 5)
   == dict.from_list([#(\"a\", 5)])
   ```"
-  {:malli/schema [:=> [:cat [:map-of :any :any] :any :any] [:map-of :any :any]]}
+  {:malli/schema [:=> [:cat [:map-of :any :any] :any :any]
+                      [:map-of :any :any]]}
   [dict key value]
   (do-insert key value dict))
 
@@ -168,7 +171,8 @@
   |> dict.map_values(fn(key, value) { key * value })
   == dict.from_list([#(3, 9), #(2, 8)])
   ```"
-  {:malli/schema [:=> [:cat [:map-of :any :any] [:=> [:cat :any :any] :any]] [:map-of :any :any]]}
+  {:malli/schema [:=> [:cat [:map-of :any :any] [:=> [:cat :any :any] :any]]
+                      [:map-of :any :any]]}
   [dict fun]
   (do-map-values fun dict))
 
@@ -232,7 +236,8 @@
   |> dict.filter(fn(key, value) { True })
   == dict.from_list([#(\"a\", 0), #(\"b\", 1)])
   ```"
-  {:malli/schema [:=> [:cat [:map-of :any :any] [:=> [:cat :any :any] :boolean]] [:map-of :any :any]]}
+  {:malli/schema [:=> [:cat [:map-of :any :any] [:=> [:cat :any :any] :boolean]]
+                      [:map-of :any :any]]}
   [dict predicate]
   (do-filter predicate dict))
 
@@ -265,7 +270,8 @@
   |> dict.take([\"a\", \"b\", \"c\"])
   == dict.from_list([#(\"a\", 0), #(\"b\", 1)])
   ```"
-  {:malli/schema [:=> [:cat [:map-of :any :any] [:sequential :any]] [:map-of :any :any]]}
+  {:malli/schema [:=> [:cat [:map-of :any :any] [:sequential :any]]
+                      [:map-of :any :any]]}
   [dict desired-keys]
   (do-take desired-keys dict))
 
@@ -292,7 +298,8 @@
   assert dict.combine(a, b, fn(one, other) { one + other })
   == dict.from_list([#(\"a\", 2), #(\"b\", 1), #(\"c\", 3)])
   ```"
-  {:malli/schema [:=> [:cat [:map-of :any :any] [:map-of :any :any] [:=> [:cat :any :any] :any]] [:map-of :any :any]]}
+  {:malli/schema [:=> [:cat [:map-of :any :any] [:map-of :any :any] [:=> [:cat :any :any] :any]]
+                      [:map-of :any :any]]}
   [dict other fun]
   (do-combine (fn [_ l r] (fun l r)) dict other))
 
@@ -309,7 +316,8 @@
   let b = dict.from_list([#(\"b\", 2), #(\"c\", 3)])
   assert dict.merge(a, b) == dict.from_list([#(\"a\", 0), #(\"b\", 2), #(\"c\", 3)])
   ```"
-  {:malli/schema [:=> [:cat [:map-of :any :any] [:map-of :any :any]] [:map-of :any :any]]}
+  {:malli/schema [:=> [:cat [:map-of :any :any] [:map-of :any :any]]
+                      [:map-of :any :any]]}
   [dict new-entries]
   (combine dict new-entries (fn [_ new-entry] new-entry)))
 
@@ -365,7 +373,8 @@
   assert dict.from_list([#(\"a\", 0), #(\"b\", 1)]) |> dict.drop([\"a\", \"b\", \"c\"])
   == dict.from_list([])
   ```"
-  {:malli/schema [:=> [:cat [:map-of :any :any] [:sequential :any]] [:map-of :any :any]]}
+  {:malli/schema [:=> [:cat [:map-of :any :any] [:sequential :any]]
+                      [:map-of :any :any]]}
   [dict disallowed-keys]
   (do-drop disallowed-keys dict))
 
@@ -393,7 +402,8 @@
   assert dict.upsert(dict, \"b\", increment)
   == dict.from_list([#(\"a\", 0), #(\"b\", 0)])
   ```"
-  {:malli/schema [:=> [:cat [:map-of :any :any] :any [:=> [:cat [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]] :any]] [:map-of :any :any]]}
+  {:malli/schema [:=> [:cat [:map-of :any :any] :any [:=> [:cat [:or [:fn option/Some?] [:fn option/None?]]] :any]]
+                      [:map-of :any :any]]}
   [dict key fun]
   (let [subject (get dict key)]
     (if (instance? Ok subject)
@@ -421,7 +431,8 @@
   
   The order of elements in the iteration is an implementation detail that
   should not be relied upon."
-  {:malli/schema [:=> [:cat [:map-of :any :any] [:=> [:cat :any :any] :any]] :nil]}
+  {:malli/schema [:=> [:cat [:map-of :any :any] [:=> [:cat :any :any] :any]]
+                      :nil]}
   [dict fun]
   (fold dict
         nil
@@ -439,6 +450,7 @@
           (group-loop to-key rest')))))
 
 (defn group
-  {:malli/schema [:=> [:cat [:=> [:cat :any] :any] [:sequential :any]] [:map-of :any [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:=> [:cat :any] :any] [:sequential :any]]
+                      [:map-of :any [:sequential :any]]]}
   [key list']
   (group-loop (to-transient (new*)) key list'))

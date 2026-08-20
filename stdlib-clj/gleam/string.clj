@@ -11,7 +11,9 @@
 
 ;; type Direction
 (defrecord Leading [])
+(defn Leading? [v] (instance? Leading v))
 (defrecord Trailing [])
+(defn Trailing? [v] (instance? Trailing v))
 
 (defn is-empty
   "Determines if a `String` is empty.
@@ -93,7 +95,8 @@
   
   assert string.compare(\"A\", \"B\") == order.Lt
   ```"
-  {:malli/schema [:=> [:cat :string :string] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
+  {:malli/schema [:=> [:cat :string :string]
+                      [:or [:fn order/Lt?] [:fn order/Eq?] [:fn order/Gt?]]]}
   [a b]
   (let [subject (= a b)]
     (if subject
@@ -193,7 +196,7 @@
 
 (def ^{:malli/schema [:=> [:cat :string :string] :boolean]} ends-with gleam-ffi/ends-with)
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]} pop-grapheme gleam-ffi/pop-grapheme)
+(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]} pop-grapheme gleam-ffi/pop-grapheme)
 
 (defn- to-graphemes-loop [string acc]
   (let [subject (pop-grapheme string)]
@@ -248,7 +251,8 @@
   ```gleam
   assert string.split_once(\"home/gleam/desktop/\", on: \"?\") == Error(Nil)
   ```"
-  {:malli/schema [:=> [:cat :string :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat :string :string]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [string substring]
   (let [subject (erl-split string substring)]
     (if (= (count subject) 2)
@@ -445,7 +449,7 @@
   "Converts an integer to a `UtfCodepoint`.
   
   Returns an `Error` if the integer does not represent a valid UTF codepoint."
-  {:malli/schema [:=> [:cat :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat :int] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [value]
   (cond
     (> value 1114111) (p/->Error nil)
@@ -469,7 +473,8 @@
   ```gleam
   assert string.to_option(\"hats\") == Some(\"hats\")
   ```"
-  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]}
+  {:malli/schema [:=> [:cat :string]
+                      [:or [:fn option/Some?] [:fn option/None?]]]}
   [string]
   (if (= string "") (option/->None) (option/->Some string)))
 
@@ -487,7 +492,7 @@
   ```gleam
   assert string.first(\"icecream\") == Ok(\"i\")
   ```"
-  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [string]
   (let [subject (pop-grapheme string)]
     (if (instance? Ok subject)
@@ -513,7 +518,7 @@
   ```gleam
   assert string.last(\"icecream\") == Ok(\"m\")
   ```"
-  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [string]
   (let [subject (pop-grapheme string)]
     (cond

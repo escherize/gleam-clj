@@ -7,10 +7,11 @@
 
 ;; type Set
 (defrecord Set [dict])
+(defn Set? [v] (instance? Set v))
 
 (defn new*
   "Creates a new empty set."
-  {:malli/schema [:=> [:cat] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat] [:fn Set?]]}
   []
   (->Set (dict/new*)))
 
@@ -28,7 +29,7 @@
   |> set.size
   == 2
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)]] :int]}
+  {:malli/schema [:=> [:cat [:fn Set?]] :int]}
   [set]
   (dict/size (:dict set)))
 
@@ -44,7 +45,7 @@
   ```gleam
   assert !{ set.new() |> set.insert(1) |> set.is_empty }
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)]] :boolean]}
+  {:malli/schema [:=> [:cat [:fn Set?]] :boolean]}
   [set]
   (= set (new*)))
 
@@ -64,7 +65,7 @@
   |> set.size
   == 2
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] :any] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat [:fn Set?] :any] [:fn Set?]]}
   [set member]
   (->Set (dict/insert (:dict set) member token)))
 
@@ -88,7 +89,7 @@
   |> set.contains(1)
   }
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] :any] :boolean]}
+  {:malli/schema [:=> [:cat [:fn Set?] :any] :boolean]}
   [set member]
   (-> (:dict set) (dict/get member) result/is-ok))
 
@@ -108,7 +109,7 @@
   |> set.contains(2)
   }
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] :any] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat [:fn Set?] :any] [:fn Set?]]}
   [set member]
   (->Set (dict/delete (:dict set) member)))
 
@@ -125,7 +126,7 @@
   ```gleam
   assert set.new() |> set.insert(2) |> set.to_list == [2]
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:fn Set?]] [:sequential :any]]}
   [set]
   (dict/keys (:dict set)))
 
@@ -146,7 +147,7 @@
   |> list.sort(by: int.compare)
   == [1, 2, 3, 4]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any]] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat [:sequential :any]] [:fn Set?]]}
   [members]
   (let [dict (list/fold members
                         (dict/new*)
@@ -168,7 +169,8 @@
   |> set.fold(0, fn(accumulator, member) { accumulator + member })
   == 13
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] :any [:=> [:cat :any :any] :any]] :any]}
+  {:malli/schema [:=> [:cat [:fn Set?] :any [:=> [:cat :any :any] :any]]
+                      :any]}
   [set initial reducer]
   (dict/fold (:dict set) initial (fn [a k _] (reducer a k))))
 
@@ -188,7 +190,8 @@
   |> set.to_list
   == [4, 6, 44]
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:=> [:cat :any] :boolean]] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat [:fn Set?] [:=> [:cat :any] :boolean]]
+                      [:fn Set?]]}
   [set predicate]
   (->Set (dict/filter (:dict set) (fn [m _] (predicate m)))))
 
@@ -204,7 +207,7 @@
   |> set.to_list
   == [2, 4, 6, 8]
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:=> [:cat :any] :any]] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat [:fn Set?] [:=> [:cat :any] :any]] [:fn Set?]]}
   [set fun]
   (fold set (new*) (fn [acc member] (insert acc (fun member)))))
 
@@ -220,7 +223,7 @@
   |> set.to_list
   == [2, 4]
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:sequential :any]] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat [:fn Set?] [:sequential :any]] [:fn Set?]]}
   [set disallowed]
   (list/fold disallowed set delete))
 
@@ -238,7 +241,7 @@
   |> set.to_list
   == [1, 3]
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:sequential :any]] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat [:fn Set?] [:sequential :any]] [:fn Set?]]}
   [set desired]
   (->Set (dict/take (:dict set) desired)))
 
@@ -257,7 +260,7 @@
   assert set.union(set.from_list([1, 2]), set.from_list([2, 3])) |> set.to_list
   == [1, 2, 3]
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] [:fn Set?]]}
   [first' second]
   (let [[larger smaller] (order first' second)]
     (fold smaller larger insert)))
@@ -274,7 +277,7 @@
   |> set.to_list
   == [2]
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] [:fn Set?]]}
   [first' second]
   (let [[larger smaller] (order first' second)]
     (take larger (to-list smaller))))
@@ -290,7 +293,7 @@
   |> set.to_list
   == [1]
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] [:fn Set?]]}
   [first' second]
   (drop first' (to-list second)))
 
@@ -306,7 +309,7 @@
   ```gleam
   assert !set.is_subset(set.from_list([1, 2, 3]), set.from_list([3, 4, 5]))
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] :boolean]}
+  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] :boolean]}
   [first' second]
   (= (intersection first' second) first'))
 
@@ -322,7 +325,7 @@
   ```gleam
   assert !set.is_disjoint(set.from_list([1, 2, 3]), set.from_list([3, 4, 5]))
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] :boolean]}
+  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] :boolean]}
   [first' second]
   (= (intersection first' second) (new*)))
 
@@ -340,7 +343,7 @@
   |> set.to_list
   == [1, 2, 4]
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:fn (partial instance? gleam.set.Set)]] [:fn (partial instance? gleam.set.Set)]]}
+  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] [:fn Set?]]}
   [first' second]
   (difference (union first' second) (intersection first' second)))
 
@@ -363,7 +366,7 @@
   // banana
   // cherry
   ```"
-  {:malli/schema [:=> [:cat [:fn (partial instance? gleam.set.Set)] [:=> [:cat :any] :any]] :nil]}
+  {:malli/schema [:=> [:cat [:fn Set?] [:=> [:cat :any] :any]] :nil]}
   [set fun]
   (fold set
         nil

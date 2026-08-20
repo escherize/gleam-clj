@@ -273,6 +273,7 @@
   \"Welcome, \" <> name
   // -> \"Welcome, User 54\"
   ```"
-  {:malli/schema [:=> [:cat :boolean [:=> [:cat] :any] [:=> [:cat] :any]] :any]}
+  {:malli/schema [:=> [:cat :boolean [:=> [:cat] :any] [:=> [:cat] :any]]
+                      :any]}
   [requirement consequence alternative]
   (if requirement (consequence) (alternative)))

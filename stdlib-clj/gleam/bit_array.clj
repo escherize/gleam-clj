@@ -2,7 +2,6 @@
   (:refer-clojure :exclude [compare concat])
   (:require
    [gleam-ffi]
-   #_{:clj-kondo/ignore [:unused-namespace]}
    [gleam.order :as order]
    [gleam.prelude :as p]
    [gleam.string :as string]))
@@ -33,7 +32,7 @@
   [first' second]
   (concat (list first' second)))
 
-(def ^{:malli/schema [:=> [:cat [:vector :int] :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]} slice gleam-ffi/ba-slice)
+(def ^{:malli/schema [:=> [:cat [:vector :int] :int :int] [:or [:fn p/Ok?] [:fn p/Error?]]]} slice gleam-ffi/ba-slice)
 
 (def ^{:malli/schema [:=> [:cat [:vector :int]] :boolean]} is-utf8 gleam-ffi/ba-is-utf8)
 
@@ -43,7 +42,7 @@
   "Converts a bit array to a string.
   
   Returns an error if the bit array is invalid UTF-8 data."
-  {:malli/schema [:=> [:cat [:vector :int]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:vector :int]] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [bits]
   (let [subject (is-utf8 bits)]
     (if subject (p/->Ok (unsafe-to-string bits)) (p/->Error nil))))
@@ -54,7 +53,7 @@
 
 (defn base64-decode
   "Decodes a base 64 encoded string into a `BitArray`."
-  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [encoded]
   (let [padded (let [subject (rem (byte-size (from-string encoded)) 4)]
                  (if (= subject 0)
@@ -79,16 +78,16 @@
 (defn base64-url-decode
   "Decodes a base 64 encoded string with URL and filename safe alphabet into a
   `BitArray`."
-  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [encoded]
   (-> encoded (string/replace "-" "+") (string/replace "_" "/") base64-decode))
 
 (def ^{:malli/schema [:=> [:cat [:vector :int]] :string]} base16-encode gleam-ffi/ba-base16-encode)
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]} base16-decode gleam-ffi/ba-base16-decode)
+(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]} base16-decode gleam-ffi/ba-base16-decode)
 
 (def ^{:malli/schema [:=> [:cat [:vector :int]] :string]} inspect gleam-ffi/ba-inspect)
 
-(def ^{:malli/schema [:=> [:cat [:vector :int] [:vector :int]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]} compare gleam-ffi/ba-compare)
+(def ^{:malli/schema [:=> [:cat [:vector :int] [:vector :int]] [:or [:fn order/Lt?] [:fn order/Eq?] [:fn order/Gt?]]]} compare gleam-ffi/ba-compare)
 
 (def ^{:malli/schema [:=> [:cat [:vector :int] [:vector :int]] :boolean]} starts-with gleam-ffi/ba-starts-with)

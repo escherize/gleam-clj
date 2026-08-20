@@ -4,18 +4,21 @@
    [gleam.dict :as dict]
    [gleam.float :as float]
    [gleam.int :as int]
-   #_{:clj-kondo/ignore [:unused-namespace]}
    [gleam.order :as order]
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
 ;; type ContinueOrStop
 (defrecord Continue [value])
+(defn Continue? [v] (instance? Continue v))
 (defrecord Stop [value])
+(defn Stop? [v] (instance? Stop v))
 
 ;; type Sorting
 (defrecord Ascending [])
+(defn Ascending? [v] (instance? Ascending v))
 (defrecord Descending [])
+(defn Descending? [v] (instance? Descending v))
 
 (defn- length-loop [list' count']
   (if (seq list')
@@ -76,7 +79,8 @@
   ```gleam
   assert list.count([1, 2, 3], int.is_odd) == 2
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] :int]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
+                      :int]}
   [list' predicate]
   (count-loop list' predicate 0))
 
@@ -190,7 +194,8 @@
   ```gleam
   assert list.first([1, 2]) == Ok(1)
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :any]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list']
   (if (empty? list')
     (p/->Error nil)
@@ -216,7 +221,8 @@
   ```gleam
   assert list.rest([1, 2]) == Ok([2])
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :any]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list']
   (if (empty? list')
     (p/->Error nil)
@@ -254,7 +260,8 @@
   |> dict.to_list
   == [#(0, [3]), #(1, [4, 1]), #(2, [5, 2])]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] [:map-of :any [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]]
+                      [:map-of :any [:sequential :any]]]}
   [list' key]
   (dict/group key list'))
 
@@ -277,7 +284,8 @@
   ```gleam
   assert list.filter([2, 4, 6, 1], fn(x) { x > 6 }) == []
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
+                      [:sequential :any]]}
   [list' predicate]
   (filter-loop list' predicate (list)))
 
@@ -300,7 +308,8 @@
   ```gleam
   assert list.filter_map([2, 4, 6, 1], fn(x) { Ok(x + 1) }) == [3, 5, 7, 2]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:sequential :any]]}
   [list' fun]
   (filter-map-loop list' fun (list)))
 
@@ -318,7 +327,8 @@
   ```gleam
   assert list.map([2, 4, 6], fn(x) { x * 2 }) == [4, 8, 12]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]]
+                      [:sequential :any]]}
   [list' fun]
   (map-loop list' fun (list)))
 
@@ -343,7 +353,8 @@
   assert list.map2([1, 2], [\"a\", \"b\", \"c\"], fn(i, x) { #(i, x) })
   == [#(1, \"a\"), #(2, \"b\")]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any] [:=> [:cat :any :any] :any]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any] [:=> [:cat :any :any] :any]]
+                      [:sequential :any]]}
   [list1 list2 fun]
   (map2-loop list1 list2 fun (list)))
 
@@ -364,7 +375,8 @@
   })
   == #(106, [2, 4, 6])
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:tuple :any :any]]] [:tuple :any [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:tuple :any :any]]]
+                      [:tuple :any [:sequential :any]]]}
   [list' initial fun]
   (map-fold-loop list' fun initial (list)))
 
@@ -387,7 +399,8 @@
   assert list.index_map([\"a\", \"b\"], fn(x, i) { #(i, x) })
   == [#(0, \"a\"), #(1, \"b\")]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :int] :any]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :int] :any]]
+                      [:sequential :any]]}
   [list' fun]
   (index-map-loop list' fun 0 (list)))
 
@@ -429,7 +442,8 @@
   ```gleam
   assert list.try_map([[1], [], [2]], list.first) == Error(Nil)
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' fun]
   (try-map-loop list' fun (list)))
 
@@ -541,7 +555,8 @@
   ```gleam
   assert list.append([1, 2], [3]) == [1, 2, 3]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]]
+                      [:sequential :any]]}
   [first' second]
   (append-loop (reverse first') second))
 
@@ -579,7 +594,8 @@
   ```gleam
   assert list.flatten([[1], [2, 3], []]) == [1, 2, 3]
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:sequential :any]]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential [:sequential :any]]]
+                      [:sequential :any]]}
   [lists]
   (flatten-loop lists (list)))
 
@@ -591,7 +607,8 @@
   ```gleam
   assert list.flat_map([2, 4, 6], fn(x) { [x, x + 1] }) == [2, 3, 4, 5, 6, 7]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:sequential :any]]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:sequential :any]]]
+                      [:sequential :any]]}
   [list' fun]
   (flatten (map list' fun)))
 
@@ -603,7 +620,8 @@
   `add(add(add(0, 1), 2), 3)`.
   
   This function runs in linear time."
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]] :any]}
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]]
+                      :any]}
   [list' initial fun]
   (if (empty? list')
     initial
@@ -621,7 +639,8 @@
   
   Unlike `fold` this function is not tail recursive. Where possible use
   `fold` instead as it will use less memory."
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]] :any]}
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]]
+                      :any]}
   [list' initial fun]
   (if (empty? list')
     initial
@@ -652,7 +671,8 @@
   |> list.index_fold(0, fn(acc, item, index) { acc + item * index })
   == 80
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any :int] :any]] :any]}
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any :int] :any]]
+                      :any]}
   [list' initial fun]
   (index-fold-loop list' initial fun 0))
 
@@ -675,7 +695,8 @@
   })
   == Error(Nil)
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' initial fun]
   (if (empty? list')
     (p/->Ok initial)
@@ -705,7 +726,8 @@
   })
   == 3
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.list.Continue)] [:fn (partial instance? gleam.list.Stop)]]]] :any]}
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:or [:fn Continue?] [:fn Stop?]]]]
+                      :any]}
   [list' initial fun]
   (if (empty? list')
     initial
@@ -735,7 +757,8 @@
   ```gleam
   assert list.find([], fn(_) { True }) == Error(Nil)
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' is-desired]
   (if (empty? list')
     (p/->Error nil)
@@ -761,7 +784,8 @@
   ```gleam
   assert list.find_map([], list.first) == Error(Nil)
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' fun]
   (if (empty? list')
     (p/->Error nil)
@@ -789,7 +813,8 @@
   ```gleam
   assert !list.all([4, 3], fn(x) { x > 3 })
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] :boolean]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
+                      :boolean]}
   [list' predicate]
   (if (empty? list')
     true
@@ -818,7 +843,8 @@
   ```gleam
   assert list.any([3, 4], fn(x) { x > 3 })
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] :boolean]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
+                      :boolean]}
   [list' predicate]
   (if (empty? list')
     false
@@ -854,7 +880,8 @@
   ```gleam
   assert list.zip([1, 2], [3, 4]) == [#(1, 3), #(2, 4)]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]] [:sequential [:tuple :any :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]]
+                      [:sequential [:tuple :any :any]]]}
   [list' other]
   (zip-loop list' other (list)))
 
@@ -887,7 +914,8 @@
   ```gleam
   assert list.strict_zip([1, 2], [3, 4]) == Ok([#(1, 3), #(2, 4)])
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' other]
   (strict-zip-loop list' other (list)))
 
@@ -909,7 +937,8 @@
   ```gleam
   assert list.unzip([]) == #([], [])
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]]] [:tuple [:sequential :any] [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]]]
+                      [:tuple [:sequential :any] [:sequential :any]]]}
   [input]
   (unzip-loop input (list) (list)))
 
@@ -1095,7 +1124,8 @@
   assert list.sort([4, 3, 6, 5, 4, 1, 2], by: int.compare)
   == [1, 2, 3, 4, 4, 5, 6]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:or [:fn order/Lt?] [:fn order/Eq?] [:fn order/Gt?]]]]
+                      [:sequential :any]]}
   [list' compare]
   (cond
     (empty? list') (list)
@@ -1152,7 +1182,8 @@
   ```gleam
   assert list.split([6, 7, 8, 9], 4) == #([6, 7, 8, 9], [])
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :int] [:tuple [:sequential :any] [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] :int]
+                      [:tuple [:sequential :any] [:sequential :any]]]}
   [list' index]
   (split-loop list' index (list)))
 
@@ -1180,7 +1211,8 @@
   assert list.split_while([1, 2, 3, 4, 5], fn(x) { x <= 5 })
   == #([1, 2, 3, 4, 5], [])
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:tuple [:sequential :any] [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
+                      [:tuple [:sequential :any] [:sequential :any]]]}
   [list' predicate]
   (split-while-loop list' predicate (list)))
 
@@ -1206,7 +1238,8 @@
   ```gleam
   assert list.key_find([#(\"a\", 0), #(\"b\", 1)], \"c\") == Error(Nil)
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [keyword-list desired-key]
   (find-map keyword-list
             (fn [keyword]
@@ -1229,7 +1262,8 @@
   ```gleam
   assert list.key_filter([#(\"a\", 0), #(\"b\", 1)], \"c\") == []
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any]
+                      [:sequential :any]]}
   [keyword-list desired-key]
   (filter-map keyword-list
               (fn [keyword]
@@ -1265,7 +1299,8 @@
   ```gleam
   assert list.key_pop([#(\"a\", 0), #(\"b\", 1)], \"c\") == Error(Nil)
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' key]
   (key-pop-loop list' key (list)))
 
@@ -1294,7 +1329,8 @@
   assert list.key_set([#(5, 0), #(4, 1)], 1, 100)
   == [#(5, 0), #(4, 1), #(1, 100)]
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any :any] [:sequential [:tuple :any :any]]]}
+  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any :any]
+                      [:sequential [:tuple :any :any]]]}
   [list' key value]
   (key-set-loop list' key value (list)))
 
@@ -1332,7 +1368,8 @@
   assert list.try_each(over: [1, 2, 3], with: function_that_might_fail)
   == Ok(Nil)
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' fun]
   (if (empty? list')
     (p/->Ok nil)
@@ -1361,7 +1398,8 @@
   
   assert [1, 2, 3, 4, 5] |> list.partition(int.is_odd) == #([1, 3, 5], [2, 4])
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:tuple [:sequential :any] [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
+                      [:tuple [:sequential :any] [:sequential :any]]]}
   [list' categorise]
   (partition-loop list' categorise (list) (list)))
 
@@ -1391,7 +1429,8 @@
   ```gleam
   assert list.permutations([1, 2]) == [[1, 2], [2, 1]]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any]] [:sequential [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any]]
+                      [:sequential [:sequential :any]]]}
   [list']
   (if (empty? list')
     (list (list))
@@ -1414,7 +1453,8 @@
   ```gleam
   assert list.window([1, 2], 4) == []
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] :int]
+                      [:sequential [:sequential :any]]]}
   [list' n]
   (let [subject (<= n 0)]
     (if subject (list) (window-loop (list) list' n))))
@@ -1431,7 +1471,8 @@
   ```gleam
   assert list.window_by_2([1]) == []
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any]] [:sequential [:tuple :any :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any]]
+                      [:sequential [:tuple :any :any]]]}
   [list']
   (zip list' (drop list' 1)))
 
@@ -1443,7 +1484,8 @@
   ```gleam
   assert list.drop_while([1, 2, 3, 4], fn(x) { x < 3 }) == [3, 4]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
+                      [:sequential :any]]}
   [list' predicate]
   (if (empty? list')
     (list)
@@ -1464,7 +1506,8 @@
   ```gleam
   assert list.take_while([1, 2, 3, 2, 4], fn(x) { x < 3 }) == [1, 2]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
+                      [:sequential :any]]}
   [list' predicate]
   (take-while-loop list' predicate (list)))
 
@@ -1487,7 +1530,8 @@
   assert [1, 2, 2, 3, 4, 4, 6, 7, 7] |> list.chunk(by: fn(n) { n % 2 })
   == [[1], [2, 2], [3], [4, 4, 6], [7, 7]]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] [:sequential [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]]
+                      [:sequential [:sequential :any]]]}
   [list' f]
   (if (empty? list')
     (list)
@@ -1524,7 +1568,8 @@
   assert [1, 2, 3, 4, 5, 6, 7, 8] |> list.sized_chunk(into: 3)
   == [[1, 2, 3], [4, 5, 6], [7, 8]]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] :int]
+                      [:sequential [:sequential :any]]]}
   [list' count']
   (sized-chunk-loop list' count' count' (list) (list)))
 
@@ -1546,7 +1591,8 @@
   ```gleam
   assert [1, 2, 3, 4, 5] |> list.reduce(fn(acc, x) { acc + x }) == Ok(15)
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] :any]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' fun]
   (if (empty? list')
     (p/->Error nil)
@@ -1568,7 +1614,8 @@
   assert list.scan(over: [1, 2, 3], from: 100, with: fn(acc, i) { acc + i })
   == [101, 103, 106]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]]
+                      [:sequential :any]]}
   [list' initial fun]
   (scan-loop list' initial (list) fun))
 
@@ -1588,7 +1635,8 @@
   ```gleam
   assert list.last([1, 2, 3, 4, 5]) == Ok(5)
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :any]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list']
   (cond
     (empty? list') (p/->Error nil)
@@ -1610,7 +1658,8 @@
   assert list.combinations([1, 2, 3, 4], 3)
   == [[1, 2, 3], [1, 2, 4], [1, 3, 4], [2, 3, 4]]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] :int]
+                      [:sequential [:sequential :any]]]}
   [items n]
   (cond
     (= n 0) (list (list))
@@ -1636,7 +1685,8 @@
   ```gleam
   assert list.combination_pairs([1, 2, 3]) == [#(1, 2), #(1, 3), #(2, 3)]
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any]] [:sequential [:tuple :any :any]]]}
+  {:malli/schema [:=> [:cat [:sequential :any]]
+                      [:sequential [:tuple :any :any]]]}
   [items]
   (combination-pairs-loop items (list)))
 
@@ -1669,7 +1719,8 @@
   assert list.transpose([[1, 2, 3], [101, 102, 103]])
   == [[1, 101], [2, 102], [3, 103]]
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:sequential :any]]] [:sequential [:sequential :any]]]}
+  {:malli/schema [:=> [:cat [:sequential [:sequential :any]]]
+                      [:sequential [:sequential :any]]]}
   [list-of-lists]
   (transpose-loop list-of-lists (list)))
 
@@ -1682,7 +1733,8 @@
   assert list.interleave([[1, 2], [101, 102], [201, 202]])
   == [1, 101, 201, 2, 102, 202]
   ```"
-  {:malli/schema [:=> [:cat [:sequential [:sequential :any]]] [:sequential :any]]}
+  {:malli/schema [:=> [:cat [:sequential [:sequential :any]]]
+                      [:sequential :any]]}
   [list']
   (-> list' transpose flatten))
 
@@ -1734,7 +1786,8 @@
   ```gleam
   assert [\"a\", \"c\", \"b\"] |> list.max(string.compare) == Ok(\"c\")
   ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:or [:fn order/Lt?] [:fn order/Eq?] [:fn order/Gt?]]]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' compare]
   (if (empty? list')
     (p/->Error nil)

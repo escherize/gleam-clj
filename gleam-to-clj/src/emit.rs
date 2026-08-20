@@ -70,6 +70,9 @@ pub fn build_typed_global(modules: &[AnalyzedModule]) -> TypedGlobal {
 
 struct Emit<'a> {
     module_path: &'a str,
+    /// modules referenced by schema predicates; they must be required even
+    /// when nothing else in the body uses them
+    schema_requires: std::cell::RefCell<HashSet<String>>,
     /// module -> alias used in this file
     aliases: HashMap<String, String>,
     global: &'a TypedGlobal,
@@ -136,6 +139,23 @@ impl Emit<'_> {
         }
     }
 
+    /// Reference to a variant's generated predicate fn (`Circle?`).
+    fn pred_ref(&self, module: &str, name: &str) -> String {
+        if module == "gleam" {
+            let _ = self.schema_requires.borrow_mut().insert("gleam.prelude".into());
+            return format!("p/{name}?");
+        }
+        if module == self.module_path {
+            return format!("{name}?");
+        }
+        let ns = kebab(&module.replace("/", "."));
+        let _ = self.schema_requires.borrow_mut().insert(ns.clone());
+        match self.aliases.get(module) {
+            Some(alias) => format!("{alias}/{name}?"),
+            None => format!("{ns}/{name}?"),
+        }
+    }
+
     fn ctor_class(&self, module: &str, name: &str) -> String {
         if module == "gleam" {
             class_ref(name)
@@ -170,6 +190,7 @@ pub fn emit_module(
     }
     let ctx = Emit {
         module_path: &am.path,
+        schema_requires: std::cell::RefCell::new(HashSet::new()),
         aliases,
         global,
         externals,
@@ -329,7 +350,24 @@ pub fn emit_module(
     if !excludes.is_empty() {
         let _ = writeln!(header, "  (:refer-clojure :exclude [{}])", excludes.join(" "));
     }
-    let needs_prelude = body.contains("p/") || body.contains("gleam.prelude.");
+    let schema_requires = ctx.schema_requires.borrow();
+    let needs_prelude = body.contains("p/")
+        || body.contains("gleam.prelude.")
+        || schema_requires.contains("gleam.prelude");
+    let self_ns = kebab(&am.path.replace("/", "."));
+    let extra_requires: Vec<String> = {
+        let mut v: Vec<String> = schema_requires
+            .iter()
+            .filter(|ns| {
+                ns.as_str() != "gleam.prelude"
+                    && ns.as_str() != self_ns
+                    && !require_entries.iter().any(|e| e.contains(&format!("[{ns} ")))
+            })
+            .map(|ns| format!("[{ns}]"))
+            .collect();
+        v.sort();
+        v
+    };
     let kept: Vec<&String> = require_entries
         .iter()
         .filter(|entry| {
@@ -347,6 +385,7 @@ pub fn emit_module(
             }
         })
         .collect();
+    let kept: Vec<&String> = kept.into_iter().chain(extra_requires.iter()).collect();
     if !kept.is_empty() {
         let _ = writeln!(header, "  (:require");
         for (i, entry) in kept.iter().enumerate() {
@@ -418,8 +457,11 @@ fn malli_type(ctx: &Emit, t: &gleam_core::type_::Type) -> String {
                     format!("[:sequential {inner}]")
                 }
                 ("gleam", "Result") => {
-                    "[:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]"
-                        .into()
+                    format!(
+                        "[:or [:fn {}] [:fn {}]]",
+                        ctx.pred_ref("gleam", "Ok"),
+                        ctx.pred_ref("gleam", "Error")
+                    )
                 }
                 ("gleam/dict", "Dict") => {
                     let k = arguments
@@ -440,10 +482,9 @@ fn malli_type(ctx: &Emit, t: &gleam_core::type_::Type) -> String {
                     else {
                         return ":any".into();
                     };
-                    let pkg = m.replace("/", ".");
                     let checks: Vec<String> = variants
                         .iter()
-                        .map(|v| format!("[:fn (partial instance? {pkg}.{v})]"))
+                        .map(|v| format!("[:fn {}]", ctx.pred_ref(m, v)))
                         .collect();
                     if checks.len() == 1 {
                         checks.into_iter().next().expect("one variant")
@@ -464,18 +505,36 @@ fn emit_custom_type(out: &mut String, t: &TypedCustomType) {
         }
         let fields = constructor_field_names(c);
         let _ = writeln!(out, "(defrecord {} [{}])", c.name, fields.join(" "));
+        let _ = writeln!(out, "(defn {}? [v] (instance? {} v))", c.name, c.name);
     }
 }
 
-/// Malli function schema for a fn's checked signature.
-fn fn_schema(ctx: &Emit, f: &TypedFunction) -> String {
+/// Malli function schema for a fn's checked signature, as (input, output).
+fn fn_schema_parts(ctx: &Emit, f: &TypedFunction) -> (String, String) {
     let args: Vec<String> = f.arguments.iter().map(|a| malli_type(ctx, &a.type_)).collect();
     let cat = if args.is_empty() {
         "[:cat]".to_string()
     } else {
         format!("[:cat {}]", args.join(" "))
     };
-    format!("[:=> {cat} {}]", malli_type(ctx, &f.return_type))
+    (cat, malli_type(ctx, &f.return_type))
+}
+
+fn fn_schema(ctx: &Emit, f: &TypedFunction) -> String {
+    let (cat, ret) = fn_schema_parts(ctx, f);
+    format!("[:=> {cat} {ret}]")
+}
+
+/// The schema attr-map, wrapped when it would overflow the line: the return
+/// schema aligns under the argument schema.
+fn schema_attr(ctx: &Emit, f: &TypedFunction, ind: usize) -> String {
+    let (cat, ret) = fn_schema_parts(ctx, f);
+    let inline = format!("{{:malli/schema [:=> {cat} {ret}]}}");
+    if fits(&inline, ind) {
+        return inline;
+    }
+    let pad = ind + "{:malli/schema [:=> ".len();
+    format!("{{:malli/schema [:=> {cat}\n{}{ret}]}}", sp(pad))
 }
 
 fn emit_function(ctx: &Emit, f: &TypedFunction) -> String {
@@ -514,7 +573,7 @@ fn emit_function(ctx: &Emit, f: &TypedFunction) -> String {
     let args: Vec<String> = f.arguments.iter().map(arg_name).collect();
 
     let mut out = format!("({defn} {name}");
-    let attr = public.then(|| format!("{{:malli/schema {}}}", fn_schema(ctx, f)));
+    let attr = public.then(|| schema_attr(ctx, f, 2));
     match &f.documentation {
         Some((_, doc)) => {
             let text: Vec<String> = doc
