@@ -1,1 +1,0 @@
--record(point, {x :: any(), y :: any()}).

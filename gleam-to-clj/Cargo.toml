@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-gleam-core = { path = "../../gleam/compiler-core" }
+gleam-core = { git = "https://github.com/escherize/gleam", rev = "d8ec90c28a10d33a509bc4ee839f5dd6aa1627aa" }
 camino = "1"
 
 [profile.dev]

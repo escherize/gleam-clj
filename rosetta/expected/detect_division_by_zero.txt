@@ -1,1 +1,0 @@
-result of division is 2

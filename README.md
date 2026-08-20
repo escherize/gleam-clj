@@ -1,5 +1,32 @@
 # gleam-clj
 
+A [Gleam](https://gleam.run) -> Clojure/JVM compiler. Not an official Gleam
+project.
+
+**Status: experimental.** Parse-only frontend (the typed-AST integration is
+planned); everything unsupported fails loudly at build time, nothing is
+silently wrong on purpose. Verified by stdout-parity corpora against real
+`gleam run`: 54/54 runnable Rosetta Code tasks, 58/58 runnable language-tour
+lessons, gleam_stdlib self-hosted, real hex packages (snag, glance) running
+byte-identical on the JVM.
+
+Known approximations: dict/set iteration is key-sorted (matches BEAM small
+maps), mutual recursion is JVM-stack-bounded (self tail calls become
+`recur`), int arithmetic auto-promotes via `+'` (bignum parity, boxed).
+
+## Licences and provenance
+
+- This project: Apache-2.0.
+- `stdlib-src/` vendors [gleam_stdlib](https://github.com/gleam-lang/stdlib)
+  (Apache-2.0); `stdlib-clj/` is compiled from it.
+- `tour/tasks/` vendors lesson code from
+  [gleam-lang/language-tour](https://github.com/gleam-lang/language-tour)
+  (Apache-2.0).
+- Rosetta Code task content is GFDL and is **not** redistributed here; run
+  `python3 rosetta/scrape.py` to fetch it locally.
+- Depends on [gleam-core](https://github.com/gleam-lang/gleam) via a fork
+  carrying a one-line patch (`pub mod call_graph`).
+
 Gleam -> Clojure compiler, v0.
 
 ## Pipeline

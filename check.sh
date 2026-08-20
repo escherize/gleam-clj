@@ -16,10 +16,15 @@ for m in coin-change shapes sum-to jellyfish ffi-demo; do
 done
 echo "fixtures ok"
 
-echo "== rosetta corpus"
-python3 rosetta/run.py 2>/dev/null | sed -n '/== totals/,/^$/p'
-
-echo "== tour corpus"
-python3 rosetta/run.py tour 2>/dev/null | sed -n '/== totals/,/^$/p'
+suite() {
+  if [ -z "$(ls "$1/tasks"/*.gleam 2>/dev/null)" ]; then
+    echo "== $1 corpus: no tasks (see $1/scrape.py or README), skipping"
+    return 0
+  fi
+  echo "== $1 corpus"
+  python3 rosetta/run.py "$1" 2>/dev/null | sed -n '/== totals/,/^$/p'
+}
+suite rosetta
+suite tour
 
 echo "ALL GREEN"

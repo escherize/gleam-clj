@@ -1,1 +1,0 @@
--record(jellyfish, {name :: binary(), jiggly :: boolean()}).

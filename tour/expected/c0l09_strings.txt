@@ -1,9 +1,0 @@
-👩‍💻 こんにちは Gleam 🏳️‍🌈
-multi
-    line
-    string
-😀
-"X" marks the spot
-One Two
-5 4 3 2 1
-abcdef

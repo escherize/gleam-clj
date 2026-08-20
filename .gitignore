@@ -1,2 +1,11 @@
 gleam-to-clj/target/
 .cpcache/
+# Scraped Rosetta Code content is GFDL-licensed; not redistributed.
+# Run: python3 rosetta/scrape.py && python3 rosetta/run.py
+rosetta/tasks/
+rosetta/expected/
+rosetta/gen/
+rosetta/work/
+tour/work/
+tour/expected/
+tour/gen/

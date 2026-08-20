@@ -1,2 +1,0 @@
-sum = 15
-product = 120
