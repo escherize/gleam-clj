@@ -22,7 +22,7 @@ suite() {
     return 0
   fi
   echo "== $1 corpus"
-  python3 rosetta/run.py "$1" 2>/dev/null | sed -n '/== totals/,/^$/p'
+  python3 rosetta/run.py "$1" 2>/dev/null | sed -n '/== totals/,$p'
 }
 suite rosetta
 suite tour
