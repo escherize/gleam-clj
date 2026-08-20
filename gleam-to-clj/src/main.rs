@@ -1331,10 +1331,6 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
     }
 }
 
-fn emit_call(ctx: &Ctx, fun: &UntypedExpr, arguments: &[CallArg<UntypedExpr>], ind: usize) -> String {
-    emit_call_t(ctx, fun, arguments, ind, None, false)
-}
-
 /// Order call arguments by the callee's parameter labels. Labelled arguments
 /// are only accepted when their positions are provable — anything else panics.
 fn reorder_labelled<'x, T>(
