@@ -1,4 +1,5 @@
 (ns repeat
+  (:refer-clojure :exclude [repeat])
   (:require
    [gleam.io :as io]
    [gleam.prelude :as p])

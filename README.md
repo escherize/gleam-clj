@@ -61,6 +61,26 @@ non-tail self-calls stay plain calls. Mutual recursion is stack-bounded on
 the JVM — deliberately not trampolined, since that would poison every return
 value at the interop boundary.
 
+## Multi-module builds
+
+`gleam-to-clj build <project-dir> <out-dir>` compiles every module under
+`<project-dir>/src` into one Clojure namespace each, in call-graph
+dependency order. Cross-module constructors work qualified (`g.Mouse(...)`)
+and via unqualified imports (`import mod.{Mouse}`). Top-level names that
+would shadow clojure.core get `(:refer-clojure :exclude [...])`.
+
+Labelled call arguments are verified against a signature registry (local
+fns, project modules, and a table generated from gleam_stdlib) and
+reordered; calls whose labels cannot be verified fail the build loudly —
+nothing is silently assumed positional.
+
+## Clojure FFI
+
+`@external(javascript, "clojure.string", "upper-case")` is interpreted as
+the Clojure binding: the fn emits as `(def shout clojure.string/upper-case)`
+and the namespace is required. (A proper `clojure` external target keyword
+awaits the typed-AST fork.)
+
 ## Tests
 
 `cargo test` in `gleam-to-clj/` snapshot-checks emitter output against the

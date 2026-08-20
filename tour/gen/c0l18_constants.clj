@@ -1,4 +1,5 @@
 (ns c0l18-constants
+  (:refer-clojure :exclude [floats ints])
   (:require
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))

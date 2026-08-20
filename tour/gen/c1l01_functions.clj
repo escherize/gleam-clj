@@ -1,4 +1,5 @@
 (ns c1l01-functions
+  (:refer-clojure :exclude [double])
   (:require
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))

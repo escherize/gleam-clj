@@ -34,3 +34,26 @@
 
 (defn drop-end [s n]
   (subs s 0 (max 0 (- (count s) n))))
+
+(defn inspect
+  "Gleam's string.inspect: render a value in Gleam literal syntax."
+  [v]
+  (cond
+    (nil? v) "Nil"
+    (true? v) "True"
+    (false? v) "False"
+    (string? v) (pr-str v)
+    (number? v) (str v)
+    (record? v) (str (.getSimpleName (class v))
+                     (when (seq v)
+                       (str "(" (str/join ", " (map inspect (vals v))) ")")))
+    (map? v) (str "dict.from_list(["
+                  (str/join ", " (map (fn [[k val]]
+                                        (str "#(" (inspect k) ", " (inspect val) ")"))
+                                      v))
+                  "])")
+    (set? v) (str "set.from_list([" (str/join ", " (map inspect v)) "])")
+    (vector? v) (str "#(" (str/join ", " (map inspect v)) ")")
+    (sequential? v) (str "[" (str/join ", " (map inspect v)) "]")
+    (fn? v) "//fn"
+    :else (pr-str v)))

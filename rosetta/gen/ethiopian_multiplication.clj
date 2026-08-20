@@ -1,4 +1,5 @@
 (ns ethiopian-multiplication
+  (:refer-clojure :exclude [double])
   (:require
    [gleam.int :as int]
    [gleam.prelude :as p])

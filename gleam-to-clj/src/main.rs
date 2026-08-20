@@ -29,8 +29,16 @@ const JAVA_LANG: &[&str] = &[
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 2 && args[1] == "build" {
+        if args.len() != 4 {
+            eprintln!("usage: gleam-to-clj build <project-dir> <out-dir>");
+            std::process::exit(2);
+        }
+        build_project(&args[2], &args[3]);
+        return;
+    }
     if args.len() < 2 {
-        eprintln!("usage: gleam-to-clj <input.gleam> [output.clj]");
+        eprintln!("usage: gleam-to-clj <input.gleam> [output.clj] | build <project-dir> <out-dir>");
         std::process::exit(2);
     }
     let input = &args[1];
@@ -43,10 +51,128 @@ fn main() {
         });
     let stem = path.file_stem().expect("file stem").to_string();
     let file_name = path.file_name().expect("file name").to_string();
-    let out = emit_module(&parsed.module, &stem, &file_name, &src);
+    let mut global = stdlib_registry();
+    register_module(&mut global, &stem, &parsed.module);
+    let out = emit_module(&parsed.module, &stem, &file_name, &src, &global);
     match args.get(2) {
         Some(out_path) => std::fs::write(out_path, out).expect("write output"),
         None => print!("{out}"),
+    }
+}
+
+/// Public shape of a module: constructor fields + per-fn parameter labels.
+#[derive(Default)]
+struct ModuleInfo {
+    constructors: HashMap<String, Vec<String>>,
+    /// gleam fn name -> external label of each parameter, in order
+    fn_labels: HashMap<String, Vec<Option<String>>>,
+}
+
+mod stdlib_labels;
+
+fn stdlib_registry() -> HashMap<String, ModuleInfo> {
+    let mut g: HashMap<String, ModuleInfo> = HashMap::new();
+    for (module, name, labels) in stdlib_labels::STDLIB_LABELS {
+        g.entry(module.to_string()).or_default().fn_labels.insert(
+            name.to_string(),
+            labels.iter().map(|l| l.map(String::from)).collect(),
+        );
+    }
+    let order = g.entry("gleam/order".to_string()).or_default();
+    for c in ["Lt", "Eq", "Gt"] {
+        order.constructors.insert(c.into(), vec![]);
+    }
+    let option = g.entry("gleam/option".to_string()).or_default();
+    option.constructors.insert("Some".into(), vec!["value".into()]);
+    option.constructors.insert("None".into(), vec![]);
+    g
+}
+
+fn register_module(global: &mut HashMap<String, ModuleInfo>, path: &str, module: &UntypedModule) {
+    let mut info = ModuleInfo::default();
+    for def in &module.definitions {
+        match &def.definition {
+            Definition::CustomType(t) => {
+                for c in &t.constructors {
+                    info.constructors
+                        .insert(c.name.to_string(), constructor_fields(c));
+                }
+            }
+            Definition::Function(f) => {
+                if let Some((_, name)) = &f.name {
+                    let labels = f
+                        .arguments
+                        .iter()
+                        .map(|a| match &a.names {
+                            ArgNames::NamedLabelled { label, .. }
+                            | ArgNames::LabelledDiscard { label, .. } => {
+                                Some(label.to_string())
+                            }
+                            _ => None,
+                        })
+                        .collect();
+                    info.fn_labels.insert(name.to_string(), labels);
+                }
+            }
+            _ => {}
+        }
+    }
+    global.insert(path.to_string(), info);
+}
+
+fn constructor_fields(c: &gleam_core::ast::RecordConstructor<()>) -> Vec<String> {
+    let n = c.arguments.len();
+    c.arguments
+        .iter()
+        .enumerate()
+        .map(|(i, a)| match &a.label {
+            Some((_, l)) => kebab(l.as_str()),
+            None if n == 1 => "value".to_string(),
+            None => format!("f{i}"),
+        })
+        .collect()
+}
+
+fn collect_gleam_files(dir: &std::path::Path, base: &std::path::Path, out: &mut Vec<(String, std::path::PathBuf)>) {
+    for entry in std::fs::read_dir(dir).expect("read src dir") {
+        let path = entry.expect("dir entry").path();
+        if path.is_dir() {
+            collect_gleam_files(&path, base, out);
+        } else if path.extension().is_some_and(|e| e == "gleam") {
+            let rel = path.strip_prefix(base).expect("strip prefix");
+            let module = rel.with_extension("");
+            out.push((module.to_string_lossy().to_string(), path));
+        }
+    }
+}
+
+fn build_project(proj: &str, out_dir: &str) {
+    let src_root = std::path::Path::new(proj).join("src");
+    let mut files = Vec::new();
+    collect_gleam_files(&src_root, &src_root, &mut files);
+    if files.is_empty() {
+        panic!("no .gleam files under {src_root:?}");
+    }
+    files.sort();
+
+    let mut parsed_modules = Vec::new();
+    let mut global = stdlib_registry();
+    for (module_path, file) in &files {
+        let src = std::fs::read_to_string(file).expect("read module");
+        let path = camino::Utf8PathBuf::from(file.to_string_lossy().to_string());
+        let parsed = parse::parse_module(path, &src, &WarningEmitter::null())
+            .unwrap_or_else(|e| panic!("parse error in {module_path}: {e:?}"));
+        register_module(&mut global, module_path, &parsed.module);
+        parsed_modules.push((module_path.clone(), file.clone(), src, parsed));
+    }
+
+    for (module_path, file, src, parsed) in &parsed_modules {
+        let file_name = file.file_name().expect("file name").to_string_lossy().to_string();
+        let code = emit_module(&parsed.module, module_path, &file_name, src, &global);
+        let out_path = std::path::Path::new(out_dir).join(format!("{module_path}.clj"));
+        std::fs::create_dir_all(out_path.parent().expect("parent")).expect("mkdir");
+        std::fs::write(&out_path, code).expect("write output");
+        eprintln!("emitted {}", out_path.display());
     }
 }
 
@@ -59,10 +185,11 @@ fn kebab(s: &str) -> String {
 }
 
 /// Where a constructor's record class lives.
+#[derive(Clone)]
 enum Origin {
     Local,
     Prelude,
-    Module(&'static str),
+    Module(String),
 }
 
 /// Clojure special forms: a top-level Gleam fn with one of these names gets
@@ -88,6 +215,13 @@ fn local_fn_name(kebab_name: &str) -> String {
     }
 }
 
+/// Public names of clojure.core, for :refer-clojure :exclude emission.
+fn clojure_core_names() -> &'static std::collections::HashSet<&'static str> {
+    static NAMES: std::sync::OnceLock<std::collections::HashSet<&'static str>> =
+        std::sync::OnceLock::new();
+    NAMES.get_or_init(|| include_str!("clojure_core_names.txt").lines().collect())
+}
+
 fn user_var(kebab_name: &str) -> String {
     if CORE_SHADOW.contains(&kebab_name) {
         format!("{kebab_name}'")
@@ -96,20 +230,26 @@ fn user_var(kebab_name: &str) -> String {
     }
 }
 
-struct Ctx {
+struct Ctx<'a> {
     /// alias -> full gleam module name, e.g. "dict" -> "gleam/dict"
     aliases: HashMap<String, String>,
     /// constructor name -> (field names, origin)
     constructors: HashMap<String, (Vec<String>, Origin)>,
     /// kebab-case names of this module's top-level functions
     local_fns: std::collections::HashSet<String>,
+    /// unqualified fn imports: kebab local name -> (alias, original gleam label)
+    unqualified_fns: HashMap<String, (String, String)>,
+    /// this module's gleam path, e.g. "glick80_api"
+    module_path: String,
+    /// every known module's public shape
+    global: &'a HashMap<String, ModuleInfo>,
     /// source file name, for echo location prefixes
     file: String,
     /// byte offset of each line start, for byte-offset -> line-number lookup
     line_starts: Vec<u32>,
 }
 
-impl Ctx {
+impl Ctx<'_> {
     /// 1-based line number for a byte offset.
     fn line_of(&self, byte: u32) -> usize {
         self.line_starts.partition_point(|&s| s <= byte)
@@ -162,7 +302,22 @@ fn class_ref(name: &str) -> String {
     }
 }
 
-impl Ctx {
+impl Ctx<'_> {
+    /// Fields of a constructor in an imported module, via its alias. Loud on
+    /// unknown modules/constructors.
+    fn imported_ctor_fields(&self, alias: &str, name: &str) -> &Vec<String> {
+        let module = self
+            .aliases
+            .get(alias)
+            .unwrap_or_else(|| panic!("unknown module alias {alias}"));
+        self.global
+            .get(module)
+            .unwrap_or_else(|| panic!("module {module} is not part of this build"))
+            .constructors
+            .get(name)
+            .unwrap_or_else(|| panic!("module {module} has no constructor {name}"))
+    }
+
     /// Constructor function reference, e.g. `->Circle`, `p/->Ok`, `order/->Lt`.
     fn ctor_ref(&self, name: &str) -> String {
         match self.constructors.get(name) {
@@ -172,7 +327,7 @@ impl Ctx {
                 let alias = self
                     .aliases
                     .iter()
-                    .find(|(_, v)| v.as_str() == *m)
+                    .find(|(_, v)| v.as_str() == m.as_str())
                     .map(|(k, _)| k.clone())
                     .unwrap_or_else(|| panic!("constructor {name} needs an import of {m}"));
                 format!("{alias}/->{name}")
@@ -192,7 +347,13 @@ impl Ctx {
     }
 }
 
-fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -> String {
+fn emit_module(
+    module: &UntypedModule,
+    module_path: &str,
+    file_name: &str,
+    src: &str,
+    global: &HashMap<String, ModuleInfo>,
+) -> String {
     let mut line_starts = vec![0u32];
     for (i, b) in src.bytes().enumerate() {
         if b == b'\n' {
@@ -204,35 +365,20 @@ fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -
     constructors.insert("Ok".to_string(), (val(), Origin::Prelude));
     constructors.insert("Error".to_string(), (val(), Origin::Prelude));
     for c in ["Lt", "Eq", "Gt"] {
-        constructors.insert(c.to_string(), (vec![], Origin::Module("gleam/order")));
+        constructors.insert(c.to_string(), (vec![], Origin::Module("gleam/order".into())));
     }
-    constructors.insert("Some".to_string(), (val(), Origin::Module("gleam/option")));
-    constructors.insert("None".to_string(), (vec![], Origin::Module("gleam/option")));
+    constructors.insert("Some".to_string(), (val(), Origin::Module("gleam/option".into())));
+    constructors.insert("None".to_string(), (vec![], Origin::Module("gleam/option".into())));
+    let self_info = &global[module_path];
+    for (name, fields) in &self_info.constructors {
+        constructors.insert(name.clone(), (fields.clone(), Origin::Local));
+    }
     let mut local_fns = std::collections::HashSet::new();
     for def in &module.definitions {
-        match &def.definition {
-            Definition::CustomType(t) => {
-                for c in &t.constructors {
-                    let n = c.arguments.len();
-                    let fields: Vec<String> = c
-                        .arguments
-                        .iter()
-                        .enumerate()
-                        .map(|(i, a)| match &a.label {
-                            Some((_, l)) => kebab(l.as_str()),
-                            None if n == 1 => "value".to_string(),
-                            None => format!("f{i}"),
-                        })
-                        .collect();
-                    constructors.insert(c.name.to_string(), (fields, Origin::Local));
-                }
+        if let Definition::Function(f) = &def.definition {
+            if let Some((_, n)) = &f.name {
+                local_fns.insert(kebab(n.as_str()));
             }
-            Definition::Function(f) => {
-                if let Some((_, n)) = &f.name {
-                    local_fns.insert(kebab(n.as_str()));
-                }
-            }
-            _ => {}
         }
     }
 
@@ -240,10 +386,29 @@ fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -
         aliases: HashMap::new(),
         constructors,
         local_fns,
+        unqualified_fns: HashMap::new(),
+        module_path: module_path.to_string(),
+        global,
         file: file_name.to_string(),
         line_starts,
     };
     let mut requires: Vec<(String, String)> = Vec::new(); // (clj ns, alias)
+
+    // @external(javascript, "some.clojure.ns", "fn") is interpreted as the
+    // Clojure binding on this backend; its namespace must be required.
+    let mut external_nses: Vec<String> = module
+        .definitions
+        .iter()
+        .filter_map(|def| match &def.definition {
+            Definition::Function(f) => {
+                f.external_javascript.as_ref().map(|(m, _, _)| m.to_string())
+            }
+            _ => None,
+        })
+        .filter(|m| m.contains('.'))
+        .collect();
+    external_nses.sort();
+    external_nses.dedup();
 
     for def in &module.definitions {
         if let Definition::Import(import) = &def.definition {
@@ -252,18 +417,64 @@ fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -
                 None => continue,
             };
             ctx.aliases.insert(alias.clone(), import.module.to_string());
+            for uv in &import.unqualified_values {
+                if uv.as_name.is_some() {
+                    panic!("unsupported: `as` rename in unqualified import of {}", uv.name);
+                }
+                let name = uv.name.as_str();
+                if name.starts_with(char::is_uppercase) {
+                    let fields = ctx.imported_ctor_fields(&alias, name).clone();
+                    ctx.constructors.insert(
+                        name.to_string(),
+                        (fields, Origin::Module(import.module.to_string())),
+                    );
+                } else {
+                    ctx.unqualified_fns
+                        .insert(kebab(name), (alias.clone(), name.to_string()));
+                }
+            }
             requires.push((kebab(&import.module.replace("/", ".")), alias));
         }
     }
     requires.push(("gleam.prelude".into(), "p".into()));
     requires.sort();
+    let mut require_entries: Vec<String> = requires
+        .iter()
+        .map(|(ns, alias)| format!("[{ns} :as {alias}]"))
+        .collect();
+    require_entries.extend(external_nses.iter().map(|ns| format!("[{ns}]")));
+    require_entries.sort();
+
+    // Top-level names that will shadow clojure.core get an explicit exclude
+    // (the emitter never emits these bare; names it does emit bare are
+    // renamed via CORE_SHADOW instead).
+    let mut excludes: Vec<String> = Vec::new();
+    for def in &module.definitions {
+        let name = match &def.definition {
+            Definition::Function(f) => {
+                f.name.as_ref().map(|(_, n)| local_fn_name(&kebab(n.as_str())))
+            }
+            Definition::ModuleConstant(c) => Some(user_var(&kebab(c.name.as_str()))),
+            _ => None,
+        };
+        if let Some(n) = name {
+            if clojure_core_names().contains(n.as_str()) {
+                excludes.push(n);
+            }
+        }
+    }
+    excludes.sort();
+    excludes.dedup();
 
     let mut out = String::new();
-    let _ = writeln!(out, "(ns {}", kebab(stem));
+    let _ = writeln!(out, "(ns {}", kebab(&module_path.replace("/", ".")));
+    if !excludes.is_empty() {
+        let _ = writeln!(out, "  (:refer-clojure :exclude [{}])", excludes.join(" "));
+    }
     let _ = writeln!(out, "  (:require");
-    for (i, (ns, alias)) in requires.iter().enumerate() {
-        let end = if i + 1 == requires.len() { ")" } else { "" };
-        let _ = writeln!(out, "   [{ns} :as {alias}]{end}");
+    for (i, entry) in require_entries.iter().enumerate() {
+        let end = if i + 1 == require_entries.len() { ")" } else { "" };
+        let _ = writeln!(out, "   {entry}{end}");
     }
     let _ = writeln!(out, "  (:import (gleam.prelude Ok)))");
 
@@ -332,7 +543,7 @@ fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -
                         out,
                         "\n(def {private}{} {})\n",
                         user_var(&kebab(c.name.as_str())),
-                        emit_constant(&c.value)
+                        emit_constant(&ctx, &c.value)
                     );
                 }
             }
@@ -346,6 +557,11 @@ fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -
 
 fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
     let name = local_fn_name(&kebab(f.name.as_ref().expect("function name").1.as_str()));
+    if let Some((module, fun, _)) = &f.external_javascript {
+        // Clojure external: alias the var directly; any Gleam body is the
+        // other-target fallback and is ignored here.
+        return format!("(def {name} {module}/{fun})\n");
+    }
     let defn = if f.publicity == Publicity::Public { "defn" } else { "defn-" };
     let args: Vec<String> = f
         .arguments
@@ -547,7 +763,15 @@ fn destructure_binding(ctx: &Ctx, pattern: &UntypedPattern) -> Option<String> {
                         f
                     }
                 };
+                // Discarded fields are simply not destructured (a repeated _
+                // key would be an illegal duplicate in a Clojure map form).
+                if matches!(arg.value, Pattern::Discard { .. }) {
+                    continue;
+                }
                 parts.push(format!("{} :{field}", destructure_binding(ctx, &arg.value)?));
+            }
+            if parts.is_empty() {
+                return Some("_".into());
             }
             Some(format!("{{{}}}", parts.join(" ")))
         }
@@ -697,10 +921,20 @@ fn pattern_cond_inner(
             "True" => tests.push(subj.to_string()),
             "False" => tests.push(format!("(not {subj})")),
             n => {
-                let Some((fields, _)) = ctx.constructors.get(n) else {
-                    panic!("unknown constructor in pattern (v0): {n}");
+                let (fields, cls) = match pattern {
+                    Pattern::Constructor { module: Some((alias, _)), .. } => {
+                        let fields = ctx.imported_ctor_fields(alias.as_str(), n);
+                        let m = ctx.aliases[alias.as_str()].replace("/", ".");
+                        (fields, format!("{m}.{n}"))
+                    }
+                    _ => {
+                        let Some((fields, _)) = ctx.constructors.get(n) else {
+                            panic!("unknown constructor in pattern (v0): {n}");
+                        };
+                        (fields, ctx.ctor_class(n))
+                    }
                 };
-                tests.push(format!("(instance? {} {subj})", ctx.ctor_class(n)));
+                tests.push(format!("(instance? {cls} {subj})"));
                 let mut pos = 0;
                 for arg in arguments {
                     let field = match &arg.label {
@@ -909,12 +1143,26 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
             },
             n => {
                 let k = kebab(n);
-                if ctx.local_fns.contains(&k) { local_fn_name(&k) } else { user_var(&k) }
+                if ctx.local_fns.contains(&k) {
+                    local_fn_name(&k)
+                } else if let Some((alias, label)) = ctx.unqualified_fns.get(&k) {
+                    ctx.module_fn(alias, label)
+                } else {
+                    user_var(&k)
+                }
             }
         },
         UntypedExpr::FieldAccess { container, label, .. } => {
             if let UntypedExpr::Var { name, .. } = container.as_ref() {
                 if ctx.aliases.contains_key(name.as_str()) {
+                    if label.starts_with(char::is_uppercase) {
+                        let fields = ctx.imported_ctor_fields(name.as_str(), label.as_str());
+                        return if fields.is_empty() {
+                            format!("({name}/->{label})")
+                        } else {
+                            format!("{name}/->{label}")
+                        };
+                    }
                     return ctx.module_fn(name.as_str(), label.as_str());
                 }
             }
@@ -975,7 +1223,9 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
                 format!("(fn [{}]\n{}{b})", args.join(" "), sp(ind + 2))
             }
         }
-        UntypedExpr::Call { fun, arguments, .. } => emit_call_t(ctx, fun, arguments, ind, tail),
+        UntypedExpr::Call { fun, arguments, .. } => {
+            emit_call_t(ctx, fun, arguments, ind, tail, false)
+        }
         UntypedExpr::PipeLine { expressions } => {
             let exprs: Vec<&UntypedExpr> = expressions.iter().collect();
             let first = emit_expr(ctx, exprs[0], ind + 4);
@@ -983,7 +1233,7 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
                 .iter()
                 .map(|step| match step {
                     UntypedExpr::Call { fun, arguments, .. } => {
-                        emit_call(ctx, fun, arguments, ind + 4)
+                        emit_call_t(ctx, fun, arguments, ind + 4, None, true)
                     }
                     v @ (UntypedExpr::Var { .. } | UntypedExpr::FieldAccess { .. }) => {
                         emit_expr(ctx, v, ind + 4)
@@ -1082,7 +1332,72 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
 }
 
 fn emit_call(ctx: &Ctx, fun: &UntypedExpr, arguments: &[CallArg<UntypedExpr>], ind: usize) -> String {
-    emit_call_t(ctx, fun, arguments, ind, None)
+    emit_call_t(ctx, fun, arguments, ind, None, false)
+}
+
+/// Order call arguments by the callee's parameter labels. Labelled arguments
+/// are only accepted when their positions are provable — anything else panics.
+fn reorder_labelled<'x, T>(
+    head: &str,
+    sig: Option<&Vec<Option<String>>>,
+    arguments: &'x [CallArg<T>],
+    piped: bool,
+) -> Vec<&'x CallArg<T>> {
+    if !arguments.iter().any(|a| a.label.is_some()) {
+        return arguments.iter().collect();
+    }
+    let Some(sig) = sig else {
+        panic!(
+            "labelled arguments to `{head}` cannot be verified without type \
+             information (parse-only); add the callee to the registry or use \
+             positional arguments"
+        );
+    };
+    // A pipe fills the first parameter, so labelled reordering works
+    // against the remaining ones.
+    let sig: Vec<Option<String>> = if piped {
+        if let Some(first) = sig.first().and_then(|l| l.as_ref()) {
+            for arg in arguments {
+                if arg.label.as_ref().is_some_and(|l| kebab(l.as_str()) == *first) {
+                    panic!(
+                        "piped call to `{head}` also labels its first parameter {first}"
+                    );
+                }
+            }
+        }
+        sig[1..].to_vec()
+    } else {
+        sig.clone()
+    };
+    if arguments.len() != sig.len() {
+        panic!(
+            "call to `{head}` has {} args but signature has {} parameters",
+            arguments.len(),
+            sig.len()
+        );
+    }
+    let mut slots: Vec<Option<&CallArg<T>>> = vec![None; sig.len()];
+    for arg in arguments.iter().filter(|a| a.label.is_some()) {
+        let label = kebab(arg.label.as_ref().expect("label").as_str());
+        let i = sig
+            .iter()
+            .position(|s| s.as_deref() == Some(label.as_str()))
+            .unwrap_or_else(|| panic!("`{head}` has no parameter labelled {label}"));
+        if slots[i].is_some() {
+            panic!("duplicate argument for label {label} in call to `{head}`");
+        }
+        slots[i] = Some(arg);
+    }
+    let mut positional = arguments.iter().filter(|a| a.label.is_none());
+    for slot in slots.iter_mut() {
+        if slot.is_none() {
+            *slot = positional.next();
+        }
+    }
+    slots
+        .into_iter()
+        .map(|s| s.unwrap_or_else(|| panic!("missing argument in call to `{head}`")))
+        .collect()
 }
 
 fn emit_call_t(
@@ -1091,6 +1406,7 @@ fn emit_call_t(
     arguments: &[CallArg<UntypedExpr>],
     ind: usize,
     tail: Option<&Tail>,
+    piped: bool,
 ) -> String {
     // Self-call in tail position -> recur (constant stack, matches BEAM TCO).
     if let (Some(t), UntypedExpr::Var { name, .. }) = (tail, fun) {
@@ -1103,14 +1419,62 @@ fn emit_call_t(
             return format!("(recur {})", args.join(" "));
         }
     }
-    let head = match fun {
+
+    // Head plus, when derivable, the callee's parameter labels (kebab-case,
+    // None = positional-only) — needed to reorder labelled arguments.
+    let (head, sig): (String, Option<Vec<Option<String>>>) = match fun {
         UntypedExpr::Var { name, .. } if name.starts_with(char::is_uppercase) => {
-            ctx.ctor_ref(name.as_str())
+            let sig = ctx
+                .constructors
+                .get(name.as_str())
+                .map(|(fields, _)| fields.iter().map(|f| Some(f.clone())).collect());
+            (ctx.ctor_ref(name.as_str()), sig)
         }
-        _ => emit_expr(ctx, fun, ind),
+        UntypedExpr::Var { name, .. } => {
+            let k = kebab(name.as_str());
+            let sig = if ctx.local_fns.contains(&k) {
+                ctx.global[&ctx.module_path]
+                    .fn_labels
+                    .get(name.as_str())
+                    .map(|labels| {
+                        labels.iter().map(|l| l.as_deref().map(kebab)).collect()
+                    })
+            } else if let Some((alias, label)) = ctx.unqualified_fns.get(&k) {
+                let module = &ctx.aliases[alias];
+                ctx.global
+                    .get(module)
+                    .and_then(|m| m.fn_labels.get(label))
+                    .map(|labels| {
+                        labels.iter().map(|l| l.as_deref().map(kebab)).collect()
+                    })
+            } else {
+                None
+            };
+            (emit_expr(ctx, fun, ind), sig)
+        }
+        UntypedExpr::FieldAccess { container, label, .. } => {
+            let mut sig = None;
+            if let UntypedExpr::Var { name, .. } = container.as_ref() {
+                if let Some(module) = ctx.aliases.get(name.as_str()) {
+                    if label.starts_with(char::is_uppercase) {
+                        let fields = ctx.imported_ctor_fields(name.as_str(), label.as_str());
+                        sig = Some(fields.iter().map(|f| Some(f.clone())).collect());
+                    } else if let Some(info) = ctx.global.get(module) {
+                        sig = info.fn_labels.get(label.as_str()).map(|labels| {
+                            labels.iter().map(|l| l.as_deref().map(kebab)).collect()
+                        });
+                    }
+                }
+            }
+            (emit_expr(ctx, fun, ind), sig)
+        }
+        _ => (emit_expr(ctx, fun, ind), None),
     };
+
+    let ordered = reorder_labelled(&head, sig.as_ref(), arguments, piped);
+
     let arg_ind = ind + 1 + head.len() + 1;
-    let args: Vec<String> = arguments
+    let args: Vec<String> = ordered
         .iter()
         .map(|a| emit_expr(ctx, &a.value, arg_ind))
         .collect();
@@ -1125,7 +1489,6 @@ fn emit_call_t(
         format!("({head} {})", args.join(&format!("\n{}", sp(arg_ind))))
     }
 }
-
 fn emit_case(
     ctx: &Ctx,
     subjects: &[UntypedExpr],
@@ -1258,23 +1621,50 @@ fn emit_guard(ctx: &Ctx, guard: &UntypedClauseGuard, env: &HashMap<String, Strin
             let n = user_var(&kebab(name.as_str()));
             env.get(&n).cloned().unwrap_or(n)
         }
-        G::Constant(c) => emit_constant(c),
+        G::Constant(c) => emit_constant(ctx, c),
         other => panic!("unsupported guard (v0): {other:?}"),
     }
 }
 
-fn emit_constant(c: &gleam_core::ast::Constant<()>) -> String {
+fn emit_constant(ctx: &Ctx, c: &gleam_core::ast::Constant<()>) -> String {
     use gleam_core::ast::Constant as C;
     match c {
+        C::Record { module, name, arguments, .. } => {
+            let (head, fields) = match module {
+                Some((alias, _)) => {
+                    let fields = ctx.imported_ctor_fields(alias.as_str(), name.as_str());
+                    (format!("{alias}/->{name}"), fields)
+                }
+                None => {
+                    let Some((fields, _)) = ctx.constructors.get(name.as_str()) else {
+                        panic!("unknown constructor in constant: {name}");
+                    };
+                    (ctx.ctor_ref(name.as_str()), fields)
+                }
+            };
+            let sig: Vec<Option<String>> = fields.iter().map(|f| Some(f.clone())).collect();
+            match arguments {
+                None => format!("({head})"),
+                Some(args) if args.is_empty() => format!("({head})"),
+                Some(args) => {
+                    let ordered = reorder_labelled(&head, Some(&sig), args, false);
+                    let parts: Vec<String> =
+                        ordered.iter().map(|a| emit_constant(ctx, &a.value)).collect();
+                    format!("({head} {})", parts.join(" "))
+                }
+            }
+        }
         C::Int { value, .. } => int_lit(value),
         C::Float { value, .. } => int_lit(value),
         C::String { value, .. } => format!("\"{}\"", clj_string(value)),
         C::Tuple { elements, .. } => {
-            let parts: Vec<String> = elements.iter().map(emit_constant).collect();
+            let parts: Vec<String> =
+                elements.iter().map(|e| emit_constant(ctx, e)).collect();
             format!("[{}]", parts.join(" "))
         }
         C::List { elements, .. } => {
-            let parts: Vec<String> = elements.iter().map(emit_constant).collect();
+            let parts: Vec<String> =
+                elements.iter().map(|e| emit_constant(ctx, e)).collect();
             if parts.is_empty() {
                 "(list)".into()
             } else {
