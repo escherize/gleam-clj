@@ -12,6 +12,11 @@
 (defn join [lst sep]
   (str/join sep lst))
 
+(defn concat-all
+  "Shim for gleam/string.concat (rename: concat collides with clojure.core)."
+  [lst]
+  (apply str lst))
+
 (defn repeat-str [s times]
   (apply str (repeat times s)))
 

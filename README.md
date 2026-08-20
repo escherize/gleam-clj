@@ -74,6 +74,20 @@ fns, project modules, and a table generated from gleam_stdlib) and
 reordered; calls whose labels cannot be verified fail the build loudly —
 nothing is silently assumed positional.
 
+## Dependencies and tests
+
+`build` walks `src/` and `test/`, then follows the import graph into the
+package sources `gleam build` vendors under `build/packages/*/src` — pure-
+Gleam hex deps compile right along (verified: snag, byte-identical output).
+Dependency fns whose externals have no Gleam fallback body fail the build
+loudly with the module and fn named. gleeunit is shimmed: the compiled test
+module's `main` discovers and runs every `*-test` fn, nonzero exit on
+failure.
+
+`./check.sh` runs everything: emitter build, snapshot tests, fixtures, both
+corpora. Corpus runs enforce a ratchet — passing fewer tasks than the last
+full run fails.
+
 ## Clojure FFI
 
 `@external(javascript, "clojure.string", "upper-case")` is interpreted as

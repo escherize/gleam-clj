@@ -131,6 +131,10 @@ def main():
             status[slug] = {"status": "pass", "detail": ""}
         print(f"{status[slug]['status']:9} {slug}", file=sys.stderr)
 
+    # Ratchet: a full run may never pass fewer tasks than the last full run.
+    prev = json.loads(status_path.read_text()) if status_path.exists() else {}
+    prev_pass = sum(1 for v in prev.values() if v["status"] == "pass")
+    new_pass = sum(1 for v in status.values() if v["status"] == "pass")
     status_path.write_text(json.dumps(status, indent=1, sort_keys=True))
 
     counts = Counter(v["status"] for v in status.values())
@@ -145,6 +149,10 @@ def main():
     for detail, n in Counter(v["detail"] for v in status.values()
                              if v["status"] == "clj_fail").most_common():
         print(f"{n:3}  {detail}")
+
+    if not only and new_pass < prev_pass:
+        print(f"\nRATCHET FAILED: {new_pass} passing, was {prev_pass}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

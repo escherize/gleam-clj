@@ -33,6 +33,11 @@
     (p/->Ok x)
     (p/->Error nil)))
 
+(defn index-map
+  "Map with the element index as the second argument to the fn."
+  [lst fun]
+  (doall (map-indexed (fn [i x] (fun x i)) lst)))
+
 (defn map2
   "Pairwise map over two lists, stopping at the shorter."
   [a b fun]

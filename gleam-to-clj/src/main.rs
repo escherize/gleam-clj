@@ -53,7 +53,7 @@ fn main() {
     let file_name = path.file_name().expect("file name").to_string();
     let mut global = stdlib_registry();
     register_module(&mut global, &stem, &parsed.module);
-    let out = emit_module(&parsed.module, &stem, &file_name, &src, &global);
+    let out = emit_module(&parsed.module, &stem, &file_name, &src, &global, false);
     match args.get(2) {
         Some(out_path) => std::fs::write(out_path, out).expect("write output"),
         None => print!("{out}"),
@@ -147,28 +147,82 @@ fn collect_gleam_files(dir: &std::path::Path, base: &std::path::Path, out: &mut 
 }
 
 fn build_project(proj: &str, out_dir: &str) {
-    let src_root = std::path::Path::new(proj).join("src");
     let mut files = Vec::new();
-    collect_gleam_files(&src_root, &src_root, &mut files);
+    for root in ["src", "test"] {
+        let dir = std::path::Path::new(proj).join(root);
+        if dir.exists() {
+            collect_gleam_files(&dir, &dir, &mut files);
+        }
+    }
     if files.is_empty() {
-        panic!("no .gleam files under {src_root:?}");
+        panic!("no .gleam files under {proj}/src");
     }
     files.sort();
 
+    // Package source roots vendored by `gleam build` — dependency modules are
+    // pulled in on demand by the import graph.
+    let packages_dir = std::path::Path::new(proj).join("build/packages");
+    let dep_roots: Vec<std::path::PathBuf> = if packages_dir.exists() {
+        std::fs::read_dir(&packages_dir)
+            .expect("read packages dir")
+            .filter_map(|e| {
+                let p = e.expect("dir entry").path().join("src");
+                p.exists().then_some(p)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    // (module_path, file, is_dep)
+    let mut queue: Vec<(String, std::path::PathBuf, bool)> =
+        files.into_iter().map(|(m, f)| (m, f, false)).collect();
+    let mut seen: std::collections::HashSet<String> =
+        queue.iter().map(|(m, _, _)| m.clone()).collect();
     let mut parsed_modules = Vec::new();
     let mut global = stdlib_registry();
-    for (module_path, file) in &files {
-        let src = std::fs::read_to_string(file).expect("read module");
+    while let Some((module_path, file, is_dep)) = queue.pop() {
+        let src = std::fs::read_to_string(&file).expect("read module");
         let path = camino::Utf8PathBuf::from(file.to_string_lossy().to_string());
         let parsed = parse::parse_module(path, &src, &WarningEmitter::null())
             .unwrap_or_else(|e| panic!("parse error in {module_path}: {e:?}"));
-        register_module(&mut global, module_path, &parsed.module);
-        parsed_modules.push((module_path.clone(), file.clone(), src, parsed));
+        for def in &parsed.module.definitions {
+            if let Definition::Import(import) = &def.definition {
+                let m = import.module.to_string();
+                // gleam/* and gleeunit are shimmed; everything else must be
+                // found in a vendored package or the build fails loudly.
+                if m == "gleam"
+                    || m.starts_with("gleam/")
+                    || m == "gleeunit"
+                    || m.starts_with("gleeunit/")
+                {
+                    continue;
+                }
+                if !seen.insert(m.clone()) {
+                    continue;
+                }
+                let dep_file = dep_roots
+                    .iter()
+                    .map(|root| root.join(format!("{m}.gleam")))
+                    .find(|p| p.exists())
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "module {m} (imported by {module_path}) not found in \
+                             src/, test/, or any vendored package — run `gleam build` \
+                             first or add the package"
+                        )
+                    });
+                queue.push((m, dep_file, true));
+            }
+        }
+        register_module(&mut global, &module_path, &parsed.module);
+        parsed_modules.push((module_path, file, src, parsed, is_dep));
     }
 
-    for (module_path, file, src, parsed) in &parsed_modules {
+    parsed_modules.sort_by(|a, b| a.0.cmp(&b.0));
+    for (module_path, file, src, parsed, is_dep) in &parsed_modules {
         let file_name = file.file_name().expect("file name").to_string_lossy().to_string();
-        let code = emit_module(&parsed.module, module_path, &file_name, src, &global);
+        let code = emit_module(&parsed.module, module_path, &file_name, src, &global, *is_dep);
         let out_path = std::path::Path::new(out_dir).join(format!("{module_path}.clj"));
         std::fs::create_dir_all(out_path.parent().expect("parent")).expect("mkdir");
         std::fs::write(&out_path, code).expect("write output");
@@ -241,6 +295,8 @@ struct Ctx<'a> {
     unqualified_fns: HashMap<String, (String, String)>,
     /// this module's gleam path, e.g. "glick80_api"
     module_path: String,
+    /// dependency modules use Gleam bodies as external fallbacks
+    is_dep: bool,
     /// every known module's public shape
     global: &'a HashMap<String, ModuleInfo>,
     /// source file name, for echo location prefixes
@@ -277,6 +333,7 @@ impl Ctx<'_> {
             ("gleam/list", "repeat") => format!("{alias}/repeated"),
             ("gleam/list", "find") => format!("{alias}/find-first"),
             ("gleam/string", "reverse") => format!("{alias}/reversed"),
+            ("gleam/string", "concat") => format!("{alias}/concat-all"),
             ("gleam/float", "min") => "min".into(),
             ("gleam/float", "max") => "max".into(),
             ("gleam/dict", "get") => format!("{alias}/lookup"),
@@ -353,6 +410,7 @@ fn emit_module(
     file_name: &str,
     src: &str,
     global: &HashMap<String, ModuleInfo>,
+    is_dep: bool,
 ) -> String {
     let mut line_starts = vec![0u32];
     for (i, b) in src.bytes().enumerate() {
@@ -388,6 +446,7 @@ fn emit_module(
         local_fns,
         unqualified_fns: HashMap::new(),
         module_path: module_path.to_string(),
+        is_dep,
         global,
         file: file_name.to_string(),
         line_starts,
@@ -417,11 +476,16 @@ fn emit_module(
                 None => continue,
             };
             ctx.aliases.insert(alias.clone(), import.module.to_string());
+            let is_prelude_import = import.module.as_str() == "gleam";
             for uv in &import.unqualified_values {
                 if uv.as_name.is_some() {
                     panic!("unsupported: `as` rename in unqualified import of {}", uv.name);
                 }
                 let name = uv.name.as_str();
+                if is_prelude_import {
+                    // Prelude values (Ok/Error/Nil/...) are already known.
+                    continue;
+                }
                 if name.starts_with(char::is_uppercase) {
                     let fields = ctx.imported_ctor_fields(&alias, name).clone();
                     ctx.constructors.insert(
@@ -433,7 +497,9 @@ fn emit_module(
                         .insert(kebab(name), (alias.clone(), name.to_string()));
                 }
             }
-            requires.push((kebab(&import.module.replace("/", ".")), alias));
+            if !is_prelude_import {
+                requires.push((kebab(&import.module.replace("/", ".")), alias));
+            }
         }
     }
     requires.push(("gleam.prelude".into(), "p".into()));
@@ -558,9 +624,26 @@ fn emit_module(
 fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
     let name = local_fn_name(&kebab(f.name.as_ref().expect("function name").1.as_str()));
     if let Some((module, fun, _)) = &f.external_javascript {
-        // Clojure external: alias the var directly; any Gleam body is the
-        // other-target fallback and is ignored here.
-        return format!("(def {name} {module}/{fun})\n");
+        if ctx.is_dep {
+            // Dependency externals target real JS; use the Gleam fallback
+            // body when there is one, otherwise refuse loudly.
+            if f.body.is_empty() {
+                panic!(
+                    "dependency module {} fn {name} requires a native external \
+                     ({module}/{fun}) and has no Gleam fallback body",
+                    ctx.module_path
+                );
+            }
+        } else {
+            // Project convention: the javascript slot IS the Clojure binding.
+            return format!("(def {name} {module}/{fun})\n");
+        }
+    }
+    if f.body.is_empty() {
+        panic!(
+            "fn {name} in {} has no body and no usable external for this backend",
+            ctx.module_path
+        );
     }
     let defn = if f.publicity == Publicity::Public { "defn" } else { "defn-" };
     let args: Vec<String> = f
@@ -922,7 +1005,9 @@ fn pattern_cond_inner(
             "False" => tests.push(format!("(not {subj})")),
             n => {
                 let (fields, cls) = match pattern {
-                    Pattern::Constructor { module: Some((alias, _)), .. } => {
+                    Pattern::Constructor { module: Some((alias, _)), .. }
+                        if ctx.aliases.get(alias.as_str()).is_some_and(|m| m != "gleam") =>
+                    {
                         let fields = ctx.imported_ctor_fields(alias.as_str(), n);
                         let m = ctx.aliases[alias.as_str()].replace("/", ".");
                         (fields, format!("{m}.{n}"))
@@ -1154,7 +1239,17 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
         },
         UntypedExpr::FieldAccess { container, label, .. } => {
             if let UntypedExpr::Var { name, .. } = container.as_ref() {
-                if ctx.aliases.contains_key(name.as_str()) {
+                if let Some(module) = ctx.aliases.get(name.as_str()) {
+                    if module == "gleam" {
+                        // Qualified prelude access: gleam.Ok, gleam.Nil, ...
+                        return match label.as_str() {
+                            "Nil" => "nil".into(),
+                            "True" => "true".into(),
+                            "False" => "false".into(),
+                            l if l.starts_with(char::is_uppercase) => ctx.ctor_ref(l),
+                            l => panic!("unknown prelude member gleam.{l}"),
+                        };
+                    }
                     if label.starts_with(char::is_uppercase) {
                         let fields = ctx.imported_ctor_fields(name.as_str(), label.as_str());
                         return if fields.is_empty() {
