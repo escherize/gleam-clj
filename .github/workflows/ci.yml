@@ -23,6 +23,16 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      # Rosetta content is GFDL and not in the repo; CI runs the tour corpus,
-      # fixtures, and snapshot tests.
+      # Rosetta content is GFDL so it is not committed; CI fetches it once
+      # into the private Actions cache (a build artifact, not redistribution)
+      # and the harness verifies it like any other corpus.
+      - uses: actions/cache@v4
+        with:
+          path: rosetta/tasks
+          key: rosetta-tasks-v1
+      - name: Fetch Rosetta corpus on cache miss
+        run: |
+          if ! ls rosetta/tasks/*.gleam >/dev/null 2>&1; then
+            python3 rosetta/scrape.py
+          fi
       - run: ./check.sh
