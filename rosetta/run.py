@@ -145,6 +145,10 @@ def main():
     for detail, n in Counter(v["detail"] for v in status.values()
                              if v["status"] == "emit_fail").most_common():
         print(f"{n:3}  {detail}")
+    print("\n== ref_fail histogram ==")
+    for detail, n in Counter(v["detail"] for v in status.values()
+                             if v["status"] == "ref_fail").most_common(5):
+        print(f"{n:3}  {detail}")
     print("\n== clj_fail histogram ==")
     for detail, n in Counter(v["detail"] for v in status.values()
                              if v["status"] == "clj_fail").most_common():
