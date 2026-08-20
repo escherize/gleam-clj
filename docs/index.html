@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>gleam-clj — Gleam on the JVM, compiled to readable Clojure</title>
+<meta name="description" content="A compiler that turns Gleam source into readable Clojure that runs on the JVM. Compiles from Gleam's own typed AST, self-hosts the standard library, and verifies every claim against the official Gleam compiler.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-body: 'Outfit', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+    /* Clojure-dominant world: blue + green + white, warm off-white paper */
+    --paper: #fbfcfe;
+    --paper2: #f2f5fa;
+    --ink: #12161d;
+    --ink-dim: #55606f;
+    --ink-faint: #8892a0;
+    --line: rgba(18, 22, 29, 0.10);
+    --line-soft: rgba(18, 22, 29, 0.06);
+
+    --clj-blue: #4066c4;       /* darkened #5881D8 for text contrast */
+    --clj-blue-lite: #90b4fe;
+    --clj-blue-dim: rgba(88, 129, 216, 0.10);
+    --clj-green: #3f8a1f;      /* darkened #63b132 for contrast */
+    --clj-green-lite: #91dc47;
+    --clj-green-dim: rgba(99, 177, 50, 0.11);
+
+    --gleam-pink: #d64fb0;     /* darkened #FFAFF3 for text contrast on paper */
+    --gleam-pink-lite: #ffaff3;
+    --gleam-pink-dim: rgba(255, 175, 243, 0.16);
+    --gleam-ink: #151515;
+
+    /* code panels stay dark regardless of page theme */
+    --code-bg: #14171e;
+    --code-bg2: #1b1f28;
+    --code-line: rgba(255, 255, 255, 0.08);
+    --code-text: #d7dde6;
+    --code-dim: #7d8798;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0e1116;
+      --paper2: #161b22;
+      --ink: #e9edf3;
+      --ink-dim: #a3adba;
+      --ink-faint: #6b7686;
+      --line: rgba(255, 255, 255, 0.11);
+      --line-soft: rgba(255, 255, 255, 0.06);
+
+      --clj-blue: #90b4fe;
+      --clj-blue-dim: rgba(144, 180, 254, 0.12);
+      --clj-green: #91dc47;
+      --clj-green-dim: rgba(145, 220, 71, 0.12);
+
+      --gleam-pink: #ffaff3;
+      --gleam-pink-dim: rgba(255, 175, 243, 0.13);
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 88px; }
+
+  ::selection { background: var(--clj-green-lite); color: #12161d; }
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track { background: var(--paper2); }
+  ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--clj-blue) 40%, transparent); border-radius: 8px; border: 3px solid var(--paper2); }
+  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--clj-blue) 60%, transparent); }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  a { color: var(--clj-blue); text-decoration: none; text-underline-offset: 3px; }
+  a:hover { text-decoration: underline; }
+
+  code { font-family: var(--font-mono); font-size: 0.86em; }
+  :not(pre) > code {
+    background: color-mix(in srgb, var(--clj-blue) 9%, transparent);
+    color: color-mix(in srgb, var(--clj-blue) 88%, var(--ink));
+    padding: 1.5px 6px; border-radius: 5px;
+    font-size: 0.82em;
+  }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+  /* ---------------- top nav ---------------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--paper) 82%, transparent);
+    backdrop-filter: saturate(1.4) blur(14px);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .topbar-inner {
+    max-width: 1160px; margin: 0 auto; padding: 14px 32px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; font-family: var(--font-mono); font-weight: 600; font-size: 15px; letter-spacing: -0.02em; }
+  .brand .glyphs { display: flex; align-items: center; gap: 3px; }
+  .brand .glyphs img { height: 22px; width: auto; display: block; }
+  .brand .arrow { color: var(--ink-faint); font-size: 13px; }
+  .brand b { color: var(--clj-blue); }
+  .nav-links { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+  .nav-links a {
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-dim);
+    padding: 7px 11px; border-radius: 7px; transition: background 0.15s, color 0.15s;
+  }
+  .nav-links a:hover { background: var(--paper2); color: var(--ink); text-decoration: none; }
+  .nav-links a.gh { color: var(--ink); border: 1px solid var(--line); }
+  @media (max-width: 760px) { .nav-links a:not(.gh) { display: none; } }
+
+  /* ---------------- layout shell ---------------- */
+  .shell { max-width: 1160px; margin: 0 auto; padding: 0 32px; }
+  @media (max-width: 640px) { .shell, .topbar-inner { padding-left: 20px; padding-right: 20px; } }
+
+  main { max-width: 760px; }
+  .with-toc { display: grid; grid-template-columns: 1fr 200px; gap: 56px; align-items: start; }
+  @media (max-width: 980px) { .with-toc { grid-template-columns: 1fr; } .toc { display: none; } }
+
+  .toc { position: sticky; top: 104px; font-family: var(--font-mono); font-size: 12px; }
+  .toc .toc-label { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.14em; font-size: 10px; margin-bottom: 14px; }
+  .toc a { display: block; color: var(--ink-dim); padding: 5px 0 5px 14px; border-left: 1px solid var(--line); transition: color 0.15s, border-color 0.15s; }
+  .toc a:hover, .toc a.active { color: var(--clj-blue); border-left-color: var(--clj-blue); text-decoration: none; }
+
+  /* ---------------- hero ---------------- */
+  .hero { padding: 76px 0 60px; position: relative; }
+  .hero::before {
+    content: ""; position: absolute; inset: -40px -200px auto -200px; height: 420px; z-index: -1;
+    background:
+      radial-gradient(ellipse 40% 60% at 22% 30%, var(--gleam-pink-dim) 0%, transparent 60%),
+      radial-gradient(ellipse 45% 70% at 78% 40%, var(--clj-green-dim) 0%, transparent 62%),
+      radial-gradient(ellipse 50% 60% at 55% 10%, var(--clj-blue-dim) 0%, transparent 60%);
+  }
+  h1.hero-title {
+    font-family: var(--font-display); font-weight: 600; font-size: clamp(2.6rem, 6vw, 4.3rem);
+    line-height: 1.02; letter-spacing: -0.035em; text-wrap: balance; max-width: 15ch;
+    animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  h1.hero-title .pink { color: var(--gleam-pink); font-style: italic; }
+  h1.hero-title .grn { color: var(--clj-green); }
+  .hero-sub {
+    font-size: 1.24rem; color: var(--ink-dim); margin-top: 22px; max-width: 54ch; line-height: 1.55;
+    animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+  }
+  .hero-cta { margin-top: 32px; display: flex; gap: 12px; flex-wrap: wrap; animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both; }
+  .btn {
+    font-family: var(--font-mono); font-size: 13px; font-weight: 500;
+    padding: 11px 18px; border-radius: 9px; transition: transform 0.15s, box-shadow 0.2s, background 0.15s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-primary { background: var(--clj-blue); color: #fff; box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--clj-blue) 60%, transparent); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 22px -6px color-mix(in srgb, var(--clj-blue) 65%, transparent); text-decoration: none; }
+  .btn-ghost { border: 1px solid var(--line); color: var(--ink); }
+  .btn-ghost:hover { background: var(--paper2); text-decoration: none; }
+
+  /* ---------------- the compile panel ---------------- */
+  .compile {
+    margin: 44px 0 0; animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both;
+    border-radius: 16px; overflow: hidden; border: 1px solid var(--line);
+    box-shadow: 0 24px 60px -30px rgba(18, 22, 40, 0.4);
+  }
+  .compile-grid { display: grid; grid-template-columns: 1fr auto 1fr; background: var(--code-bg); }
+  @media (max-width: 720px) { .compile-grid { grid-template-columns: 1fr; } }
+  .pane { padding: 0; min-width: 0; }
+  .pane-head {
+    display: flex; align-items: center; gap: 8px; padding: 12px 18px;
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.02em;
+    border-bottom: 1px solid var(--code-line); color: var(--code-dim);
+  }
+  .pane-head img { height: 15px; }
+  .pane-head .lang { font-weight: 600; }
+  .pane--src .pane-head .lang { color: var(--gleam-pink-lite); }
+  .pane--out .pane-head .lang { color: var(--clj-green-lite); }
+  .compile pre { margin: 0; padding: 18px; overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.62; color: var(--code-text); }
+  .seam {
+    display: flex; align-items: center; justify-content: center; padding: 0 6px;
+    background: linear-gradient(180deg, var(--code-bg), var(--code-bg2)); border-left: 1px solid var(--code-line); border-right: 1px solid var(--code-line);
+  }
+  .seam .chip {
+    font-family: var(--font-mono); font-size: 10px; color: var(--clj-green-lite);
+    writing-mode: vertical-rl; letter-spacing: 0.2em; text-transform: uppercase; padding: 10px 0;
+    opacity: 0.92;
+  }
+  @media (max-width: 720px) {
+    .seam { writing-mode: horizontal-tb; padding: 8px; border-left: none; border-right: none; border-top: 1px solid var(--code-line); border-bottom: 1px solid var(--code-line); }
+    .seam .chip { writing-mode: horizontal-tb; }
+  }
+  /* syntax token colors */
+  .k  { color: var(--gleam-pink-lite); }   /* gleam keyword / clojure sym */
+  .ty { color: var(--clj-blue-lite); }      /* types / records */
+  .st { color: #e5c07b; }                   /* strings */
+  .cm { color: var(--code-dim); font-style: italic; }
+  .fn { color: var(--clj-green-lite); }     /* fn names */
+  .pn { color: #b58fe0; }                   /* punctuation accent */
+
+  /* ---------------- receipts strip ---------------- */
+  .receipts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 34px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  @media (max-width: 640px) { .receipts { grid-template-columns: 1fr 1fr; } }
+  .receipt { background: var(--paper); padding: 20px 22px; }
+  .receipt .n { font-family: var(--font-display); font-weight: 600; font-size: 2rem; letter-spacing: -0.03em; line-height: 1; }
+  .receipt:nth-child(1) .n { color: var(--clj-green); }
+  .receipt:nth-child(2) .n { color: var(--clj-blue); }
+  .receipt:nth-child(3) .n { color: var(--gleam-pink); }
+  .receipt:nth-child(4) .n { color: var(--clj-green); }
+  .receipt .l { font-size: 12.5px; color: var(--ink-dim); margin-top: 8px; line-height: 1.45; }
+
+  /* ---------------- sections ---------------- */
+  section { padding: 60px 0; border-top: 1px solid var(--line-soft); scroll-margin-top: 88px; }
+  .sec-tag { font-family: var(--font-mono); font-size: 11px; color: var(--clj-blue); letter-spacing: 0.12em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .sec-tag::before { content: "("; color: var(--ink-faint); font-size: 15px; }
+  .sec-tag::after { content: ")"; color: var(--ink-faint); font-size: 15px; }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.7rem, 3.4vw, 2.35rem); letter-spacing: -0.025em; line-height: 1.08; text-wrap: balance; }
+  section > p { margin-top: 16px; color: var(--ink-dim); max-width: 66ch; }
+  section > p strong { color: var(--ink); font-weight: 600; }
+  h3 { font-family: var(--font-body); font-weight: 600; font-size: 1.15rem; letter-spacing: -0.01em; margin: 34px 0 12px; }
+
+  pre.block { background: var(--code-bg); color: var(--code-text); border-radius: 12px; padding: 18px 20px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.62; margin: 18px 0; border: 1px solid var(--code-line); }
+  pre.block .cmt { color: var(--code-dim); }
+  pre.block .pr { color: var(--clj-green-lite); }
+  pre.block .fl { color: var(--gleam-pink-lite); }
+
+  .lede { font-size: 1.12rem; color: var(--ink); }
+
+  /* comparison table */
+  .cmp { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 14.5px; }
+  .cmp th, .cmp td { text-align: left; padding: 13px 14px; vertical-align: top; border-bottom: 1px solid var(--line-soft); }
+  .cmp thead th { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); font-weight: 600; border-bottom: 1px solid var(--line); }
+  .cmp tbody th { font-weight: 600; color: var(--ink); font-family: var(--font-body); font-size: 14px; width: 22%; }
+  .cmp td { color: var(--ink-dim); }
+  .cmp .erl { color: color-mix(in srgb, #a2003e 70%, var(--ink)); }
+  .cmp .js  { color: color-mix(in srgb, #b8860b 80%, var(--ink)); }
+  .cmp .jvm { color: var(--clj-blue); font-weight: 500; }
+  @media (prefers-color-scheme: dark) { .cmp .erl { color: #ff8fb0; } .cmp .js { color: #f0c674; } }
+  .cmp-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .cmp { min-width: 620px; }
+  .cmp th:first-child, .cmp td:first-child { position: sticky; left: 0; background: var(--paper); z-index: 1; }
+
+  /* runtime layers */
+  .layers { display: grid; gap: 12px; margin-top: 24px; }
+  .layer { border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; background: var(--paper); position: relative; }
+  .layer h3 { margin: 0 0 6px; font-family: var(--font-mono); font-size: 13.5px; }
+  .layer h3 code { background: none; padding: 0; font-size: 1em; }
+  .layer:nth-child(1) h3 code { color: var(--clj-blue); }
+  .layer:nth-child(2) h3 code { color: var(--gleam-pink); }
+  .layer:nth-child(3) h3 code { color: var(--clj-green); }
+  .layer p { margin: 0; font-size: 14px; color: var(--ink-dim); }
+  .layer .badge { position: absolute; top: 18px; right: 20px; font-family: var(--font-mono); font-size: 10.5px; padding: 3px 9px; border-radius: 20px; background: var(--paper2); color: var(--ink-faint); }
+
+  /* callout */
+  .note { margin: 26px 0; padding: 18px 22px; background: var(--clj-green-dim); border-radius: 12px; font-size: 14.5px; line-height: 1.6; color: var(--ink); }
+  .note strong { color: var(--clj-green); }
+  .note.blue { background: var(--clj-blue-dim); }
+  .note.blue strong { color: var(--clj-blue); }
+  .note.pink { background: var(--gleam-pink-dim); }
+  .note.pink strong { color: var(--gleam-pink); }
+
+  ul.clean { list-style: none; margin: 18px 0; display: grid; gap: 11px; }
+  ul.clean li { padding-left: 26px; position: relative; color: var(--ink-dim); font-size: 15px; line-height: 1.55; }
+  ul.clean li::before { content: ")"; position: absolute; left: 6px; top: -1px; color: var(--clj-green); font-family: var(--font-mono); font-weight: 600; }
+  ul.clean li strong { color: var(--ink); font-weight: 600; }
+
+  /* limits */
+  .limits { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 22px; }
+  @media (max-width: 640px) { .limits { grid-template-columns: 1fr; } }
+  .limit { border: 1px solid var(--line); border-radius: 11px; padding: 16px 18px; }
+  .limit .h { font-weight: 600; font-size: 14.5px; margin-bottom: 5px; }
+  .limit .d { font-size: 13.5px; color: var(--ink-dim); line-height: 1.5; }
+
+  footer { border-top: 1px solid var(--line); padding: 44px 0 70px; margin-top: 40px; }
+  footer .shell { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+  footer p { font-size: 13.5px; color: var(--ink-dim); font-family: var(--font-mono); }
+  footer .glyphs { display: flex; gap: 4px; align-items: center; }
+  footer .glyphs img { height: 20px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="brand">
+      <span class="glyphs">
+        <img src="assets/gleam-lucy.svg" alt="Gleam">
+        <span class="arrow">→</span>
+        <img src="assets/clojure.svg" alt="Clojure">
+      </span>
+      gleam<b>-clj</b>
+    </span>
+    <nav class="nav-links">
+      <a href="#start">Start</a>
+      <a href="#backends">vs erlang/js</a>
+      <a href="#runtime">Runtime</a>
+      <a href="#verify">Verification</a>
+      <a href="#libs">Packaging</a>
+      <a class="gh" href="https://github.com/escherize/gleam-clj">GitHub ↗</a>
+    </nav>
+  </div>
+</div>
+
+<div class="shell">
+<div class="hero">
+  <h1 class="hero-title">Write <span class="pink">Gleam</span>. Ship readable <span class="grn">Clojure</span>.</h1>
+  <p class="hero-sub">gleam-clj compiles Gleam — a small, statically typed functional language — into idiomatic Clojure that runs on the JVM. The type checker guards your logic; the output reads like a person wrote it.</p>
+  <div class="hero-cta">
+    <a class="btn btn-primary" href="#start">Get started →</a>
+    <a class="btn btn-ghost" href="#verify">How it's verified</a>
+  </div>
+
+  <div class="compile">
+    <div class="compile-grid">
+      <div class="pane pane--src">
+        <div class="pane-head"><img src="assets/gleam-lucy.svg" alt=""><span class="lang">min_coins.gleam</span></div>
+<pre><span class="k">pub fn</span> <span class="fn">min_coins</span>(coins, amount)
+  -> <span class="ty">Result</span>(<span class="ty">Int</span>, <span class="ty">Nil</span>) {
+  <span class="k">case</span> amount {
+    <span class="pn">0</span> -> <span class="ty">Ok</span>(<span class="pn">0</span>)
+    a <span class="k">if</span> a < <span class="pn">0</span> -> <span class="ty">Error</span>(<span class="ty">Nil</span>)
+    _ -> {
+      int.<span class="fn">range</span>(<span class="pn">1</span>, amount + <span class="pn">1</span>, ..)
+      |> dict.<span class="fn">get</span>(amount)
+    }
+  }
+}</pre>
+      </div>
+      <div class="seam"><span class="chip">compiles to</span></div>
+      <div class="pane pane--out">
+        <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">min_coins.clj</span></div>
+<pre>(<span class="k">defn</span> <span class="fn">min-coins</span>
+  {<span class="ty">:malli/schema</span> [:=> [:cat [:sequential :int] :int]
+                  [:or [:fn p/Ok?] [:fn p/Error?]]]}
+  [coins amount]
+  (<span class="k">cond</span>
+    (= amount <span class="pn">0</span>)   (p/-&gt;<span class="ty">Ok</span> <span class="pn">0</span>)
+    (&lt; amount <span class="pn">0</span>)   (p/-&gt;<span class="ty">Error</span> nil)
+    <span class="ty">:else</span> (-&gt; (int/<span class="fn">range</span> <span class="pn">1</span> (+' amount <span class="pn">1</span>) ..)
+              (dict/<span class="fn">get</span> amount))))</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="receipts">
+    <div class="receipt"><div class="n">114/114</div><div class="l">corpus programs produce byte-identical output to the official Gleam compiler</div></div>
+    <div class="receipt"><div class="n">20,000</div><div class="l">differential-fuzz comparisons against a real Clojure implementation — zero divergence</div></div>
+    <div class="receipt"><div class="n">197</div><div class="l">Metabase tests passing on a compiled-Gleam parser, in Metabase's own suite</div></div>
+    <div class="receipt"><div class="n">368/468</div><div class="l">standard-library functions run Gleam's own implementations, compiled by this compiler</div></div>
+  </div>
+</div>
+</div>
+
+<div class="shell with-toc">
+<main>
+
+  <section id="start">
+    <div class="sec-tag">Getting started</div>
+    <h2>From nothing to a running Clojure program</h2>
+    <p class="lede">You need the Rust toolchain (to build the compiler), the <a href="https://gleam.run/getting-started/installing/">Gleam CLI</a>, and a JVM with the Clojure CLI. Then:</p>
+<pre class="block"><span class="cmt"># build the compiler (links Gleam's real compiler front-end)</span>
+git clone https://github.com/escherize/gleam-clj
+<span class="pr">cd</span> gleam-clj/gleam-to-clj && cargo build
+
+<span class="cmt"># compile one Gleam file to a Clojure namespace</span>
+./target/debug/gleam-to-clj ../my_module.gleam my_module.clj
+
+<span class="cmt"># or compile a whole project (src/, test/, and vendored hex deps)</span>
+./target/debug/gleam-to-clj build ./my-project ./out</pre>
+    <p>The output namespace requires a small runtime — the prelude, an FFI core, and the compiled standard library — packaged as a git-dep so consuming code needs <strong>no Rust or Gleam toolchain</strong>. Run the result like any Clojure:</p>
+<pre class="block"><span class="pr">clojure</span> -M -m my-module
+<span class="cmt">;; => your program, on the JVM</span></pre>
+    <div class="note blue">The compiler <strong>fails loud</strong>. Anything it can't compile panics at build time with the feature named — nothing is silently dropped or mistranslated. That property is what makes the verification below meaningful.</div>
+  </section>
+
+  <section id="backends">
+    <div class="sec-tag">Compared to erlang &amp; js</div>
+    <h2>A third backend, held to the first two's standard</h2>
+    <p>Gleam officially compiles to <strong>Erlang</strong> (the BEAM) and <strong>JavaScript</strong>. gleam-clj is an unofficial third target: the JVM, via Clojure. It reuses Gleam's own compiler front-end — the same parser and type checker — so a program that type-checks for the official backends type-checks here.</p>
+    <div class="cmp-wrap">
+    <table class="cmp">
+      <thead><tr><th>&nbsp;</th><th class="erl">→ Erlang (BEAM)</th><th class="js">→ JavaScript</th><th class="jvm">→ Clojure (this)</th></tr></thead>
+      <tbody>
+        <tr><th>Official?</th><td class="erl">Yes</td><td class="js">Yes</td><td class="jvm">No — community</td></tr>
+        <tr><th>Integers</th><td class="erl">Arbitrary precision</td><td class="js">f64 (unsafe past 2⁵³)</td><td class="jvm">Arbitrary precision — Clojure's <code>+'</code>. Matches BEAM, not JS.</td></tr>
+        <tr><th>Concurrency</th><td class="erl">BEAM processes, OTP</td><td class="js">Single-threaded, async</td><td class="jvm">JVM threads. OTP is out of scope.</td></tr>
+        <tr><th>Tail calls</th><td class="erl">Native TCO</td><td class="js">Trampolined</td><td class="jvm">Self-calls → <code>recur</code>; mutual recursion is stack-bounded.</td></tr>
+        <tr><th>Interop target</th><td class="erl">Erlang / Elixir</td><td class="js">JS / TS / browser</td><td class="jvm">Clojure — plain records, keyword access, value equality.</td></tr>
+        <tr><th>Output you read</th><td class="erl">Generated Erlang</td><td class="js">Generated JS/mjs</td><td class="jvm">Idiomatic Clojure — the point of the project.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>The headline difference: the official backends generate code you're not meant to read. gleam-clj treats <strong>readable, idiomatic Clojure as the deliverable</strong> — kebab-case, docstrings, <code>-&gt;</code> threading, records with keyword access — so the output is code a Clojure team can review, call, and trust.</p>
+  </section>
+
+  <section id="runtime">
+    <div class="sec-tag">The runtime model</div>
+    <h2>Three layers, and most of it is Gleam compiling itself</h2>
+    <p>Compiled modules sit on a small runtime. Only the bottom sliver is hand-written; the bulk of the standard library is Gleam source, compiled by this same compiler.</p>
+    <div class="layers">
+      <div class="layer">
+        <h3><code>gleam.prelude</code> + <code>stdlib</code></h3>
+        <span class="badge">368 / 468 fns</span>
+        <p>The standard library's pure functions — folds, sorts, Result plumbing, string ops — are pure Gleam, so they're <strong>compiled, not reimplemented</strong>. They run Gleam's actual logic.</p>
+      </div>
+      <div class="layer">
+        <h3><code>gleam-ffi</code> — the native core</h3>
+        <span class="badge">~110 fns</span>
+        <p>The only hand-written layer: Clojure implementations of every <code>@external</code> the stdlib bottoms out in — dict as a persistent map, graphemes via <code>BreakIterator</code>, UTF-8 byte ops, base64. The one place a bug could be <em>silent</em> — which is exactly where the fuzzers aim.</p>
+      </div>
+      <div class="layer">
+        <h3>Data representation</h3>
+        <span class="badge">zero-copy interop</span>
+        <p>Gleam values become the obvious Clojure ones: ints/floats/strings as-is, lists as seqs, tuples as vectors, custom types as <code>defrecord</code>s. Keyword access, destructuring, and value equality work with no adapters.</p>
+      </div>
+    </div>
+    <div class="note pink">Arithmetic compiles to Clojure's promoting operators (<code>+'</code>, <code>-'</code>, <code>*'</code>) on purpose: Gleam ints are arbitrary precision on the BEAM, so unchecked longs would be <strong>wrong</strong>, not merely faster.</div>
+  </section>
+
+  <section id="verify">
+    <div class="sec-tag">Verification &amp; oracles</div>
+    <h2>Every claim has an oracle</h2>
+    <p class="lede">A compiler is only as trustworthy as its evidence. gleam-clj never asserts equivalence it didn't measure — and the measurement uses the <strong>official Gleam compiler as the source of truth</strong>.</p>
+    <h3>Stdout-parity corpora</h3>
+    <p>Every test program runs twice: once with the official Gleam compiler on the BEAM (the oracle), once compiled to Clojure on the JVM. Pass means byte-identical stdout; programs that crash on purpose must crash with matching output.</p>
+    <ul class="clean">
+      <li><strong>54 / 54</strong> runnable Rosetta Code tasks — byte-identical</li>
+      <li><strong>60 / 60</strong> runnable Gleam language-tour lessons — byte-identical</li>
+      <li>A <strong>ratchet</strong> in CI: the passing count can never drop</li>
+    </ul>
+    <h3>Differential fuzzing</h3>
+    <p>For the real-world port of Metabase's SQL-parameter parser, the upstream test table was ported <em>and</em> the two implementations were fed 5,000 random inputs across four modes — <strong>20,000 comparisons against the original Clojure</strong>, zero divergence, down to which error type is thrown. It found a genuine runtime bug in minutes.</p>
+    <h3>Fail loud, everywhere</h3>
+    <p>Unsupported constructs panic at build time with the feature named. Labelled arguments are checked against real function signatures or refuse to compile. CI re-proves the whole chain on every push and narrates the method in its own logs.</p>
+    <div class="note"><strong>The one soft spot, named honestly:</strong> the FFI core is the only layer that can be silently wrong (everything else fails loud). That's precisely where every new real-world consumer — and every fuzzer — is aimed.</div>
+  </section>
+
+  <section id="libs">
+    <div class="sec-tag">Packaging</div>
+    <h2>Consume it as an ordinary Clojure library</h2>
+    <p>Compiled Gleam ships as plain Clojure source with a runtime snapshot — a git-dep, no exotic build step. Two libraries prove the model:</p>
+    <ul class="clean">
+      <li><strong>gleam-parser</strong> — <a href="https://hexdocs.pm/glance/">glance</a>, Gleam's own parser (written in Gleam), compiled to Clojure. It parses its own 2,300-line source on the JVM.</li>
+      <li><strong>mb-lib-parse</strong> — Metabase's <code>lib.parse</code> rewritten in ~450 lines of Gleam and wired into Metabase itself; every consumer test passes on it.</li>
+    </ul>
+<pre class="block"><span class="cmt">;; deps.edn — pull a compiled-Gleam library like any git dep</span>
+{<span class="fl">:deps</span> {io.github.escherize/gleam-parser
+        {<span class="fl">:git/url</span> <span class="st">"https://github.com/escherize/gleam-clj"</span>
+         <span class="fl">:git/sha</span> <span class="st">"..."</span>
+         <span class="fl">:deps/root</span> <span class="st">"libs/gleam-parser"</span>}}}</pre>
+    <p>Every public function carries <code>{:malli/schema …}</code> metadata derived from the Gleam types — so <a href="https://github.com/metosin/malli">malli</a> instrumentation and clj-kondo type-linting work out of the box, with zero runtime cost until you opt in.</p>
+  </section>
+
+  <section id="limits">
+    <div class="sec-tag">Status &amp; honest limits</div>
+    <h2>What it is, and what it isn't</h2>
+    <p>gleam-clj is <strong>experimental</strong> but real: it compiles from Gleam's typed AST, self-hosts the standard library, runs actual hex packages, and drives a slice of Metabase. It is not a finished product, and these edges are deliberate:</p>
+    <div class="limits">
+      <div class="limit"><div class="h">No OTP</div><div class="d">Erlang processes, supervisors, and the actor model don't map to the JVM and are out of scope. This is for pure and computational Gleam, not concurrent systems.</div></div>
+      <div class="limit"><div class="h">Mutual recursion is stack-bounded</div><div class="d">Self tail-calls become <code>recur</code>; mutually recursive functions rely on the JVM stack and aren't trampolined.</div></div>
+      <div class="limit"><div class="h">FFI-backed hex packages need shims</div><div class="d">Packages whose externals target Erlang/JS need a small Clojure implementation supplied via an externals map. Pure-Gleam packages just work.</div></div>
+      <div class="limit"><div class="h">Approximations, documented</div><div class="d">Dict/set iteration is key-sorted to match BEAM small-map order; a handful of stdlib behaviors are noted in the repo. Graphemes are correct (BreakIterator).</div></div>
+    </div>
+    <div class="hero-cta" style="margin-top:34px">
+      <a class="btn btn-primary" href="https://github.com/escherize/gleam-clj">Read the source →</a>
+      <a class="btn btn-ghost" href="https://github.com/escherize/gleam-clj/actions">See CI prove it live</a>
+    </div>
+  </section>
+
+</main>
+<aside class="toc">
+  <div class="toc-label">On this page</div>
+  <a href="#start">Getting started</a>
+  <a href="#backends">vs erlang / js</a>
+  <a href="#runtime">Runtime model</a>
+  <a href="#verify">Verification</a>
+  <a href="#libs">Packaging</a>
+  <a href="#limits">Status &amp; limits</a>
+</aside>
+</div>
+
+<footer>
+  <div class="shell">
+    <p>gleam-clj — a Gleam → Clojure/JVM compiler. Not affiliated with the Gleam project.</p>
+    <span class="glyphs">
+      <img src="assets/gleam-lucy.svg" alt="Gleam">
+      <img src="assets/clojure.svg" alt="Clojure">
+    </span>
+  </div>
+</footer>
+
+<script>
+  // active-section highlight in the sticky TOC
+  const links = [...document.querySelectorAll('.toc a')];
+  const map = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = map.get(e.target.id);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
