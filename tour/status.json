@@ -104,8 +104,8 @@
   "status": "pass"
  },
  "c1l09_documentation_comments": {
-  "detail": "error: Module does not have a main function",
-  "status": "ref_fail"
+  "detail": "",
+  "status": "pass"
  },
  "c1l10_deprecations": {
   "detail": "",
@@ -180,8 +180,8 @@
   "status": "pass"
  },
  "c3l06_generic_custom_types": {
-  "detail": "error: Module does not have a main function",
-  "status": "ref_fail"
+  "detail": "",
+  "status": "pass"
  },
  "c3l07_nil": {
   "detail": "",
