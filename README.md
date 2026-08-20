@@ -1,5 +1,7 @@
 # gleam-clj
 
+[![ci](https://github.com/escherize/gleam-clj/actions/workflows/ci.yml/badge.svg)](https://github.com/escherize/gleam-clj/actions/workflows/ci.yml)
+
 A [Gleam](https://gleam.run) -> Clojure/JVM compiler. Not an official Gleam
 project.
 
@@ -8,7 +10,8 @@ planned); everything unsupported fails loudly at build time, nothing is
 silently wrong on purpose. Verified by stdout-parity corpora against real
 `gleam run`: 54/54 runnable Rosetta Code tasks, 58/58 runnable language-tour
 lessons, gleam_stdlib self-hosted, real hex packages (snag, glance) running
-byte-identical on the JVM.
+byte-identical on the JVM. CI re-proves this on every push — read any run's
+log for the method and the per-suite SUMMARY verdicts.
 
 Known approximations: dict/set iteration is key-sorted (matches BEAM small
 maps), mutual recursion is JVM-stack-bounded (self tail calls become
