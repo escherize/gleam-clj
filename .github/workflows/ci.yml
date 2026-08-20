@@ -38,4 +38,6 @@ jobs:
           fi
       - name: Fetch glance for the gleam-parser library
         run: cd libs/gleam-parser/project && gleam build
+      - name: Fetch stdlib for the mb-lib-parse library
+        run: cd libs/mb-lib-parse/project && gleam build
       - run: ./check.sh

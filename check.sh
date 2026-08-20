@@ -76,6 +76,19 @@ else
   echo "gleam-parser skipped (run: cd libs/gleam-parser/project && gleam build)"
 fi
 
+echo "== mb-lib-parse library (metabase.lib.parse in Gleam): build, parity, lint"
+if [ -d libs/mb-lib-parse/project/build ]; then
+  ./libs/mb-lib-parse/build.sh >/dev/null
+  (cd libs/mb-lib-parse && clojure -M:test -m parse-gleam-test >/dev/null 2>&1)     || { echo "MB-LIB-PARSE PARITY FAILED"; exit 1; }
+  (cd libs/mb-lib-parse && clojure -M:test -m differential-test >/dev/null 2>&1)     || { echo "MB-LIB-PARSE DIFFERENTIAL FAILED"; exit 1; }
+  if command -v clj-kondo >/dev/null; then
+    (cd libs/mb-lib-parse && clj-kondo --lint src test >/dev/null 2>&1)       || { echo "MB-LIB-PARSE LINT FAILED"; exit 1; }
+  fi
+  echo "mb-lib-parse ok (48 ported assertions + differential fuzz vs original when present)"
+else
+  echo "mb-lib-parse skipped (run: cd libs/mb-lib-parse/project && gleam build)"
+fi
+
 suite rosetta "Gleam solutions scraped from Rosetta Code (GFDL, fetched locally via rosetta/scrape.py, not redistributed)"
 suite tour "all 63 example programs from the official Gleam language tour"
 

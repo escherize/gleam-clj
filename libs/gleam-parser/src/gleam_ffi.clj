@@ -146,15 +146,14 @@
 (defn ends-with [^String s ^String suf] (.endsWith s suf))
 
 (defn erl-split
-  "Split on every occurrence of the pattern, like string:split(A, B, all)."
+  "Split at the FIRST occurrence of the pattern, like 2-arg string:split —
+  [before after], or [s] when absent. (split_once pattern-matches on
+  exactly two elements, so splitting every occurrence here is a bug.)"
   [^String s ^String pat]
-  (if (empty? pat)
-    (list s)
-    (loop [s s acc []]
-      (let [i (.indexOf s pat)]
-        (if (neg? i)
-          (apply list (conj acc s))
-          (recur (subs s (+ i (count pat))) (conj acc (subs s 0 i))))))))
+  (let [i (if (empty? pat) -1 (.indexOf s pat))]
+    (if (neg? i)
+      (list s)
+      (list (subs s 0 i) (subs s (+ i (count pat)))))))
 
 (defn erl-trim [^String s direction]
   (case (.getSimpleName (class direction))
@@ -223,8 +222,17 @@
 (defn st-lowercase [tree] [(cstr/lower-case (st-str tree))])
 (defn st-uppercase [tree] [(cstr/upper-case (st-str tree))])
 (defn st-to-graphemes [s] (apply list (graphemes s)))
+(defn- split-all [^String s ^String pat]
+  (if (empty? pat)
+    (list s)
+    (loop [s s acc []]
+      (let [i (.indexOf s pat)]
+        (if (neg? i)
+          (apply list (conj acc s))
+          (recur (subs s (+ i (count pat))) (conj acc (subs s 0 i))))))))
+
 (defn st-split [tree ^String pat _direction]
-  (apply list (map vector (erl-split (st-str tree) pat))))
+  (apply list (map vector (split-all (st-str tree) pat))))
 (defn st-replace [tree ^String pat ^String sub]
   [(.replace (st-str tree) pat sub)])
 

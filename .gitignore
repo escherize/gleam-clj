@@ -11,3 +11,4 @@ tour/expected/
 tour/gen/
 /.clj-kondo/
 libs/gleam-parser/project/build/
+libs/mb-lib-parse/project/build/
