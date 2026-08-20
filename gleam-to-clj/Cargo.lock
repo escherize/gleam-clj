@@ -1090,7 +1090,10 @@ name = "gleam-to-clj"
 version = "0.1.0"
 dependencies = [
  "camino",
+ "ecow",
  "gleam-core",
+ "im",
+ "src-span",
 ]
 
 [[package]]

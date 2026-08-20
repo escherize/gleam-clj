@@ -27,8 +27,19 @@ const JAVA_LANG: &[&str] = &[
     "Comparable", "Runnable", "Math", "System", "Void", "Enum", "Record",
 ];
 
+mod analysis;
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 2 && args[1] == "typecheck" {
+        if args.len() < 3 {
+            eprintln!("usage: gleam-to-clj typecheck <project-dir> [stdlib-src-dir]");
+            std::process::exit(2);
+        }
+        let stdlib = args.get(3).map(String::as_str).unwrap_or("stdlib-src");
+        typecheck(&args[2], stdlib);
+        return;
+    }
     if args.len() >= 2 && args[1] == "build" {
         if args.len() != 4 {
             eprintln!("usage: gleam-to-clj build <project-dir> <out-dir>");
@@ -161,6 +172,48 @@ fn collect_gleam_files(dir: &std::path::Path, base: &std::path::Path, out: &mut 
             out.push((module.to_string_lossy().to_string(), path));
         }
     }
+}
+
+/// Phase A of the typed pipeline: analyze stdlib + project sources with
+/// gleam-core's type checker and report, proving TypedModules flow end to end.
+fn typecheck(proj: &str, stdlib_dir: &str) {
+    let mut files: Vec<(String, std::path::PathBuf, bool)> = Vec::new();
+    let stdlib_src = std::path::Path::new(stdlib_dir).join("src");
+    if stdlib_src.exists() {
+        let mut v = Vec::new();
+        collect_gleam_files(&stdlib_src, &stdlib_src, &mut v);
+        files.extend(v.into_iter().map(|(m, f)| (m, f, true)));
+    }
+    for root in ["src", "test"] {
+        let dir = std::path::Path::new(proj).join(root);
+        if dir.exists() {
+            let mut v = Vec::new();
+            collect_gleam_files(&dir, &dir, &mut v);
+            files.extend(v.into_iter().map(|(m, f)| (m, f, false)));
+        }
+    }
+    let mut seen = std::collections::HashSet::new();
+    files.retain(|(m, _, _)| seen.insert(m.clone()));
+
+    let sources: Vec<analysis::SourceModule> = files
+        .into_iter()
+        .map(|(path, file, is_dep)| analysis::SourceModule {
+            file_name: file.to_string_lossy().to_string(),
+            src: std::fs::read_to_string(&file).expect("read module"),
+            path,
+            is_dep,
+        })
+        .collect();
+    let n = sources.len();
+    let analyzed = analysis::analyze(sources);
+    for m in &analyzed {
+        eprintln!(
+            "typed {} ({} definitions)",
+            m.path,
+            m.module.definitions.functions.len()
+        );
+    }
+    println!("TYPECHECKED {n} modules");
 }
 
 fn build_project(proj: &str, out_dir: &str) {

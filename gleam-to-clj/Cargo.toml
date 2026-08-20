@@ -6,6 +6,9 @@ edition = "2021"
 [dependencies]
 gleam-core = { git = "https://github.com/escherize/gleam", rev = "d8ec90c28a10d33a509bc4ee839f5dd6aa1627aa" }
 camino = "1"
+im = "15"
+src-span = { git = "https://github.com/escherize/gleam", rev = "d8ec90c28a10d33a509bc4ee839f5dd6aa1627aa" }
+ecow = "0.3"
 
 [profile.dev]
 debug = 0
