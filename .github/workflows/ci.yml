@@ -19,6 +19,7 @@ jobs:
       - uses: DeLaGuardo/setup-clojure@13.0
         with:
           cli: latest
+          clj-kondo: latest
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

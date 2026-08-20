@@ -56,6 +56,14 @@ if n("diff") or n("clj_fail") or n("emit_fail"):
     sys.exit(1)
 EOF
 }
+if command -v clj-kondo >/dev/null; then
+  echo "== clj-kondo over all generated Clojure (zero findings required)"
+  clj-kondo --lint gen stdlib-clj src 2>/dev/null | tail -1
+  clj-kondo --lint gen stdlib-clj src >/dev/null 2>&1 || { echo "LINT FAILED"; exit 1; }
+else
+  echo "== clj-kondo not installed, skipping lint"
+fi
+
 suite rosetta "Gleam solutions scraped from Rosetta Code (GFDL, fetched locally via rosetta/scrape.py, not redistributed)"
 suite tour "all 63 example programs from the official Gleam language tour"
 

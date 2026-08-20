@@ -1,14 +1,8 @@
 (ns gleam.function
-  (:refer-clojure :exclude [identity])
-  (:require
-   [gleam.prelude :as p])
-  (:import (gleam.prelude Ok)))
+  (:refer-clojure :exclude [identity]))
 
 (defn identity
   "Takes a single argument and always returns its input value."
+  {:malli/schema [:=> [:cat :any] :any]}
   [x]
   x)
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'identity [:=> [:cat :any] :any]})

@@ -1,8 +1,5 @@
 (ns gleam.order
-  (:refer-clojure :exclude [compare reverse])
-  (:require
-   [gleam.prelude :as p])
-  (:import (gleam.prelude Ok)))
+  (:refer-clojure :exclude [compare reverse]))
 
 ;; type Order
 (defrecord Lt [])
@@ -26,6 +23,7 @@
   ```gleam
   assert order.negate(Gt) == Lt
   ```"
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
   [order]
   (cond
     (instance? Lt order) (->Gt)
@@ -48,6 +46,7 @@
   ```gleam
   assert order.to_int(Gt) == 1
   ```"
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] :int]}
   [order]
   (cond
     (instance? Lt order) -1
@@ -62,6 +61,7 @@
   ```gleam
   assert order.compare(Eq, with: Lt) == Gt
   ```"
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
   [a b]
   (cond
     (= a b) (->Eq)
@@ -80,6 +80,7 @@
   
   assert list.sort([1, 5, 4], by: order.reverse(int.compare)) == [5, 4, 1]
   ```"
+  {:malli/schema [:=> [:cat [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]]}
   [orderer]
   (fn [a b] (orderer b a)))
 
@@ -99,6 +100,7 @@
   
   assert order.break_tie(in: int.compare(1, 0), with: Eq) == Gt
   ```"
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
   [order other]
   (if (or (instance? Lt order) (instance? Gt order)) order other))
 
@@ -122,14 +124,6 @@
   
   assert order.lazy_break_tie(in: int.compare(1, 0), with: fn() { Eq }) == Gt
   ```"
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]] [:=> [:cat] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
   [order comparison]
   (if (or (instance? Lt order) (instance? Gt order)) order (comparison)))
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'break-tie [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
-   'compare [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
-   'lazy-break-tie [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]] [:=> [:cat] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
-   'negate [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
-   'reverse [:=> [:cat [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]]
-   'to-int [:=> [:cat [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]] :int]})

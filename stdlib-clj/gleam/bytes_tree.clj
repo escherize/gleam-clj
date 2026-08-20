@@ -3,9 +3,7 @@
   (:require
    [gleam.bit-array :as bit_array]
    [gleam.list :as list]
-   [gleam.prelude :as p]
-   [gleam.string-tree :as string_tree])
-  (:import (gleam.prelude Ok)))
+   [gleam.string-tree :as string_tree]))
 
 ;; type BytesTree
 (defrecord Bytes [value])
@@ -16,12 +14,14 @@
   "Joins a list of bytes trees into a single one.
   
   Runs in constant time."
+  {:malli/schema [:=> [:cat [:sequential [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   [trees]
   (->Many trees))
 
 (defn new*
   "Create an empty `BytesTree`. Useful as the start of a pipe chaining many
   trees together."
+  {:malli/schema [:=> [:cat] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   []
   (concat (list)))
 
@@ -32,6 +32,7 @@
   "Creates a new bytes tree from a bit array.
   
   Runs in constant time."
+  {:malli/schema [:=> [:cat [:vector :int]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   [bits]
   (-> bits bit_array/pad-to-bytes wrap-list))
 
@@ -39,6 +40,7 @@
   "Appends a bytes tree onto the end of another.
   
   Runs in constant time."
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   [first' second]
   (if (instance? Many second)
     (let [trees (:value second)]
@@ -49,6 +51,7 @@
   "Prepends a bit array to the start of a bytes tree.
   
   Runs in constant time."
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] [:vector :int]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   [second first']
   (append-tree (from-bit-array first') second))
 
@@ -56,6 +59,7 @@
   "Appends a bit array to the end of a bytes tree.
   
   Runs in constant time."
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] [:vector :int]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   [first' second]
   (append-tree first' (from-bit-array second)))
 
@@ -63,6 +67,7 @@
   "Prepends a bytes tree onto the start of another.
   
   Runs in constant time."
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   [second first']
   (append-tree first' second))
 
@@ -71,6 +76,7 @@
   
   Runs in constant time when running on Erlang.
   Runs in linear time otherwise."
+  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   [string]
   (->Text (string_tree/from-string string)))
 
@@ -79,6 +85,7 @@
   
   Runs in constant time when running on Erlang.
   Runs in linear time with the length of the string otherwise."
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] :string] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   [second first']
   (append-tree (from-string first') second))
 
@@ -87,6 +94,7 @@
   
   Runs in constant time when running on Erlang.
   Runs in linear time with the length of the string otherwise."
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] :string] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   [first' second]
   (append-tree first' (from-string second)))
 
@@ -94,6 +102,7 @@
   "Joins a list of bit arrays into a single bytes tree.
   
   Runs in constant time."
+  {:malli/schema [:=> [:cat [:sequential [:vector :int]]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   [bits]
   (-> bits (list/map from-bit-array) concat))
 
@@ -102,6 +111,7 @@
   
   Runs in constant time when running on Erlang.
   Runs in linear time otherwise."
+  {:malli/schema [:=> [:cat [:or ]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]}
   [tree]
   (->Text tree))
 
@@ -112,9 +122,8 @@
                                                (recur remaining-stack acc))
     (and (seq stack) (seq (first stack)) (instance? Bytes (first (first stack)))) (let [bits (:value (first (first stack))) rest' (rest (first stack)) remaining-stack (rest stack)]
                                                                                     (recur (list* rest' remaining-stack) (list* bits acc)))
-    (and (seq stack) (seq (first stack)) (instance? Text (first (first stack)))) (let [tree (:value (first (first stack))) rest' (rest (first stack)) remaining-stack (rest stack)]
-                                                                                   (let [bits (bit_array/from-string (string_tree/to-string tree))]
-                                                                                     (recur (list* rest' remaining-stack) (list* bits acc))))
+    (and (seq stack) (seq (first stack)) (instance? Text (first (first stack)))) (let [tree (:value (first (first stack))) rest' (rest (first stack)) remaining-stack (rest stack) bits (bit_array/from-string (string_tree/to-string tree))]
+                                                                                   (recur (list* rest' remaining-stack) (list* bits acc)))
     (and (seq stack) (seq (first stack)) (instance? Many (first (first stack)))) (let [trees (:value (first (first stack))) rest' (rest (first stack)) remaining-stack (rest stack)]
                                                                                    (recur (list* trees rest' remaining-stack) acc))))
 
@@ -125,6 +134,7 @@
   
   When running on Erlang this function is implemented natively by the
   virtual machine and is highly optimised."
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]] [:vector :int]]}
   [tree]
   (-> (list (list tree)) (to-list (list)) list/reverse bit_array/concat))
 
@@ -132,24 +142,8 @@
   "Returns the size of the bytes tree's content in bytes.
   
   Runs in linear time."
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]] :int]}
   [tree]
   (-> (list (list tree))
       (to-list (list))
       (list/fold 0 (fn [acc bits] (+' (bit_array/byte-size bits) acc)))))
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'append [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] [:vector :int]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'append-string [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] :string] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'append-tree [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'byte-size [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]] :int]
-   'concat [:=> [:cat [:sequential [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'concat-bit-arrays [:=> [:cat [:sequential [:vector :int]]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'from-bit-array [:=> [:cat [:vector :int]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'from-string [:=> [:cat :string] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'from-string-tree [:=> [:cat [:or ]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'new* [:=> [:cat] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'prepend [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] [:vector :int]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'prepend-string [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] :string] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'prepend-tree [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]] [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]]
-   'to-bit-array [:=> [:cat [:or [:fn (partial instance? gleam.bytes_tree.Bytes)] [:fn (partial instance? gleam.bytes_tree.Text)] [:fn (partial instance? gleam.bytes_tree.Many)]]] [:vector :int]]})

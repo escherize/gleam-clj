@@ -2,21 +2,20 @@
   (:refer-clojure :exclude [compare concat])
   (:require
    [gleam-ffi]
-   [gleam.int :as int]
+   #_{:clj-kondo/ignore [:unused-namespace]}
    [gleam.order :as order]
    [gleam.prelude :as p]
-   [gleam.string :as string])
-  (:import (gleam.prelude Ok)))
+   [gleam.string :as string]))
 
-(def from-string gleam-ffi/ba-from-string)
+(def ^{:malli/schema [:=> [:cat :string] [:vector :int]]} from-string gleam-ffi/ba-from-string)
 
-(def bit-size gleam-ffi/ba-bit-size)
+(def ^{:malli/schema [:=> [:cat [:vector :int]] :int]} bit-size gleam-ffi/ba-bit-size)
 
-(def byte-size gleam-ffi/ba-byte-size)
+(def ^{:malli/schema [:=> [:cat [:vector :int]] :int]} byte-size gleam-ffi/ba-byte-size)
 
-(def pad-to-bytes gleam-ffi/identity1)
+(def ^{:malli/schema [:=> [:cat [:vector :int]] [:vector :int]]} pad-to-bytes gleam-ffi/identity1)
 
-(def concat gleam-ffi/ba-concat)
+(def ^{:malli/schema [:=> [:cat [:sequential [:vector :int]]] [:vector :int]]} concat gleam-ffi/ba-concat)
 
 (defn append
   "Creates a new bit array by joining two bit arrays.
@@ -30,14 +29,13 @@
   )
   == bit_array.from_string(\"butterfly\")
   ```"
+  {:malli/schema [:=> [:cat [:vector :int] [:vector :int]] [:vector :int]]}
   [first' second]
   (concat (list first' second)))
 
-(def slice gleam-ffi/ba-slice)
+(def ^{:malli/schema [:=> [:cat [:vector :int] :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]} slice gleam-ffi/ba-slice)
 
-(def is-utf8-loop gleam-ffi/ba-is-utf8)
-
-(def is-utf8 gleam-ffi/ba-is-utf8)
+(def ^{:malli/schema [:=> [:cat [:vector :int]] :boolean]} is-utf8 gleam-ffi/ba-is-utf8)
 
 (def unsafe-to-string gleam-ffi/ba-unsafe-to-string)
 
@@ -45,16 +43,18 @@
   "Converts a bit array to a string.
   
   Returns an error if the bit array is invalid UTF-8 data."
+  {:malli/schema [:=> [:cat [:vector :int]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [bits]
   (let [subject (is-utf8 bits)]
     (if subject (p/->Ok (unsafe-to-string bits)) (p/->Error nil))))
 
-(def base64-encode gleam-ffi/ba-base64-encode)
+(def ^{:malli/schema [:=> [:cat [:vector :int] :boolean] :string]} base64-encode gleam-ffi/ba-base64-encode)
 
 (def decode64 gleam-ffi/ba-decode64)
 
 (defn base64-decode
   "Decodes a base 64 encoded string into a `BitArray`."
+  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [encoded]
   (let [padded (let [subject (rem (byte-size (from-string encoded)) 4)]
                  (if (= subject 0)
@@ -69,6 +69,7 @@
   
   If the bit array does not contain a whole number of bytes then it is padded
   with zero bits prior to being encoded."
+  {:malli/schema [:=> [:cat [:vector :int] :boolean] :string]}
   [input padding]
   (-> input
       (base64-encode padding)
@@ -78,40 +79,16 @@
 (defn base64-url-decode
   "Decodes a base 64 encoded string with URL and filename safe alphabet into a
   `BitArray`."
+  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [encoded]
   (-> encoded (string/replace "-" "+") (string/replace "_" "/") base64-decode))
 
-(def base16-encode gleam-ffi/ba-base16-encode)
+(def ^{:malli/schema [:=> [:cat [:vector :int]] :string]} base16-encode gleam-ffi/ba-base16-encode)
 
-(def base16-decode gleam-ffi/ba-base16-decode)
+(def ^{:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]} base16-decode gleam-ffi/ba-base16-decode)
 
-(def inspect-loop gleam-ffi/ba-inspect)
+(def ^{:malli/schema [:=> [:cat [:vector :int]] :string]} inspect gleam-ffi/ba-inspect)
 
-(def inspect gleam-ffi/ba-inspect)
+(def ^{:malli/schema [:=> [:cat [:vector :int] [:vector :int]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]} compare gleam-ffi/ba-compare)
 
-(def bit-array-to-int-and-size gleam-ffi/ba-to-int-and-size)
-
-(def compare gleam-ffi/ba-compare)
-
-(def starts-with gleam-ffi/ba-starts-with)
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'append [:=> [:cat [:vector :int] [:vector :int]] [:vector :int]]
-   'base16-decode [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'base16-encode [:=> [:cat [:vector :int]] :string]
-   'base64-decode [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'base64-encode [:=> [:cat [:vector :int] :boolean] :string]
-   'base64-url-decode [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'base64-url-encode [:=> [:cat [:vector :int] :boolean] :string]
-   'bit-size [:=> [:cat [:vector :int]] :int]
-   'byte-size [:=> [:cat [:vector :int]] :int]
-   'compare [:=> [:cat [:vector :int] [:vector :int]] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
-   'concat [:=> [:cat [:sequential [:vector :int]]] [:vector :int]]
-   'from-string [:=> [:cat :string] [:vector :int]]
-   'inspect [:=> [:cat [:vector :int]] :string]
-   'is-utf8 [:=> [:cat [:vector :int]] :boolean]
-   'pad-to-bytes [:=> [:cat [:vector :int]] [:vector :int]]
-   'slice [:=> [:cat [:vector :int] :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'starts-with [:=> [:cat [:vector :int] [:vector :int]] :boolean]
-   'to-string [:=> [:cat [:vector :int]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]})
+(def ^{:malli/schema [:=> [:cat [:vector :int] [:vector :int]] :boolean]} starts-with gleam-ffi/ba-starts-with)

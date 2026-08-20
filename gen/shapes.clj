@@ -1,8 +1,7 @@
 (ns shapes
   (:require
    [gleam.list :as list]
-   [gleam.prelude :as p])
-  (:import (gleam.prelude Ok)))
+   [gleam.prelude :as p]))
 
 ;; type Shape
 (defrecord Circle [value])
@@ -11,6 +10,7 @@
 
 (defn area
   "Area with pi = 3.0, engineering approximation."
+  {:malli/schema [:=> [:cat [:or [:fn (partial instance? shapes.Circle)] [:fn (partial instance? shapes.Rect)] [:fn (partial instance? shapes.Point)]]] :double]}
   [shape]
   (cond
     (instance? Circle shape) (let [r (:value shape)]
@@ -25,10 +25,14 @@
     (let [x (first xs) rest' (rest xs)]
       (+ x (sum rest')))))
 
-(defn total-area [shapes]
+(defn total-area
+  {:malli/schema [:=> [:cat [:sequential [:or [:fn (partial instance? shapes.Circle)] [:fn (partial instance? shapes.Rect)] [:fn (partial instance? shapes.Point)]]]] :double]}
+  [shapes]
   (-> shapes (list/map area) sum))
 
-(defn main []
+(defn main
+  {:malli/schema [:=> [:cat] :double]}
+  []
   (p/let-assert 12.0 (area (->Circle 2.0)))
   (p/let-assert 6.0 (area (->Rect 2.0 3.0)))
   (p/let-assert 0.0 (area (->Point)))
@@ -38,9 +42,3 @@
 
 (defn -main [& _]
   (main))
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'area [:=> [:cat [:or [:fn (partial instance? shapes.Circle)] [:fn (partial instance? shapes.Rect)] [:fn (partial instance? shapes.Point)]]] :double]
-   'main [:=> [:cat] :double]
-   'total-area [:=> [:cat [:sequential [:or [:fn (partial instance? shapes.Circle)] [:fn (partial instance? shapes.Rect)] [:fn (partial instance? shapes.Point)]]]] :double]})

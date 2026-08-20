@@ -1,8 +1,5 @@
 (ns gleam.bool
-  (:refer-clojure :exclude [and or])
-  (:require
-   [gleam.prelude :as p])
-  (:import (gleam.prelude Ok)))
+  (:refer-clojure :exclude [and or]))
 
 (defn and
   "Returns the and of two bools, but it evaluates both arguments.
@@ -27,6 +24,7 @@
   ```gleam
   assert !bool.and(False, False)
   ```"
+  {:malli/schema [:=> [:cat :boolean :boolean] :boolean]}
   [a b]
   (and a b))
 
@@ -53,6 +51,7 @@
   ```gleam
   assert !bool.or(False, False)
   ```"
+  {:malli/schema [:=> [:cat :boolean :boolean] :boolean]}
   [a b]
   (or a b))
 
@@ -70,6 +69,7 @@
   ```gleam
   assert bool.negate(False)
   ```"
+  {:malli/schema [:=> [:cat :boolean] :boolean]}
   [bool]
   (not bool))
 
@@ -93,6 +93,7 @@
   ```gleam
   assert !bool.nor(True, True)
   ```"
+  {:malli/schema [:=> [:cat :boolean :boolean] :boolean]}
   [a b]
   (not (or a b)))
 
@@ -116,6 +117,7 @@
   ```gleam
   assert !bool.nand(True, True)
   ```"
+  {:malli/schema [:=> [:cat :boolean :boolean] :boolean]}
   [a b]
   (not (and a b)))
 
@@ -139,6 +141,7 @@
   ```gleam
   assert !bool.exclusive_or(True, True)
   ```"
+  {:malli/schema [:=> [:cat :boolean :boolean] :boolean]}
   [a b]
   (not= a b))
 
@@ -162,6 +165,7 @@
   ```gleam
   assert bool.exclusive_nor(True, True)
   ```"
+  {:malli/schema [:=> [:cat :boolean :boolean] :boolean]}
   [a b]
   (= a b))
 
@@ -177,6 +181,7 @@
   ```gleam
   assert bool.to_string(False) == \"False\"
   ```"
+  {:malli/schema [:=> [:cat :boolean] :string]}
   [bool]
   (if (not bool) "False" "True"))
 
@@ -234,6 +239,7 @@
   \"Hello, \" <> name
   // -> \"Hello, Kamaka\"
   ```"
+  {:malli/schema [:=> [:cat :boolean :any [:=> [:cat] :any]] :any]}
   [requirement consequence alternative]
   (if requirement consequence (alternative)))
 
@@ -267,18 +273,6 @@
   \"Welcome, \" <> name
   // -> \"Welcome, User 54\"
   ```"
+  {:malli/schema [:=> [:cat :boolean [:=> [:cat] :any] [:=> [:cat] :any]] :any]}
   [requirement consequence alternative]
   (if requirement (consequence) (alternative)))
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'and [:=> [:cat :boolean :boolean] :boolean]
-   'exclusive-nor [:=> [:cat :boolean :boolean] :boolean]
-   'exclusive-or [:=> [:cat :boolean :boolean] :boolean]
-   'guard [:=> [:cat :boolean :any [:=> [:cat] :any]] :any]
-   'lazy-guard [:=> [:cat :boolean [:=> [:cat] :any] [:=> [:cat] :any]] :any]
-   'nand [:=> [:cat :boolean :boolean] :boolean]
-   'negate [:=> [:cat :boolean] :boolean]
-   'nor [:=> [:cat :boolean :boolean] :boolean]
-   'or [:=> [:cat :boolean :boolean] :boolean]
-   'to-string [:=> [:cat :boolean] :string]})

@@ -1,8 +1,5 @@
 (ns gleam.pair
-  (:refer-clojure :exclude [second])
-  (:require
-   [gleam.prelude :as p])
-  (:import (gleam.prelude Ok)))
+  (:refer-clojure :exclude [second]))
 
 (defn first'
   "Returns the first element in a pair.
@@ -12,6 +9,7 @@
   ```gleam
   assert pair.first(#(1, 2)) == 1
   ```"
+  {:malli/schema [:=> [:cat [:tuple :any :any]] :any]}
   [pair]
   (let [[a _] pair]
     a))
@@ -24,6 +22,7 @@
   ```gleam
   assert pair.second(#(1, 2)) == 2
   ```"
+  {:malli/schema [:=> [:cat [:tuple :any :any]] :any]}
   [pair]
   (let [[_ a] pair]
     a))
@@ -36,6 +35,7 @@
   ```gleam
   assert pair.swap(#(1, 2)) == #(2, 1)
   ```"
+  {:malli/schema [:=> [:cat [:tuple :any :any]] [:tuple :any :any]]}
   [pair]
   (let [[a b] pair]
     [b a]))
@@ -49,6 +49,7 @@
   ```gleam
   assert #(1, 2) |> pair.map_first(fn(n) { n * 2 }) == #(2, 2)
   ```"
+  {:malli/schema [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]] [:tuple :any :any]]}
   [pair fun]
   (let [[a b] pair]
     [(fun a) b]))
@@ -62,6 +63,7 @@
   ```gleam
   assert #(1, 2) |> pair.map_second(fn(n) { n * 2 }) == #(1, 4)
   ```"
+  {:malli/schema [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]] [:tuple :any :any]]}
   [pair fun]
   (let [[a b] pair]
     [a (fun b)]))
@@ -75,14 +77,6 @@
   ```gleam
   assert pair.new(1, 2) == #(1, 2)
   ```"
+  {:malli/schema [:=> [:cat :any :any] [:tuple :any :any]]}
   [first' second]
   [first' second])
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'first' [:=> [:cat [:tuple :any :any]] :any]
-   'map-first [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]] [:tuple :any :any]]
-   'map-second [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]] [:tuple :any :any]]
-   'new* [:=> [:cat :any :any] [:tuple :any :any]]
-   'second [:=> [:cat [:tuple :any :any]] :any]
-   'swap [:=> [:cat [:tuple :any :any]] [:tuple :any :any]]})

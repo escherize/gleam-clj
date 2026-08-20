@@ -269,7 +269,12 @@ fn sp(n: usize) -> String {
 }
 
 fn kebab(s: &str) -> String {
-    s.replace('_', "-")
+    // A leading underscore is Gleam's "intentionally unused" marker and a
+    // fine Clojure convention too — keep it, kebab the rest.
+    match s.strip_prefix('_') {
+        Some(rest) => format!("_{}", rest.replace('_', "-")),
+        None => s.replace('_', "-"),
+    }
 }
 
 
@@ -304,10 +309,12 @@ fn clojure_core_names() -> &'static std::collections::HashSet<&'static str> {
 }
 
 fn user_var(kebab_name: &str) -> String {
-    if CORE_SHADOW.contains(&kebab_name) {
-        format!("{kebab_name}'")
-    } else {
-        kebab_name.to_string()
+    match kebab_name {
+        // clj-kondo's reader splits nil'/true'/false' at the quote; use an
+        // underscore suffix for these three.
+        "nil" | "true" | "false" => format!("{kebab_name}_"),
+        k if CORE_SHADOW.contains(&k) => format!("{k}'"),
+        k => k.to_string(),
     }
 }
 

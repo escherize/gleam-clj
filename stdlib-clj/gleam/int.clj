@@ -4,8 +4,7 @@
    [gleam-ffi]
    [gleam.float :as float]
    [gleam.order :as order]
-   [gleam.prelude :as p])
-  (:import (gleam.prelude Ok)))
+   [gleam.prelude :as p]))
 
 (defn absolute-value
   "Returns the absolute value of the input.
@@ -19,11 +18,12 @@
   ```gleam
   assert int.absolute_value(10) == 10
   ```"
+  {:malli/schema [:=> [:cat :int] :int]}
   [x]
   (let [subject (>= x 0)]
     (if subject x (*' x -1))))
 
-(def to-float gleam-ffi/int-to-float)
+(def ^{:malli/schema [:=> [:cat :int] :double]} to-float gleam-ffi/int-to-float)
 
 (defn power
   "Returns the result of the base being raised to the power of the
@@ -50,6 +50,7 @@
   ```gleam
   assert int.power(-1, 0.5) == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat :int :double] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [base exponent]
   (-> base to-float (float/power exponent)))
 
@@ -65,10 +66,11 @@
   ```gleam
   assert int.square_root(-16) == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [x]
   (-> x to-float float/square-root))
 
-(def parse gleam-ffi/int-parse)
+(def ^{:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]} parse gleam-ffi/int-parse)
 
 (def do-base-parse gleam-ffi/int-base-parse)
 
@@ -100,11 +102,12 @@
   ```gleam
   assert int.base_parse(\"48\", 37) == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat :string :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [string base]
   (let [subject (and (>= base 2) (<= base 36))]
     (if subject (do-base-parse string base) (p/->Error nil))))
 
-(def to-string gleam-ffi/int-to-string)
+(def ^{:malli/schema [:=> [:cat :int] :string]} to-string gleam-ffi/int-to-string)
 
 (def do-to-base-string gleam-ffi/int-to-base-string)
 
@@ -134,6 +137,7 @@
   ```gleam
   assert int.to_base_string(48, 37) == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [x base]
   (let [subject (and (>= base 2) (<= base 36))]
     (if subject (p/->Ok (do-to-base-string x base)) (p/->Error nil))))
@@ -146,6 +150,7 @@
   ```gleam
   assert int.to_base2(2) == \"10\"
   ```"
+  {:malli/schema [:=> [:cat :int] :string]}
   [x]
   (do-to-base-string x 2))
 
@@ -157,6 +162,7 @@
   ```gleam
   assert int.to_base8(15) == \"17\"
   ```"
+  {:malli/schema [:=> [:cat :int] :string]}
   [x]
   (do-to-base-string x 8))
 
@@ -168,6 +174,7 @@
   ```gleam
   assert int.to_base16(48) == \"30\"
   ```"
+  {:malli/schema [:=> [:cat :int] :string]}
   [x]
   (do-to-base-string x 16))
 
@@ -179,6 +186,7 @@
   ```gleam
   assert int.to_base36(48) == \"1C\"
   ```"
+  {:malli/schema [:=> [:cat :int] :string]}
   [x]
   (do-to-base-string x 36))
 
@@ -190,6 +198,7 @@
   ```gleam
   assert int.max(2, 3) == 3
   ```"
+  {:malli/schema [:=> [:cat :int :int] :int]}
   [a b]
   (let [subject (> a b)]
     (if subject a b)))
@@ -202,6 +211,7 @@
   ```gleam
   assert int.min(2, 3) == 2
   ```"
+  {:malli/schema [:=> [:cat :int :int] :int]}
   [a b]
   (let [subject (< a b)]
     (if subject a b)))
@@ -222,6 +232,7 @@
   ```gleam
   assert int.clamp(40, min: 50, max: 30) == 40
   ```"
+  {:malli/schema [:=> [:cat :int :int :int] :int]}
   [x min-bound max-bound]
   (let [subject (>= min-bound max-bound)]
     (if subject
@@ -244,6 +255,7 @@
   ```gleam
   assert int.compare(3, 3) == Eq
   ```"
+  {:malli/schema [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
   [a b]
   (let [subject (= a b)]
     (if subject
@@ -263,6 +275,7 @@
   ```gleam
   assert !int.is_even(3)
   ```"
+  {:malli/schema [:=> [:cat :int] :boolean]}
   [x]
   (= (rem x 2) 0))
 
@@ -278,6 +291,7 @@
   ```gleam
   assert !int.is_odd(2)
   ```"
+  {:malli/schema [:=> [:cat :int] :boolean]}
   [x]
   (not= (rem x 2) 0))
 
@@ -289,6 +303,7 @@
   ```gleam
   assert int.negate(1) == -1
   ```"
+  {:malli/schema [:=> [:cat :int] :int]}
   [x]
   (*' -1 x))
 
@@ -306,6 +321,7 @@
   ```gleam
   assert int.sum([1, 2, 3]) == 6
   ```"
+  {:malli/schema [:=> [:cat [:sequential :int]] :int]}
   [numbers]
   (sum-loop numbers 0))
 
@@ -323,6 +339,7 @@
   ```gleam
   assert int.product([2, 3, 4]) == 24
   ```"
+  {:malli/schema [:=> [:cat [:sequential :int]] :int]}
   [numbers]
   (product-loop numbers 1))
 
@@ -347,6 +364,7 @@
   int.random(-1)
   // -> -1
   ```"
+  {:malli/schema [:=> [:cat :int] :int]}
   [max']
   (-> (* (float/random) (to-float max')) float/floor float/round))
 
@@ -373,6 +391,7 @@
   ```gleam
   assert int.divide(-99, 2) == Ok(-49)
   ```"
+  {:malli/schema [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [dividend divisor]
   (if (= divisor 0)
     (p/->Error nil)
@@ -417,6 +436,7 @@
   ```gleam
   assert int.remainder(-13, by: -3) == Ok(-1)
   ```"
+  {:malli/schema [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [dividend divisor]
   (if (= divisor 0)
     (p/->Error nil)
@@ -457,12 +477,12 @@
   ```gleam
   assert int.modulo(13, by: -3) == Ok(-2)
   ```"
+  {:malli/schema [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [dividend divisor]
   (if (= divisor 0)
     (p/->Error nil)
-    (let [remainder (rem dividend divisor)]
-      (let [subject (< (*' remainder divisor) 0)]
-        (if subject (p/->Ok (+' remainder divisor)) (p/->Ok remainder))))))
+    (let [remainder (rem dividend divisor) subject (< (*' remainder divisor) 0)]
+      (if subject (p/->Ok (+' remainder divisor)) (p/->Ok remainder)))))
 
 (defn floor-divide
   "Performs a *floored* integer division, which means that the result will
@@ -491,14 +511,14 @@
   ```gleam
   assert int.floor_divide(-99, 2) == Ok(-50)
   ```"
+  {:malli/schema [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [dividend divisor]
   (if (= divisor 0)
     (p/->Error nil)
-    (let [divisor divisor]
-      (let [subject (and (< (*' dividend divisor) 0) (not= (rem dividend divisor) 0))]
-        (if subject
-          (p/->Ok (-' (quot dividend divisor) 1))
-          (p/->Ok (quot dividend divisor)))))))
+    (let [divisor divisor subject (and (< (*' dividend divisor) 0) (not= (rem dividend divisor) 0))]
+      (if subject
+        (p/->Ok (-' (quot dividend divisor) 1))
+        (p/->Ok (quot dividend divisor))))))
 
 (defn add
   "Adds two integers together.
@@ -521,6 +541,7 @@
   ```gleam
   assert 3 |> int.add(2) == 5
   ```"
+  {:malli/schema [:=> [:cat :int :int] :int]}
   [a b]
   (+' a b))
 
@@ -545,6 +566,7 @@
   ```gleam
   assert 3 |> int.multiply(2) == 6
   ```"
+  {:malli/schema [:=> [:cat :int :int] :int]}
   [a b]
   (*' a b))
 
@@ -573,20 +595,21 @@
   ```gleam
   assert 3 |> int.subtract(2, _) == -1
   ```"
+  {:malli/schema [:=> [:cat :int :int] :int]}
   [a b]
   (-' a b))
 
-(def bitwise-and gleam-ffi/bitwise-and)
+(def ^{:malli/schema [:=> [:cat :int :int] :int]} bitwise-and gleam-ffi/bitwise-and)
 
-(def bitwise-not gleam-ffi/bitwise-not)
+(def ^{:malli/schema [:=> [:cat :int] :int]} bitwise-not gleam-ffi/bitwise-not)
 
-(def bitwise-or gleam-ffi/bitwise-or)
+(def ^{:malli/schema [:=> [:cat :int :int] :int]} bitwise-or gleam-ffi/bitwise-or)
 
-(def bitwise-exclusive-or gleam-ffi/bitwise-xor)
+(def ^{:malli/schema [:=> [:cat :int :int] :int]} bitwise-exclusive-or gleam-ffi/bitwise-xor)
 
-(def bitwise-shift-left gleam-ffi/shift-left)
+(def ^{:malli/schema [:=> [:cat :int :int] :int]} bitwise-shift-left gleam-ffi/shift-left)
 
-(def bitwise-shift-right gleam-ffi/shift-right)
+(def ^{:malli/schema [:=> [:cat :int :int] :int]} bitwise-shift-right gleam-ffi/shift-right)
 
 (defn- range-loop [current stop increment acc reducer]
   (let [subject (= current stop)]
@@ -613,46 +636,8 @@
   ```gleam
   assert int.range(from: 1, to: -2, with: [], run: list.prepend) == [-1, 0, 1]
   ```"
+  {:malli/schema [:=> [:cat :int :int :any [:=> [:cat :any :int] :any]] :any]}
   [start stop acc reducer]
   (let [increment (let [subject (< start stop)]
                     (if subject 1 -1))]
     (range-loop start stop increment acc reducer)))
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'absolute-value [:=> [:cat :int] :int]
-   'add [:=> [:cat :int :int] :int]
-   'base-parse [:=> [:cat :string :int] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'bitwise-and [:=> [:cat :int :int] :int]
-   'bitwise-exclusive-or [:=> [:cat :int :int] :int]
-   'bitwise-not [:=> [:cat :int] :int]
-   'bitwise-or [:=> [:cat :int :int] :int]
-   'bitwise-shift-left [:=> [:cat :int :int] :int]
-   'bitwise-shift-right [:=> [:cat :int :int] :int]
-   'clamp [:=> [:cat :int :int :int] :int]
-   'compare [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
-   'divide [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'floor-divide [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'is-even [:=> [:cat :int] :boolean]
-   'is-odd [:=> [:cat :int] :boolean]
-   'max' [:=> [:cat :int :int] :int]
-   'min' [:=> [:cat :int :int] :int]
-   'modulo [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'multiply [:=> [:cat :int :int] :int]
-   'negate [:=> [:cat :int] :int]
-   'parse [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'power [:=> [:cat :int :double] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'product [:=> [:cat [:sequential :int]] :int]
-   'random [:=> [:cat :int] :int]
-   'range [:=> [:cat :int :int :any [:=> [:cat :any :int] :any]] :any]
-   'remainder [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'square-root [:=> [:cat :int] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'subtract [:=> [:cat :int :int] :int]
-   'sum [:=> [:cat [:sequential :int]] :int]
-   'to-base-string [:=> [:cat :int :int] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'to-base16 [:=> [:cat :int] :string]
-   'to-base2 [:=> [:cat :int] :string]
-   'to-base36 [:=> [:cat :int] :string]
-   'to-base8 [:=> [:cat :int] :string]
-   'to-float [:=> [:cat :int] :double]
-   'to-string [:=> [:cat :int] :string]})

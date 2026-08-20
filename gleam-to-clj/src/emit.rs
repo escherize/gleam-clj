@@ -217,17 +217,6 @@ pub fn emit_module(
     excludes.dedup();
 
     let mut out = String::new();
-    let _ = writeln!(out, "(ns {}", kebab(&am.path.replace("/", ".")));
-    if !excludes.is_empty() {
-        let _ = writeln!(out, "  (:refer-clojure :exclude [{}])", excludes.join(" "));
-    }
-    let _ = writeln!(out, "  (:require");
-    for (i, entry) in require_entries.iter().enumerate() {
-        let end = if i + 1 == require_entries.len() { ")" } else { "" };
-        let _ = writeln!(out, "   {entry}{end}");
-    }
-    let _ = writeln!(out, "  (:import (gleam.prelude Ok)))");
-
     for t in &defs.custom_types {
         emit_custom_type(&mut out, t);
     }
@@ -241,6 +230,61 @@ pub fn emit_module(
         .collect();
     let const_by_name: HashMap<&str, &TypedModuleConstant> =
         defs.constants.iter().map(|c| (c.name.as_str(), c)).collect();
+    // Reachability from public fns and constants: private fns orphaned by
+    // externals-map overrides are dead code (and clj-kondo agrees).
+    let mut called: HashMap<String, Vec<String>> = HashMap::new();
+    for f in &defs.functions {
+        let Some((_, fname)) = &f.name else { continue };
+        // An externals-overridden fn emits as a def alias; its Gleam body
+        // never exists, so it contributes no call edges.
+        if externals.contains_key(&(am.path.clone(), fname.to_string())) {
+            let _ = called.insert(fname.to_string(), Vec::new());
+            continue;
+        }
+        let mut uses = Vec::new();
+        for stmt in &f.body {
+            let walk = |e: &TypedExpr, uses: &mut Vec<String>| {
+                visit_exprs_dyn(e, &mut |x| {
+                    if let TypedExpr::Var { constructor, .. } = x {
+                        if let ValueConstructorVariant::ModuleFn { module, name, .. } =
+                            &constructor.variant
+                        {
+                            if module.as_str() == am.path {
+                                uses.push(name.to_string());
+                            }
+                        }
+                    }
+                });
+            };
+            match stmt {
+                Statement::Expression(e) => walk(e, &mut uses),
+                Statement::Assignment(a) => walk(&a.value, &mut uses),
+                Statement::Use(u) => walk(&u.call, &mut uses),
+                Statement::Assert(a) => walk(&a.value, &mut uses),
+            }
+        }
+        let _ = called.insert(fname.to_string(), uses);
+    }
+    let mut reachable: std::collections::HashSet<String> = defs
+        .functions
+        .iter()
+        .filter(|f| !matches!(f.publicity, Publicity::Private))
+        .filter_map(|f| f.name.as_ref().map(|(_, n)| n.to_string()))
+        .collect();
+    // Constants can hold fn references; they always emit, so those fns are
+    // roots too.
+    for c in &defs.constants {
+        collect_constant_fn_refs(&c.value, &am.path, &mut reachable);
+    }
+    let mut frontier: Vec<String> = reachable.iter().cloned().collect();
+    while let Some(name) = frontier.pop() {
+        for callee in called.get(&name).cloned().unwrap_or_default() {
+            if reachable.insert(callee.clone()) {
+                frontier.push(callee);
+            }
+        }
+    }
+
     let mut has_pub_main = false;
     for group in &am.dependency_order {
         if group.len() > 1 {
@@ -252,6 +296,11 @@ pub fn emit_module(
         }
         for name in group {
             if let Some(f) = fn_by_name.get(name.as_str()) {
+                if matches!(f.publicity, Publicity::Private)
+                    && !reachable.contains(name.as_str())
+                {
+                    continue;
+                }
                 out.push('\n');
                 out.push_str(&emit_function(&ctx, f));
                 if !matches!(f.publicity, Publicity::Private) && name.as_str() == "main" {
@@ -272,45 +321,62 @@ pub fn emit_module(
         out.push_str("\n(defn -main [& _]\n  (main))\n");
     }
 
-    // Malli schemas for the public fns, derived from the checked types. Pure
-    // data plus instance? predicates; malli itself is only needed by callers
-    // who choose to instrument.
-    let pub_fns: Vec<&&TypedFunction> = fn_by_name
-        .values()
-        .filter(|f| !matches!(f.publicity, Publicity::Private))
-        .collect();
-    if !pub_fns.is_empty() {
-        let mut entries: Vec<(String, String)> = pub_fns
-            .iter()
-            .map(|f| {
-                let name = local_fn_name(&kebab(f.name.as_ref().expect("name").1.as_str()));
-                let args: Vec<String> = f
-                    .arguments
-                    .iter()
-                    .map(|a| malli_type(&ctx, &a.type_))
-                    .collect();
-                let cat = if args.is_empty() {
-                    "[:cat]".to_string()
-                } else {
-                    format!("[:cat {}]", args.join(" "))
-                };
-                let schema = format!("[:=> {cat} {}]", malli_type(&ctx, &f.return_type));
-                (name, schema)
-            })
-            .collect();
-        entries.sort();
-        out.push_str("\n(def malli-schemas\n  \"Malli schemas for this module's public fns, derived from Gleam's types.\"\n  {");
-        let mut first = true;
-        for (name, schema) in entries {
-            if !first {
-                out.push_str("\n   ");
-            }
-            first = false;
-            let _ = write!(out, "'{name} {schema}");
-        }
-        out.push_str("})\n");
+    // Header last: requires and imports are emitted only when the body
+    // actually uses them (clj-kondo: unused namespaces / imports).
+    let body = out;
+    let mut header = String::new();
+    let _ = writeln!(header, "(ns {}", kebab(&am.path.replace("/", ".")));
+    if !excludes.is_empty() {
+        let _ = writeln!(header, "  (:refer-clojure :exclude [{}])", excludes.join(" "));
     }
-    out
+    let needs_prelude = body.contains("p/") || body.contains("gleam.prelude.");
+    let kept: Vec<&String> = require_entries
+        .iter()
+        .filter(|entry| {
+            if entry.as_str() == "[gleam.prelude :as p]" {
+                return needs_prelude;
+            }
+            if let Some((ns, alias)) = entry
+                .trim_start_matches('[')
+                .trim_end_matches(']')
+                .split_once(" :as ")
+            {
+                body.contains(&format!("{alias}/")) || body.contains(&format!("{ns}."))
+            } else {
+                true
+            }
+        })
+        .collect();
+    if !kept.is_empty() {
+        let _ = writeln!(header, "  (:require");
+        for (i, entry) in kept.iter().enumerate() {
+            let end = if i + 1 == kept.len() { ")" } else { "" };
+            // Required only so its record classes exist at load time?
+            // clj-kondo can't see class usage as ns usage; say so explicitly.
+            let class_only = entry
+                .trim_start_matches('[')
+                .trim_end_matches(']')
+                .split_once(" :as ")
+                .is_some_and(|(ns, alias)| {
+                    !body.contains(&format!("{alias}/")) && body.contains(&format!("{ns}."))
+                });
+            if class_only {
+                let _ = writeln!(header, "   #_{{:clj-kondo/ignore [:unused-namespace]}}");
+            }
+            let _ = writeln!(header, "   {entry}{end}");
+        }
+    }
+    let needs_ok = body.contains("(instance? Ok ") || body.contains("instance? Ok)");
+    if needs_ok {
+        let _ = writeln!(header, "  (:import (gleam.prelude Ok))");
+    }
+    // close the ns form
+    let header = {
+        let mut h = header.trim_end().to_string();
+        h.push_str(")\n");
+        h
+    };
+    format!("{header}{body}")
 }
 
 /// Gleam type -> malli schema (as emitted Clojure code; custom types become
@@ -352,7 +418,7 @@ fn malli_type(ctx: &Emit, t: &gleam_core::type_::Type) -> String {
                     format!("[:sequential {inner}]")
                 }
                 ("gleam", "Result") => {
-                    "[:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]"
+                    "[:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]"
                         .into()
                 }
                 ("gleam/dict", "Dict") => {
@@ -401,16 +467,33 @@ fn emit_custom_type(out: &mut String, t: &TypedCustomType) {
     }
 }
 
+/// Malli function schema for a fn's checked signature.
+fn fn_schema(ctx: &Emit, f: &TypedFunction) -> String {
+    let args: Vec<String> = f.arguments.iter().map(|a| malli_type(ctx, &a.type_)).collect();
+    let cat = if args.is_empty() {
+        "[:cat]".to_string()
+    } else {
+        format!("[:cat {}]", args.join(" "))
+    };
+    format!("[:=> {cat} {}]", malli_type(ctx, &f.return_type))
+}
+
 fn emit_function(ctx: &Emit, f: &TypedFunction) -> String {
     let gleam_name = f.name.as_ref().expect("function name").1.to_string();
     let name = local_fn_name(&kebab(&gleam_name));
+    let public = !matches!(f.publicity, Publicity::Private);
+    let def_meta = if public {
+        format!("^{{:malli/schema {}}} ", fn_schema(ctx, f))
+    } else {
+        String::new()
+    };
     if let Some(target) = ctx.externals.get(&(ctx.module_path.to_string(), gleam_name.clone())) {
-        return format!("(def {name} {target})\n");
+        return format!("(def {def_meta}{name} {target})\n");
     }
     if let Some((module, fun, _)) = &f.external_javascript {
         let looks_clojure = !module.contains('/') && !module.ends_with(".mjs");
         if looks_clojure && !ctx.is_dep {
-            return format!("(def {name} {module}/{fun})\n");
+            return format!("(def {def_meta}{name} {module}/{fun})\n");
         }
         if f.body.is_empty() {
             panic!(
@@ -431,6 +514,7 @@ fn emit_function(ctx: &Emit, f: &TypedFunction) -> String {
     let args: Vec<String> = f.arguments.iter().map(arg_name).collect();
 
     let mut out = format!("({defn} {name}");
+    let attr = public.then(|| format!("{{:malli/schema {}}}", fn_schema(ctx, f)));
     match &f.documentation {
         Some((_, doc)) => {
             let text: Vec<String> = doc
@@ -438,11 +522,19 @@ fn emit_function(ctx: &Emit, f: &TypedFunction) -> String {
                 .map(|l| l.trim().replace('\\', "\\\\").replace('"', "\\\""))
                 .collect();
             let _ = write!(out, "\n  \"{}\"", text.join("\n  ").trim_end());
+            if let Some(attr) = &attr {
+                let _ = write!(out, "\n  {attr}");
+            }
             let _ = write!(out, "\n  [{}]\n  ", args.join(" "));
         }
-        None => {
-            let _ = write!(out, " [{}]\n  ", args.join(" "));
-        }
+        None => match &attr {
+            Some(attr) => {
+                let _ = write!(out, "\n  {attr}\n  [{}]\n  ", args.join(" "));
+            }
+            None => {
+                let _ = write!(out, " [{}]\n  ", args.join(" "));
+            }
+        },
     }
     let stmts: Vec<&TypedStatement> = f.body.iter().collect();
     let tail = Tail { name: name.clone() };
@@ -489,7 +581,7 @@ fn emit_body(ctx: &Emit, stmts: &[&TypedStatement], ind: usize, tail: Option<&Ta
                     .map(|(n, v)| format!("{n} {v}"))
                     .collect::<Vec<_>>()
                     .join(&format!("\n{}", sp(bind_ind)));
-                format!("(let [{binds_str}]\n{}{rest})", sp(ind + 2))
+                merged_let(&binds_str, rest, ind)
             }
             AssignmentKind::Assert { message, .. } => {
                 emit_let_assert(ctx, a, message.as_ref(), stmts, ind, tail)
@@ -644,6 +736,43 @@ fn order_binds(binds: Vec<(String, String)>) -> Vec<(String, String)> {
     let mut out = binds;
     out.sort_by_key(|(n, _)| orig.iter().any(|(n2, v2)| n2 != n && mentions(v2, n)));
     out
+}
+
+/// Wrap `inner` in a let; when `inner` is itself a let, splice its bindings
+/// into ours instead of nesting (clj-kondo: redundant let).
+fn merged_let(binds_str: &str, inner: String, body_ind: usize) -> String {
+    if let Some(rest) = inner.strip_prefix("(let [") {
+        // find the closing bracket of the inner binding vector
+        let mut depth = 1;
+        let mut i = 0;
+        let bytes = rest.as_bytes();
+        while depth > 0 {
+            match bytes[i] {
+                b'[' => depth += 1,
+                b']' => depth -= 1,
+                _ => {}
+            }
+            i += 1;
+        }
+        let inner_binds = &rest[..i - 1];
+        let mut body = rest[i..].trim_start_matches('\n').to_string();
+        // body was indented two deeper than our target; shift it left
+        let from = format!("\n{}", sp(body_ind + 4));
+        let to = format!("\n{}", sp(body_ind + 2));
+        body = body.replace(&from, &to);
+        let body = body.trim_start();
+        // inner bindings were indented relative to the inner let; normalize
+        let inner_binds = inner_binds
+            .lines()
+            .map(|l| l.trim())
+            .collect::<Vec<_>>()
+            .join(" ");
+        return format!(
+            "(let [{binds_str} {inner_binds}]\n{}{body}",
+            sp(body_ind + 2)
+        );
+    }
+    format!("(let [{binds_str}]\n{}{inner})", sp(body_ind + 2))
 }
 
 fn destructure_binding(ctx: &Emit, pattern: &TypedPattern) -> Option<String> {
@@ -1288,8 +1417,13 @@ fn emit_case(
                 .map(|(n, v)| format!("{n} {v}"))
                 .collect::<Vec<_>>()
                 .join(" ");
-            let inner = emit_expr(ctx, then, body_ind + 2, tail);
-            format!("(let [{binds_str}]\n{}{inner})", sp(body_ind + 2))
+            let inner = if let TypedExpr::Block { statements, .. } = then {
+                let stmts: Vec<&TypedStatement> = statements.iter().collect();
+                emit_body(ctx, &stmts, body_ind + 2, tail)
+            } else {
+                emit_expr(ctx, then, body_ind + 2, tail)
+            };
+            merged_let(&binds_str, inner, body_ind)
         }
     };
 
@@ -1530,6 +1664,36 @@ fn visit_exprs(e: &TypedExpr, f: &mut impl FnMut(&TypedExpr)) {
         TypedExpr::BitArray { segments, .. } => {
             for s in segments {
                 visit_exprs(&s.value, f);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_constant_fn_refs(
+    c: &gleam_core::ast::Constant<std::sync::Arc<gleam_core::type_::Type>>,
+    module_path: &str,
+    out: &mut std::collections::HashSet<String>,
+) {
+    use gleam_core::ast::Constant as C;
+    match c {
+        C::Var { constructor, .. } => {
+            if let Some(vc) = constructor {
+                if let ValueConstructorVariant::ModuleFn { module, name, .. } = &vc.variant {
+                    if module.as_str() == module_path {
+                        let _ = out.insert(name.to_string());
+                    }
+                }
+            }
+        }
+        C::Tuple { elements, .. } | C::List { elements, .. } => {
+            for e in elements {
+                collect_constant_fn_refs(e, module_path, out);
+            }
+        }
+        C::Record { arguments, .. } => {
+            for a in arguments.iter().flatten() {
+                collect_constant_fn_refs(&a.value, module_path, out);
             }
         }
         _ => {}

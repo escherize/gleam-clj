@@ -9,3 +9,4 @@ rosetta/work/
 tour/work/
 tour/expected/
 tour/gen/
+.clj-kondo/

@@ -4,6 +4,7 @@
    [gleam.dict :as dict]
    [gleam.float :as float]
    [gleam.int :as int]
+   #_{:clj-kondo/ignore [:unused-namespace]}
    [gleam.order :as order]
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
@@ -44,17 +45,17 @@
   ```gleam
   assert list.length([1, 2]) == 2
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any]] :int]}
   [list']
   (length-loop list' 0))
 
 (defn- count-loop [list' predicate acc]
   (if (empty? list')
     acc
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (predicate first')]
-        (if subject
-          (recur rest' predicate (+' acc 1))
-          (recur rest' predicate acc))))))
+    (let [first' (first list') rest' (rest list') subject (predicate first')]
+      (if subject
+        (recur rest' predicate (+' acc 1))
+        (recur rest' predicate acc)))))
 
 (defn count'
   "Counts the number of elements in a given list satisfying a given predicate.
@@ -75,6 +76,7 @@
   ```gleam
   assert list.count([1, 2, 3], int.is_odd) == 2
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] :int]}
   [list' predicate]
   (count-loop list' predicate 0))
 
@@ -111,6 +113,7 @@
   ```gleam
   assert list.reverse([1, 2]) == [2, 1]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any]] [:sequential :any]]}
   [list']
   (reverse-and-prepend list' (list)))
 
@@ -132,6 +135,7 @@
   ```gleam
   assert !list.is_empty([1, 1])
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any]] :boolean]}
   [list']
   (= list' (list)))
 
@@ -162,6 +166,7 @@
   ```gleam
   assert [1, 0] |> list.contains(any: 0)
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :any] :boolean]}
   [list' elem]
   (cond
     (empty? list') false
@@ -185,6 +190,7 @@
   ```gleam
   assert list.first([1, 2]) == Ok(1)
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list']
   (if (empty? list')
     (p/->Error nil)
@@ -210,6 +216,7 @@
   ```gleam
   assert list.rest([1, 2]) == Ok([2])
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list']
   (if (empty? list')
     (p/->Error nil)
@@ -247,16 +254,15 @@
   |> dict.to_list
   == [#(0, [3]), #(1, [4, 1]), #(2, [5, 2])]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] [:map-of :any [:sequential :any]]]}
   [list' key]
   (dict/group key list'))
 
 (defn- filter-loop [list' fun acc]
   (if (empty? list')
     (reverse acc)
-    (let [first' (first list') rest' (rest list')]
-      (let [new-acc (let [subject (fun first')]
-                      (if subject (list* first' acc) acc))]
-        (recur rest' fun new-acc)))))
+    (let [first' (first list') rest' (rest list') new-acc (let [subject (fun first')] (if subject (list* first' acc) acc))]
+      (recur rest' fun new-acc))))
 
 (defn filter
   "Returns a new list containing only the elements from the first list for
@@ -271,19 +277,15 @@
   ```gleam
   assert list.filter([2, 4, 6, 1], fn(x) { x > 6 }) == []
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:sequential :any]]}
   [list' predicate]
   (filter-loop list' predicate (list)))
 
 (defn- filter-map-loop [list' fun acc]
   (if (empty? list')
     (reverse acc)
-    (let [first' (first list') rest' (rest list')]
-      (let [new-acc (let [subject (fun first')]
-                      (if (instance? Ok subject)
-                        (let [first' (:value subject)]
-                          (list* first' acc))
-                        acc))]
-        (recur rest' fun new-acc)))))
+    (let [first' (first list') rest' (rest list') new-acc (let [subject (fun first')] (if (instance? Ok subject) (let [first' (:value subject)] (list* first' acc)) acc))]
+      (recur rest' fun new-acc))))
 
 (defn filter-map
   "Returns a new list containing only the elements from the first list for
@@ -298,6 +300,7 @@
   ```gleam
   assert list.filter_map([2, 4, 6, 1], fn(x) { Ok(x + 1) }) == [3, 5, 7, 2]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:sequential :any]]}
   [list' fun]
   (filter-map-loop list' fun (list)))
 
@@ -315,6 +318,7 @@
   ```gleam
   assert list.map([2, 4, 6], fn(x) { x * 2 }) == [4, 8, 12]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] [:sequential :any]]}
   [list' fun]
   (map-loop list' fun (list)))
 
@@ -339,15 +343,15 @@
   assert list.map2([1, 2], [\"a\", \"b\", \"c\"], fn(i, x) { #(i, x) })
   == [#(1, \"a\"), #(2, \"b\")]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any] [:=> [:cat :any :any] :any]] [:sequential :any]]}
   [list1 list2 fun]
   (map2-loop list1 list2 fun (list)))
 
 (defn- map-fold-loop [list' fun acc list-acc]
   (if (empty? list')
     [acc (reverse list-acc)]
-    (let [first' (first list') rest' (rest list')]
-      (let [[acc first'] (fun acc first')]
-        (recur rest' fun acc (list* first' list-acc))))))
+    (let [first' (first list') rest' (rest list') [acc first'] (fun acc first')]
+      (recur rest' fun acc (list* first' list-acc)))))
 
 (defn map-fold
   "Similar to `map` but also lets you pass around an accumulated value.
@@ -360,15 +364,15 @@
   })
   == #(106, [2, 4, 6])
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:tuple :any :any]]] [:tuple :any [:sequential :any]]]}
   [list' initial fun]
   (map-fold-loop list' fun initial (list)))
 
 (defn- index-map-loop [list' fun index acc]
   (if (empty? list')
     (reverse acc)
-    (let [first' (first list') rest' (rest list')]
-      (let [acc (list* (fun first' index) acc)]
-        (recur rest' fun (+' index 1) acc)))))
+    (let [first' (first list') rest' (rest list') acc (list* (fun first' index) acc)]
+      (recur rest' fun (+' index 1) acc))))
 
 (defn index-map
   "Similar to `map`, but the supplied function will also be passed the index
@@ -383,19 +387,19 @@
   assert list.index_map([\"a\", \"b\"], fn(x, i) { #(i, x) })
   == [#(0, \"a\"), #(1, \"b\")]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :int] :any]] [:sequential :any]]}
   [list' fun]
   (index-map-loop list' fun 0 (list)))
 
 (defn- try-map-loop [list' fun acc]
   (if (empty? list')
     (p/->Ok (reverse acc))
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (fun first')]
-        (if (instance? Ok subject)
-          (let [first' (:value subject)]
-            (recur rest' fun (list* first' acc)))
-          (let [error (:value subject)]
-            (p/->Error error)))))))
+    (let [first' (first list') rest' (rest list') subject (fun first')]
+      (if (instance? Ok subject)
+        (let [first' (:value subject)]
+          (recur rest' fun (list* first' acc)))
+        (let [error (:value subject)]
+          (p/->Error error))))))
 
 (defn try-map
   "Takes a function that returns a `Result` and applies it to each element in a
@@ -425,6 +429,7 @@
   ```gleam
   assert list.try_map([[1], [], [2]], list.first) == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list' fun]
   (try-map-loop list' fun (list)))
 
@@ -446,6 +451,7 @@
   ```gleam
   assert list.drop([1, 2, 3, 4], 9) == []
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential :any]]}
   [list' n]
   (let [subject (<= n 0)]
     (if subject
@@ -482,6 +488,7 @@
   ```gleam
   assert list.take([1, 2, 3, 4], 9) == [1, 2, 3, 4]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential :any]]}
   [list' n]
   (take-loop list' n (list)))
 
@@ -493,6 +500,7 @@
   ```gleam
   assert list.new() == []
   ```"
+  {:malli/schema [:=> [:cat] [:sequential :any]]}
   []
   (list))
 
@@ -512,6 +520,7 @@
   ```gleam
   assert list.wrap([[]]) == [[[]]]
   ```"
+  {:malli/schema [:=> [:cat :any] [:sequential :any]]}
   [item]
   (list item))
 
@@ -532,6 +541,7 @@
   ```gleam
   assert list.append([1, 2], [3]) == [1, 2, 3]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]] [:sequential :any]]}
   [first' second]
   (append-loop (reverse first') second))
 
@@ -548,6 +558,7 @@
   let existing_list = [2, 3, 4]
   assert list.prepend(to: existing_list, this: 1) == [1, 2, 3, 4]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :any] [:sequential :any]]}
   [list' item]
   (list* item list'))
 
@@ -568,6 +579,7 @@
   ```gleam
   assert list.flatten([[1], [2, 3], []]) == [1, 2, 3]
   ```"
+  {:malli/schema [:=> [:cat [:sequential [:sequential :any]]] [:sequential :any]]}
   [lists]
   (flatten-loop lists (list)))
 
@@ -579,6 +591,7 @@
   ```gleam
   assert list.flat_map([2, 4, 6], fn(x) { [x, x + 1] }) == [2, 3, 4, 5, 6, 7]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:sequential :any]]] [:sequential :any]]}
   [list' fun]
   (flatten (map list' fun)))
 
@@ -590,6 +603,7 @@
   `add(add(add(0, 1), 2), 3)`.
   
   This function runs in linear time."
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]] :any]}
   [list' initial fun]
   (if (empty? list')
     initial
@@ -607,6 +621,7 @@
   
   Unlike `fold` this function is not tail recursive. Where possible use
   `fold` instead as it will use less memory."
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]] :any]}
   [list' initial fun]
   (if (empty? list')
     initial
@@ -637,6 +652,7 @@
   |> list.index_fold(0, fn(acc, item, index) { acc + item * index })
   == 80
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any :int] :any]] :any]}
   [list' initial fun]
   (index-fold-loop list' initial fun 0))
 
@@ -659,16 +675,16 @@
   })
   == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list' initial fun]
   (if (empty? list')
     (p/->Ok initial)
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (fun initial first')]
-        (if (instance? Ok subject)
-          (let [result (:value subject)]
-            (recur rest' result fun))
-          (let [error subject]
-            error))))))
+    (let [first' (first list') rest' (rest list') subject (fun initial first')]
+      (if (instance? Ok subject)
+        (let [result (:value subject)]
+          (recur rest' result fun))
+        (let [error subject]
+          error)))))
 
 (defn fold-until
   "A variant of fold that allows to stop folding earlier.
@@ -689,16 +705,16 @@
   })
   == 3
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.list.Continue)] [:fn (partial instance? gleam.list.Stop)]]]] :any]}
   [list' initial fun]
   (if (empty? list')
     initial
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (fun initial first')]
-        (if (instance? Continue subject)
-          (let [next-accumulator (:value subject)]
-            (recur rest' next-accumulator fun))
-          (let [b (:value subject)]
-            b))))))
+    (let [first' (first list') rest' (rest list') subject (fun initial first')]
+      (if (instance? Continue subject)
+        (let [next-accumulator (:value subject)]
+          (recur rest' next-accumulator fun))
+        (let [b (:value subject)]
+          b)))))
 
 (defn find
   "Finds the first element in a given list for which the given function returns
@@ -719,12 +735,12 @@
   ```gleam
   assert list.find([], fn(_) { True }) == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list' is-desired]
   (if (empty? list')
     (p/->Error nil)
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (is-desired first')]
-        (if subject (p/->Ok first') (recur rest' is-desired))))))
+    (let [first' (first list') rest' (rest list') subject (is-desired first')]
+      (if subject (p/->Ok first') (recur rest' is-desired)))))
 
 (defn find-map
   "Finds the first element in a given list for which the given function returns
@@ -745,15 +761,15 @@
   ```gleam
   assert list.find_map([], list.first) == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list' fun]
   (if (empty? list')
     (p/->Error nil)
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (fun first')]
-        (if (instance? Ok subject)
-          (let [first' (:value subject)]
-            (p/->Ok first'))
-          (recur rest' fun))))))
+    (let [first' (first list') rest' (rest list') subject (fun first')]
+      (if (instance? Ok subject)
+        (let [first' (:value subject)]
+          (p/->Ok first'))
+        (recur rest' fun)))))
 
 (defn all
   "Returns `True` if the given function returns `True` for all the elements in
@@ -773,12 +789,12 @@
   ```gleam
   assert !list.all([4, 3], fn(x) { x > 3 })
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] :boolean]}
   [list' predicate]
   (if (empty? list')
     true
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (predicate first')]
-        (if subject (recur rest' predicate) false)))))
+    (let [first' (first list') rest' (rest list') subject (predicate first')]
+      (if subject (recur rest' predicate) false))))
 
 (defn any
   "Returns `True` if the given function returns `True` for any the elements in
@@ -802,12 +818,12 @@
   ```gleam
   assert list.any([3, 4], fn(x) { x > 3 })
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] :boolean]}
   [list' predicate]
   (if (empty? list')
     false
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (predicate first')]
-        (if subject true (recur rest' predicate))))))
+    (let [first' (first list') rest' (rest list') subject (predicate first')]
+      (if subject true (recur rest' predicate)))))
 
 (defn- zip-loop [one other acc]
   (if (and (seq one) (seq other))
@@ -838,6 +854,7 @@
   ```gleam
   assert list.zip([1, 2], [3, 4]) == [#(1, 3), #(2, 4)]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]] [:sequential [:tuple :any :any]]]}
   [list' other]
   (zip-loop list' other (list)))
 
@@ -870,6 +887,7 @@
   ```gleam
   assert list.strict_zip([1, 2], [3, 4]) == Ok([#(1, 3), #(2, 4)])
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list' other]
   (strict-zip-loop list' other (list)))
 
@@ -891,6 +909,7 @@
   ```gleam
   assert list.unzip([]) == #([], [])
   ```"
+  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]]] [:tuple [:sequential :any] [:sequential :any]]]}
   [input]
   (unzip-loop input (list) (list)))
 
@@ -914,6 +933,7 @@
   ```gleam
   assert list.intersperse([], 2) == []
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :any] [:sequential :any]]}
   [list' elem]
   (if (or (empty? list') (= (count list') 1))
     list'
@@ -923,11 +943,10 @@
 (defn- unique-loop [list' seen acc]
   (if (empty? list')
     (reverse acc)
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (dict/has-key seen first')]
-        (if subject
-          (recur rest' seen acc)
-          (recur rest' (dict/insert seen first' nil) (list* first' acc)))))))
+    (let [first' (first list') rest' (rest list') subject (dict/has-key seen first')]
+      (if subject
+        (recur rest' seen acc)
+        (recur rest' (dict/insert seen first' nil) (list* first' acc))))))
 
 (defn unique
   "Removes any duplicate elements from a given list.
@@ -939,6 +958,7 @@
   ```gleam
   assert list.unique([1, 1, 1, 4, 7, 3, 3, 4]) == [1, 4, 7, 3]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any]] [:sequential :any]]}
   [list']
   (unique-loop list' (dict/new*) (list)))
 
@@ -957,11 +977,10 @@
                      (reverse-and-prepend list' acc))
     (empty? list2) (let [list' list1]
                      (reverse-and-prepend list' acc))
-    (and (seq list1) (seq list2)) (let [first1 (first list1) rest1 (rest list1) first2 (first list2) rest2 (rest list2)]
-                                    (let [subject (compare first1 first2)]
-                                      (if (instance? gleam.order.Lt subject)
-                                        (recur list1 rest2 compare (list* first2 acc))
-                                        (recur rest1 list2 compare (list* first1 acc)))))))
+    (and (seq list1) (seq list2)) (let [first1 (first list1) rest1 (rest list1) first2 (first list2) rest2 (rest list2) subject (compare first1 first2)]
+                                    (if (instance? gleam.order.Lt subject)
+                                      (recur list1 rest2 compare (list* first2 acc))
+                                      (recur rest1 list2 compare (list* first1 acc))))))
 
 (defn- merge-descending-pairs
   "This is the same as merge_ascending_pairs but flipped for descending lists."
@@ -970,12 +989,8 @@
     (empty? sequences) (reverse acc)
     (= (count sequences) 1) (let [sequence (first sequences)]
                               (reverse (list* (reverse sequence) acc)))
-    (<= 2 (count sequences)) (let [descending1 (first sequences) descending2 (nth sequences 1) rest' (nthrest sequences 2)]
-                               (let [ascending (merge-descendings descending1
-                                                                  descending2
-                                                                  compare
-                                                                  (list))]
-                                 (recur rest' compare (list* ascending acc))))))
+    (<= 2 (count sequences)) (let [descending1 (first sequences) descending2 (nth sequences 1) rest' (nthrest sequences 2) ascending (merge-descendings descending1 descending2 compare (list))]
+                               (recur rest' compare (list* ascending acc)))))
 
 (defn- merge-ascendings
   "Merges two lists sorted in ascending order into a single list sorted in
@@ -991,11 +1006,10 @@
                      (reverse-and-prepend list' acc))
     (empty? list2) (let [list' list1]
                      (reverse-and-prepend list' acc))
-    (and (seq list1) (seq list2)) (let [first1 (first list1) rest1 (rest list1) first2 (first list2) rest2 (rest list2)]
-                                    (let [subject (compare first1 first2)]
-                                      (if (instance? gleam.order.Lt subject)
-                                        (recur rest1 list2 compare (list* first1 acc))
-                                        (recur list1 rest2 compare (list* first2 acc)))))))
+    (and (seq list1) (seq list2)) (let [first1 (first list1) rest1 (rest list1) first2 (first list2) rest2 (rest list2) subject (compare first1 first2)]
+                                    (if (instance? gleam.order.Lt subject)
+                                      (recur rest1 list2 compare (list* first1 acc))
+                                      (recur list1 rest2 compare (list* first2 acc))))))
 
 (defn- merge-ascending-pairs
   "Given a list of ascending lists, it merges adjacent pairs into a single
@@ -1006,12 +1020,8 @@
     (empty? sequences) (reverse acc)
     (= (count sequences) 1) (let [sequence (first sequences)]
                               (reverse (list* (reverse sequence) acc)))
-    (<= 2 (count sequences)) (let [ascending1 (first sequences) ascending2 (nth sequences 1) rest' (nthrest sequences 2)]
-                               (let [descending (merge-ascendings ascending1
-                                                                  ascending2
-                                                                  compare
-                                                                  (list))]
-                                 (recur rest' compare (list* descending acc))))))
+    (<= 2 (count sequences)) (let [ascending1 (first sequences) ascending2 (nth sequences 1) rest' (nthrest sequences 2) descending (merge-ascendings ascending1 ascending2 compare (list))]
+                               (recur rest' compare (list* descending acc)))))
 
 (defn- merge-all
   "Given some some sorted sequences (assumed to be sorted in `direction`) it
@@ -1062,21 +1072,16 @@
       (if (instance? Ascending direction)
         (list* (reverse growing) acc)
         (list* growing acc))
-      (let [new (first list') rest' (rest list')]
-        (let [s0 (compare prev new)]
-          (if (or (and (instance? gleam.order.Gt s0) (instance? Descending direction)) (and (instance? gleam.order.Lt s0) (instance? Ascending direction)) (and (instance? gleam.order.Eq s0) (instance? Ascending direction)))
-            (recur rest' compare growing direction new acc)
-            (let [acc (if (instance? Ascending direction)
-                        (list* (reverse growing) acc)
-                        (list* growing acc))]
-              (if (empty? rest')
-                (list* (list new) acc)
-                (let [next (first rest') rest' (rest rest')]
-                  (let [direction (let [subject (compare new next)]
-                                    (if (or (instance? gleam.order.Lt subject) (instance? gleam.order.Eq subject))
-                                      (->Ascending)
-                                      (->Descending)))]
-                    (recur rest' compare (list new) direction next acc)))))))))))
+      (let [new (first list') rest' (rest list') s0 (compare prev new)]
+        (if (or (and (instance? gleam.order.Gt s0) (instance? Descending direction)) (and (instance? gleam.order.Lt s0) (instance? Ascending direction)) (and (instance? gleam.order.Eq s0) (instance? Ascending direction)))
+          (recur rest' compare growing direction new acc)
+          (let [acc (if (instance? Ascending direction)
+                      (list* (reverse growing) acc)
+                      (list* growing acc))]
+            (if (empty? rest')
+              (list* (list new) acc)
+              (let [next (first rest') rest' (rest rest') direction (let [subject (compare new next)] (if (or (instance? gleam.order.Lt subject) (instance? gleam.order.Eq subject)) (->Ascending) (->Descending)))]
+                (recur rest' compare (list new) direction next acc)))))))))
 
 (defn sort
   "Sorts from smallest to largest based upon the ordering specified by a given
@@ -1090,23 +1095,14 @@
   assert list.sort([4, 3, 6, 5, 4, 1, 2], by: int.compare)
   == [1, 2, 3, 4, 4, 5, 6]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:sequential :any]]}
   [list' compare]
   (cond
     (empty? list') (list)
     (= (count list') 1) (let [x (first list')]
                           (list x))
-    (<= 2 (count list')) (let [x (first list') y (nth list' 1) rest' (nthrest list' 2)]
-                           (let [direction (let [subject (compare x y)]
-                                             (if (or (instance? gleam.order.Lt subject) (instance? gleam.order.Eq subject))
-                                               (->Ascending)
-                                               (->Descending)))
-                                 sequences (sequences rest'
-                                                      compare
-                                                      (list x)
-                                                      direction
-                                                      y
-                                                      (list))]
-                             (merge-all sequences (->Ascending) compare)))))
+    (<= 2 (count list')) (let [x (first list') y (nth list' 1) rest' (nthrest list' 2) direction (let [subject (compare x y)] (if (or (instance? gleam.order.Lt subject) (instance? gleam.order.Eq subject)) (->Ascending) (->Descending))) sequences (sequences rest' compare (list x) direction y (list))]
+                           (merge-all sequences (->Ascending) compare))))
 
 (defn- repeat-loop [item times acc]
   (let [subject (<= times 0)]
@@ -1124,6 +1120,7 @@
   ```gleam
   assert list.repeat(\"a\", times: 5) == [\"a\", \"a\", \"a\", \"a\", \"a\"]
   ```"
+  {:malli/schema [:=> [:cat :any :int] [:sequential :any]]}
   [a times]
   (repeat-loop a times (list)))
 
@@ -1155,15 +1152,15 @@
   ```gleam
   assert list.split([6, 7, 8, 9], 4) == #([6, 7, 8, 9], [])
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :int] [:tuple [:sequential :any] [:sequential :any]]]}
   [list' index]
   (split-loop list' index (list)))
 
 (defn- split-while-loop [list' f acc]
   (if (empty? list')
     [(reverse acc) (list)]
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (f first')]
-        (if subject (recur rest' f (list* first' acc)) [(reverse acc) list'])))))
+    (let [first' (first list') rest' (rest list') subject (f first')]
+      (if subject (recur rest' f (list* first' acc)) [(reverse acc) list']))))
 
 (defn split-while
   "Splits a list in two before the first element that a given function returns
@@ -1183,6 +1180,7 @@
   assert list.split_while([1, 2, 3, 4, 5], fn(x) { x <= 5 })
   == #([1, 2, 3, 4, 5], [])
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:tuple [:sequential :any] [:sequential :any]]]}
   [list' predicate]
   (split-while-loop list' predicate (list)))
 
@@ -1208,12 +1206,12 @@
   ```gleam
   assert list.key_find([#(\"a\", 0), #(\"b\", 1)], \"c\") == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [keyword-list desired-key]
   (find-map keyword-list
             (fn [keyword]
-              (let [[key value] keyword]
-                (let [subject (= key desired-key)]
-                  (if subject (p/->Ok value) (p/->Error nil)))))))
+              (let [[key value] keyword subject (= key desired-key)]
+                (if subject (p/->Ok value) (p/->Error nil))))))
 
 (defn key-filter
   "Given a list of 2-element tuples, finds all tuples that have a given
@@ -1231,12 +1229,12 @@
   ```gleam
   assert list.key_filter([#(\"a\", 0), #(\"b\", 1)], \"c\") == []
   ```"
+  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any] [:sequential :any]]}
   [keyword-list desired-key]
   (filter-map keyword-list
               (fn [keyword]
-                (let [[key value] keyword]
-                  (let [subject (= key desired-key)]
-                    (if subject (p/->Ok value) (p/->Error nil)))))))
+                (let [[key value] keyword subject (= key desired-key)]
+                  (if subject (p/->Ok value) (p/->Error nil))))))
 
 (defn- key-pop-loop [list' key checked]
   (cond
@@ -1267,6 +1265,7 @@
   ```gleam
   assert list.key_pop([#(\"a\", 0), #(\"b\", 1)], \"c\") == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list' key]
   (key-pop-loop list' key (list)))
 
@@ -1295,6 +1294,7 @@
   assert list.key_set([#(5, 0), #(4, 1)], 1, 100)
   == [#(5, 0), #(4, 1), #(1, 100)]
   ```"
+  {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any :any] [:sequential [:tuple :any :any]]]}
   [list' key value]
   (key-set-loop list' key value (list)))
 
@@ -1311,12 +1311,13 @@
   // 2
   // 3
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] :nil]}
   [list' f]
   (if (empty? list')
     nil
     (let [first' (first list') rest' (rest list')]
-      (do (f first')
-          (recur rest' f)))))
+      (f first')
+      (recur rest' f))))
 
 (defn try-each
   "Calls a `Result` returning function for each element in a list, discarding
@@ -1331,24 +1332,23 @@
   assert list.try_each(over: [1, 2, 3], with: function_that_might_fail)
   == Ok(Nil)
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list' fun]
   (if (empty? list')
     (p/->Ok nil)
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (fun first')]
-        (if (instance? Ok subject)
-          (recur rest' fun)
-          (let [e (:value subject)]
-            (p/->Error e)))))))
+    (let [first' (first list') rest' (rest list') subject (fun first')]
+      (if (instance? Ok subject)
+        (recur rest' fun)
+        (let [e (:value subject)]
+          (p/->Error e))))))
 
 (defn- partition-loop [list' categorise trues falses]
   (if (empty? list')
     [(reverse trues) (reverse falses)]
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (categorise first')]
-        (if subject
-          (recur rest' categorise (list* first' trues) falses)
-          (recur rest' categorise trues (list* first' falses)))))))
+    (let [first' (first list') rest' (rest list') subject (categorise first')]
+      (if subject
+        (recur rest' categorise (list* first' trues) falses)
+        (recur rest' categorise trues (list* first' falses))))))
 
 (defn partition
   "Partitions a list into a tuple/pair of lists
@@ -1361,6 +1361,7 @@
   
   assert [1, 2, 3, 4, 5] |> list.partition(int.is_odd) == #([1, 3, 5], [2, 4])
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:tuple [:sequential :any] [:sequential :any]]]}
   [list' categorise]
   (partition-loop list' categorise (list) (list)))
 
@@ -1390,6 +1391,7 @@
   ```gleam
   assert list.permutations([1, 2]) == [[1, 2], [2, 1]]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any]] [:sequential [:sequential :any]]]}
   [list']
   (if (empty? list')
     (list (list))
@@ -1397,9 +1399,8 @@
       (permutation-zip l (list) (list)))))
 
 (defn- window-loop [acc list' n]
-  (let [window (take list' n)]
-    (let [subject (= (length window) n)]
-      (if subject (recur (list* window acc) (drop list' 1) n) (reverse acc)))))
+  (let [window (take list' n) subject (= (length window) n)]
+    (if subject (recur (list* window acc) (drop list' 1) n) (reverse acc))))
 
 (defn window
   "Returns a list of sliding windows.
@@ -1413,6 +1414,7 @@
   ```gleam
   assert list.window([1, 2], 4) == []
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential [:sequential :any]]]}
   [list' n]
   (let [subject (<= n 0)]
     (if subject (list) (window-loop (list) list' n))))
@@ -1429,6 +1431,7 @@
   ```gleam
   assert list.window_by_2([1]) == []
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any]] [:sequential [:tuple :any :any]]]}
   [list']
   (zip list' (drop list' 1)))
 
@@ -1440,19 +1443,18 @@
   ```gleam
   assert list.drop_while([1, 2, 3, 4], fn(x) { x < 3 }) == [3, 4]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:sequential :any]]}
   [list' predicate]
   (if (empty? list')
     (list)
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (predicate first')]
-        (if subject (recur rest' predicate) (list* first' rest'))))))
+    (let [first' (first list') rest' (rest list') subject (predicate first')]
+      (if subject (recur rest' predicate) (list* first' rest')))))
 
 (defn- take-while-loop [list' predicate acc]
   (if (empty? list')
     (reverse acc)
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (predicate first')]
-        (if subject (recur rest' predicate (list* first' acc)) (reverse acc))))))
+    (let [first' (first list') rest' (rest list') subject (predicate first')]
+      (if subject (recur rest' predicate (list* first' acc)) (reverse acc)))))
 
 (defn take-while
   "Takes the first elements in a given list for which the predicate function returns `True`.
@@ -1462,18 +1464,17 @@
   ```gleam
   assert list.take_while([1, 2, 3, 2, 4], fn(x) { x < 3 }) == [1, 2]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:sequential :any]]}
   [list' predicate]
   (take-while-loop list' predicate (list)))
 
 (defn- chunk-loop [list' f previous-key current-chunk acc]
   (if (seq list')
-    (let [first' (first list') rest' (rest list')]
-      (let [key (f first')]
-        (let [subject (= key previous-key)]
-          (if subject
-            (recur rest' f key (list* first' current-chunk) acc)
-            (let [new-acc (list* (reverse current-chunk) acc)]
-              (recur rest' f key (list first') new-acc))))))
+    (let [first' (first list') rest' (rest list') key (f first') subject (= key previous-key)]
+      (if subject
+        (recur rest' f key (list* first' current-chunk) acc)
+        (let [new-acc (list* (reverse current-chunk) acc)]
+          (recur rest' f key (list first') new-acc))))
     (reverse (list* (reverse current-chunk) acc))))
 
 (defn chunk
@@ -1486,6 +1487,7 @@
   assert [1, 2, 2, 3, 4, 4, 6, 7, 7] |> list.chunk(by: fn(n) { n % 2 })
   == [[1], [2, 2], [3], [4, 4, 6], [7, 7]]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] [:sequential [:sequential :any]]]}
   [list' f]
   (if (empty? list')
     (list)
@@ -1498,12 +1500,10 @@
       (reverse acc)
       (let [remaining current-chunk]
         (reverse (list* (reverse remaining) acc))))
-    (let [first' (first list') rest' (rest list')]
-      (let [chunk (list* first' current-chunk)]
-        (let [subject (> left 1)]
-          (if subject
-            (recur rest' count' (-' left 1) chunk acc)
-            (recur rest' count' count' (list) (list* (reverse chunk) acc))))))))
+    (let [first' (first list') rest' (rest list') chunk (list* first' current-chunk) subject (> left 1)]
+      (if subject
+        (recur rest' count' (-' left 1) chunk acc)
+        (recur rest' count' count' (list) (list* (reverse chunk) acc))))))
 
 (defn sized-chunk
   "Returns a list of chunks containing `count` elements each.
@@ -1524,6 +1524,7 @@
   assert [1, 2, 3, 4, 5, 6, 7, 8] |> list.sized_chunk(into: 3)
   == [[1, 2, 3], [4, 5, 6], [7, 8]]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential [:sequential :any]]]}
   [list' count']
   (sized-chunk-loop list' count' count' (list) (list)))
 
@@ -1545,6 +1546,7 @@
   ```gleam
   assert [1, 2, 3, 4, 5] |> list.reduce(fn(acc, x) { acc + x }) == Ok(15)
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list' fun]
   (if (empty? list')
     (p/->Error nil)
@@ -1554,9 +1556,8 @@
 (defn- scan-loop [list' accumulator accumulated fun]
   (if (empty? list')
     (reverse accumulated)
-    (let [first' (first list') rest' (rest list')]
-      (let [next (fun accumulator first')]
-        (recur rest' next (list* next accumulated) fun)))))
+    (let [first' (first list') rest' (rest list') next (fun accumulator first')]
+      (recur rest' next (list* next accumulated) fun))))
 
 (defn scan
   "Similar to `fold`, but yields the state of the accumulator at each stage.
@@ -1567,6 +1568,7 @@
   assert list.scan(over: [1, 2, 3], from: 100, with: fn(acc, i) { acc + i })
   == [101, 103, 106]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]] [:sequential :any]]}
   [list' initial fun]
   (scan-loop list' initial (list) fun))
 
@@ -1586,6 +1588,7 @@
   ```gleam
   assert list.last([1, 2, 3, 4, 5]) == Ok(5)
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list']
   (cond
     (empty? list') (p/->Error nil)
@@ -1607,6 +1610,7 @@
   assert list.combinations([1, 2, 3, 4], 3)
   == [[1, 2, 3], [1, 2, 4], [1, 3, 4], [2, 3, 4]]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential [:sequential :any]]]}
   [items n]
   (cond
     (= n 0) (list (list))
@@ -1621,10 +1625,8 @@
 (defn- combination-pairs-loop [items acc]
   (if (empty? items)
     (reverse acc)
-    (let [first' (first items) rest' (rest items)]
-      (let [first-combinations (map rest' (fn [other] [first' other]))
-            acc (reverse-and-prepend first-combinations acc)]
-        (recur rest' acc)))))
+    (let [first' (first items) rest' (rest items) first-combinations (map rest' (fn [other] [first' other])) acc (reverse-and-prepend first-combinations acc)]
+      (recur rest' acc))))
 
 (defn combination-pairs
   "Return unique pair combinations of elements in the list.
@@ -1634,6 +1636,7 @@
   ```gleam
   assert list.combination_pairs([1, 2, 3]) == [#(1, 2), #(1, 3), #(2, 3)]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any]] [:sequential [:tuple :any :any]]]}
   [items]
   (combination-pairs-loop items (list)))
 
@@ -1642,9 +1645,8 @@
     (empty? rows) [(reverse column) (reverse remaining-rows)]
     (and (seq rows) (empty? (first rows))) (let [rest' (rest rows)]
                                              (recur rest' column remaining-rows))
-    (and (seq rows) (seq (first rows))) (let [first' (first (first rows)) remaining-row (rest (first rows)) rest-rows (rest rows)]
-                                          (let [remaining-rows (list* remaining-row remaining-rows)]
-                                            (recur rest-rows (list* first' column) remaining-rows)))))
+    (and (seq rows) (seq (first rows))) (let [first' (first (first rows)) remaining-row (rest (first rows)) rest-rows (rest rows) remaining-rows (list* remaining-row remaining-rows)]
+                                          (recur rest-rows (list* first' column) remaining-rows))))
 
 (defn- transpose-loop [rows columns]
   (if (empty? rows)
@@ -1667,6 +1669,7 @@
   assert list.transpose([[1, 2, 3], [101, 102, 103]])
   == [[1, 101], [2, 102], [3, 103]]
   ```"
+  {:malli/schema [:=> [:cat [:sequential [:sequential :any]]] [:sequential [:sequential :any]]]}
   [list-of-lists]
   (transpose-loop list-of-lists (list)))
 
@@ -1679,6 +1682,7 @@
   assert list.interleave([[1, 2], [101, 102], [201, 202]])
   == [1, 101, 201, 2, 102, 202]
   ```"
+  {:malli/schema [:=> [:cat [:sequential [:sequential :any]]] [:sequential :any]]}
   [list']
   (-> list' transpose flatten))
 
@@ -1703,6 +1707,7 @@
   [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] |> list.shuffle
   // -> [1, 6, 9, 10, 3, 8, 4, 2, 7, 5]
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any]] [:sequential :any]]}
   [list']
   (-> list'
       (fold (list) (fn [acc a] (list* [(float/random) a] acc)))
@@ -1712,11 +1717,10 @@
 (defn- max-loop [list' compare max']
   (if (empty? list')
     max'
-    (let [first' (first list') rest' (rest list')]
-      (let [subject (compare first' max')]
-        (if (instance? gleam.order.Gt subject)
-          (recur rest' compare first')
-          (recur rest' compare max'))))))
+    (let [first' (first list') rest' (rest list') subject (compare first' max')]
+      (if (instance? gleam.order.Gt subject)
+        (recur rest' compare first')
+        (recur rest' compare max')))))
 
 (defn max'
   "Takes a list and a comparator, and returns the maximum element in the list
@@ -1730,6 +1734,7 @@
   ```gleam
   assert [\"a\", \"c\", \"b\"] |> list.max(string.compare) == Ok(\"c\")
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [list' compare]
   (if (empty? list')
     (p/->Error nil)
@@ -1750,25 +1755,20 @@
                (when-not (instance? Ok v)
                  (throw (ex-info "let assert failed" {:value v})))
                (let [log (:value v)]
-                 (float/round (float/floor (/ (log-random) log)))))]
-    (let [subject (drop list' skip)]
-      (if (empty? subject)
-        reservoir
-        (let [first' (first subject) rest' (rest subject)]
-          (let [reservoir (dict/insert reservoir (int/random n) first')
-                w (* w (float/exponential (/ (log-random) (int/to-float n))))]
-            (recur rest' reservoir n w)))))))
+                 (float/round (float/floor (/ (log-random) log))))) subject (drop list' skip)]
+    (if (empty? subject)
+      reservoir
+      (let [first' (first subject) rest' (rest subject) reservoir (dict/insert reservoir (int/random n) first') w (* w (float/exponential (/ (log-random) (int/to-float n))))]
+        (recur rest' reservoir n w)))))
 
 (defn- build-reservoir-loop [list' size reservoir]
-  (let [reservoir-size (dict/size reservoir)]
-    (let [subject (>= reservoir-size size)]
-      (if subject
-        [reservoir list']
-        (if (empty? list')
-          [reservoir (list)]
-          (let [first' (first list') rest' (rest list')]
-            (let [reservoir (dict/insert reservoir reservoir-size first')]
-              (recur rest' size reservoir))))))))
+  (let [reservoir-size (dict/size reservoir) subject (>= reservoir-size size)]
+    (if subject
+      [reservoir list']
+      (if (empty? list')
+        [reservoir (list)]
+        (let [first' (first list') rest' (rest list') reservoir (dict/insert reservoir reservoir-size first')]
+          (recur rest' size reservoir))))))
 
 (defn- build-reservoir
   "Builds the initial reservoir used by Algorithm L.
@@ -1793,78 +1793,10 @@
   list.sample([1, 2, 3, 4, 5], 3)
   // -> [2, 4, 5]  // A random sample of 3 items
   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential :any]]}
   [list' n]
-  (let [[reservoir rest'] (build-reservoir list' n)]
-    (let [subject (dict/is-empty reservoir)]
-      (if subject
-        (list)
-        (let [w (float/exponential (/ (log-random) (int/to-float n)))]
-          (dict/values (sample-loop rest' reservoir n w)))))))
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'all [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] :boolean]
-   'any [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] :boolean]
-   'append [:=> [:cat [:sequential :any] [:sequential :any]] [:sequential :any]]
-   'chunk [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] [:sequential [:sequential :any]]]
-   'combination-pairs [:=> [:cat [:sequential :any]] [:sequential [:tuple :any :any]]]
-   'combinations [:=> [:cat [:sequential :any] :int] [:sequential [:sequential :any]]]
-   'contains [:=> [:cat [:sequential :any] :any] :boolean]
-   'count' [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] :int]
-   'drop [:=> [:cat [:sequential :any] :int] [:sequential :any]]
-   'drop-while [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:sequential :any]]
-   'each [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] :nil]
-   'filter [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:sequential :any]]
-   'filter-map [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]] [:sequential :any]]
-   'find [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'find-map [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'first' [:=> [:cat [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'flat-map [:=> [:cat [:sequential :any] [:=> [:cat :any] [:sequential :any]]] [:sequential :any]]
-   'flatten [:=> [:cat [:sequential [:sequential :any]]] [:sequential :any]]
-   'fold [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]] :any]
-   'fold-right [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]] :any]
-   'fold-until [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.list.Continue)] [:fn (partial instance? gleam.list.Stop)]]]] :any]
-   'group [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] [:map-of :any [:sequential :any]]]
-   'index-fold [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any :int] :any]] :any]
-   'index-map [:=> [:cat [:sequential :any] [:=> [:cat :any :int] :any]] [:sequential :any]]
-   'interleave [:=> [:cat [:sequential [:sequential :any]]] [:sequential :any]]
-   'intersperse [:=> [:cat [:sequential :any] :any] [:sequential :any]]
-   'is-empty [:=> [:cat [:sequential :any]] :boolean]
-   'key-filter [:=> [:cat [:sequential [:tuple :any :any]] :any] [:sequential :any]]
-   'key-find [:=> [:cat [:sequential [:tuple :any :any]] :any] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'key-pop [:=> [:cat [:sequential [:tuple :any :any]] :any] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'key-set [:=> [:cat [:sequential [:tuple :any :any]] :any :any] [:sequential [:tuple :any :any]]]
-   'last [:=> [:cat [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'length [:=> [:cat [:sequential :any]] :int]
-   'map [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] [:sequential :any]]
-   'map-fold [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:tuple :any :any]]] [:tuple :any [:sequential :any]]]
-   'map2 [:=> [:cat [:sequential :any] [:sequential :any] [:=> [:cat :any :any] :any]] [:sequential :any]]
-   'max' [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'new* [:=> [:cat] [:sequential :any]]
-   'partition [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:tuple [:sequential :any] [:sequential :any]]]
-   'permutations [:=> [:cat [:sequential :any]] [:sequential [:sequential :any]]]
-   'prepend [:=> [:cat [:sequential :any] :any] [:sequential :any]]
-   'reduce [:=> [:cat [:sequential :any] [:=> [:cat :any :any] :any]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'repeat [:=> [:cat :any :int] [:sequential :any]]
-   'rest' [:=> [:cat [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'reverse [:=> [:cat [:sequential :any]] [:sequential :any]]
-   'sample [:=> [:cat [:sequential :any] :int] [:sequential :any]]
-   'scan [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]] [:sequential :any]]
-   'shuffle [:=> [:cat [:sequential :any]] [:sequential :any]]
-   'sized-chunk [:=> [:cat [:sequential :any] :int] [:sequential [:sequential :any]]]
-   'sort [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]] [:sequential :any]]
-   'split [:=> [:cat [:sequential :any] :int] [:tuple [:sequential :any] [:sequential :any]]]
-   'split-while [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:tuple [:sequential :any] [:sequential :any]]]
-   'strict-zip [:=> [:cat [:sequential :any] [:sequential :any]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'take [:=> [:cat [:sequential :any] :int] [:sequential :any]]
-   'take-while [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]] [:sequential :any]]
-   'transpose [:=> [:cat [:sequential [:sequential :any]]] [:sequential [:sequential :any]]]
-   'try-each [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'try-fold [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'try-map [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'unique [:=> [:cat [:sequential :any]] [:sequential :any]]
-   'unzip [:=> [:cat [:sequential [:tuple :any :any]]] [:tuple [:sequential :any] [:sequential :any]]]
-   'window [:=> [:cat [:sequential :any] :int] [:sequential [:sequential :any]]]
-   'window-by-2 [:=> [:cat [:sequential :any]] [:sequential [:tuple :any :any]]]
-   'wrap [:=> [:cat :any] [:sequential :any]]
-   'zip [:=> [:cat [:sequential :any] [:sequential :any]] [:sequential [:tuple :any :any]]]})
+  (let [[reservoir rest'] (build-reservoir list' n) subject (dict/is-empty reservoir)]
+    (if subject
+      (list)
+      (let [w (float/exponential (/ (log-random) (int/to-float n)))]
+        (dict/values (sample-loop rest' reservoir n w))))))

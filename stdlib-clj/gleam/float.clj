@@ -3,12 +3,11 @@
   (:require
    [gleam-ffi]
    [gleam.order :as order]
-   [gleam.prelude :as p])
-  (:import (gleam.prelude Ok)))
+   [gleam.prelude :as p]))
 
-(def parse gleam-ffi/float-parse)
+(def ^{:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]} parse gleam-ffi/float-parse)
 
-(def to-string gleam-ffi/float-to-string)
+(def ^{:malli/schema [:=> [:cat :double] :string]} to-string gleam-ffi/float-to-string)
 
 (defn max'
   "Compares two `Float`s, returning the larger of the two.
@@ -18,6 +17,7 @@
   ```gleam
   assert float.max(2.0, 2.3) == 2.3
   ```"
+  {:malli/schema [:=> [:cat :double :double] :double]}
   [a b]
   (let [subject (> a b)]
     (if subject a b)))
@@ -30,6 +30,7 @@
   ```gleam
   assert float.min(2.0, 2.3) == 2.0
   ```"
+  {:malli/schema [:=> [:cat :double :double] :double]}
   [a b]
   (let [subject (< a b)]
     (if subject a b)))
@@ -51,6 +52,7 @@
   ```gleam
   assert float.clamp(1.2, min: 1.4, max: 0.6) == 1.2
   ```"
+  {:malli/schema [:=> [:cat :double :double :double] :double]}
   [x min-bound max-bound]
   (let [subject (>= min-bound max-bound)]
     (if subject
@@ -70,6 +72,7 @@
   To handle
   [Floating Point Imprecision](https://en.wikipedia.org/wiki/Floating-point_arithmetic#Accuracy_problems)
   you may use [`loosely_compare`](#loosely_compare) instead."
+  {:malli/schema [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
   [a b]
   (let [subject (= a b)]
     (if subject
@@ -89,6 +92,7 @@
   ```gleam
   assert float.absolute_value(10.2) == 10.2
   ```"
+  {:malli/schema [:=> [:cat :double] :double]}
   [x]
   (let [subject (>= x 0.0)]
     (if subject x (- 0.0 x))))
@@ -111,10 +115,10 @@
   
   If you want to check only for equality you may use
   [`loosely_equals`](#loosely_equals) instead."
+  {:malli/schema [:=> [:cat :double :double :double] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
   [a b tolerance]
-  (let [difference (absolute-value (- a b))]
-    (let [subject (<= difference tolerance)]
-      (if subject (order/->Eq) (compare a b)))))
+  (let [difference (absolute-value (- a b)) subject (<= difference tolerance)]
+    (if subject (order/->Eq) (compare a b))))
 
 (defn loosely-equals
   "Checks for equality of two `Float`s within a tolerance,
@@ -135,13 +139,14 @@
   ```gleam
   assert !float.loosely_equals(5.0, with: 5.1, tolerating: 0.1)
   ```"
+  {:malli/schema [:=> [:cat :double :double :double] :boolean]}
   [a b tolerance]
   (let [difference (absolute-value (- a b))]
     (<= difference tolerance)))
 
-(def ceiling gleam-ffi/f-ceiling)
+(def ^{:malli/schema [:=> [:cat :double] :double]} ceiling gleam-ffi/f-ceiling)
 
-(def floor gleam-ffi/f-floor)
+(def ^{:malli/schema [:=> [:cat :double] :double]} floor gleam-ffi/f-floor)
 
 (defn negate
   "Returns the negative of the value provided.
@@ -151,6 +156,7 @@
   ```gleam
   assert float.negate(1.0) == -1.0
   ```"
+  {:malli/schema [:=> [:cat :double] :double]}
   [x]
   (* -1.0 x))
 
@@ -168,11 +174,12 @@
   ```gleam
   assert float.round(2.5) == 3
   ```"
+  {:malli/schema [:=> [:cat :double] :int]}
   [x]
   (let [subject (>= x 0.0)]
     (if subject (js-round x) (-' 0 (js-round (negate x))))))
 
-(def truncate gleam-ffi/f-truncate)
+(def ^{:malli/schema [:=> [:cat :double] :int]} truncate gleam-ffi/f-truncate)
 
 (def do-to-float gleam-ffi/f-to-float)
 
@@ -193,6 +200,7 @@
   ```gleam
   assert float.to_precision(547_890.453444, -3) == 548_000.0
   ```"
+  {:malli/schema [:=> [:cat :double :int] :double]}
   [x precision]
   (let [subject (<= precision 0)]
     (if subject
@@ -226,10 +234,10 @@
   ```gleam
   assert float.power(-1.0, 0.5) == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [base exponent]
-  (let [fractional (> (- (ceiling exponent) exponent) 0.0)]
-    (let [subject (or (and (< base 0.0) fractional) (and (= base 0.0) (< exponent 0.0)))]
-      (if subject (p/->Error nil) (p/->Ok (do-power base exponent))))))
+  (let [fractional (> (- (ceiling exponent) exponent) 0.0) subject (or (and (< base 0.0) fractional) (and (= base 0.0) (< exponent 0.0)))]
+    (if subject (p/->Error nil) (p/->Ok (do-power base exponent)))))
 
 (defn square-root
   "Returns the square root of the input as a `Float`.
@@ -243,6 +251,7 @@
   ```gleam
   assert float.square_root(-16.0) == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat :double] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [x]
   (power x 0.5))
 
@@ -260,6 +269,7 @@
   ```gleam
   assert float.sum([1.0, 2.2, 3.3]) == 6.5
   ```"
+  {:malli/schema [:=> [:cat [:sequential :double]] :double]}
   [numbers]
   (sum-loop numbers 0.0))
 
@@ -277,10 +287,11 @@
   ```gleam
   assert float.product([2.5, 3.2, 4.2]) == 33.6
   ```"
+  {:malli/schema [:=> [:cat [:sequential :double]] :double]}
   [numbers]
   (product-loop numbers 1.0))
 
-(def random gleam-ffi/f-random)
+(def ^{:malli/schema [:=> [:cat] :double]} random gleam-ffi/f-random)
 
 (defn modulo
   "Computes the modulo of a float division of inputs as a `Result`.
@@ -307,6 +318,7 @@
   ```gleam
   assert float.modulo(-13.3, by: -3.3) == Ok(-0.1)
   ```"
+  {:malli/schema [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [dividend divisor]
   (if (= divisor 0.0)
     (p/->Error nil)
@@ -324,6 +336,7 @@
   ```gleam
   assert float.divide(1.0, 0.0) == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [a b]
   (if (= b 0.0)
     (p/->Error nil)
@@ -351,6 +364,7 @@
   ```gleam
   assert 3.0 |> float.add(2.0) == 5.0
   ```"
+  {:malli/schema [:=> [:cat :double :double] :double]}
   [a b]
   (+ a b))
 
@@ -375,6 +389,7 @@
   ```gleam
   assert 3.0 |> float.multiply(2.0) == 6.0
   ```"
+  {:malli/schema [:=> [:cat :double :double] :double]}
   [a b]
   (* a b))
 
@@ -403,6 +418,7 @@
   ```gleam
   assert 3.0 |> float.subtract(2.0, _) == -1.0
   ```"
+  {:malli/schema [:=> [:cat :double :double] :double]}
   [a b]
   (- a b))
 
@@ -429,38 +445,9 @@
   ```gleam
   assert float.logarithm(-1.0) == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat :double] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [x]
   (let [subject (<= x 0.0)]
     (if subject (p/->Error nil) (p/->Ok (do-log x)))))
 
-(def exponential gleam-ffi/f-exp)
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'absolute-value [:=> [:cat :double] :double]
-   'add [:=> [:cat :double :double] :double]
-   'ceiling [:=> [:cat :double] :double]
-   'clamp [:=> [:cat :double :double :double] :double]
-   'compare [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
-   'divide [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'exponential [:=> [:cat :double] :double]
-   'floor [:=> [:cat :double] :double]
-   'logarithm [:=> [:cat :double] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'loosely-compare [:=> [:cat :double :double :double] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
-   'loosely-equals [:=> [:cat :double :double :double] :boolean]
-   'max' [:=> [:cat :double :double] :double]
-   'min' [:=> [:cat :double :double] :double]
-   'modulo [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'multiply [:=> [:cat :double :double] :double]
-   'negate [:=> [:cat :double] :double]
-   'parse [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'power [:=> [:cat :double :double] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'product [:=> [:cat [:sequential :double]] :double]
-   'random [:=> [:cat] :double]
-   'round [:=> [:cat :double] :int]
-   'square-root [:=> [:cat :double] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'subtract [:=> [:cat :double :double] :double]
-   'sum [:=> [:cat [:sequential :double]] :double]
-   'to-precision [:=> [:cat :double :int] :double]
-   'to-string [:=> [:cat :double] :string]
-   'truncate [:=> [:cat :double] :int]})
+(def ^{:malli/schema [:=> [:cat :double] :double]} exponential gleam-ffi/f-exp)

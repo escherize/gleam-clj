@@ -25,10 +25,11 @@
   ```gleam
   assert !string.is_empty(\"the world\")
   ```"
+  {:malli/schema [:=> [:cat :string] :boolean]}
   [str']
   (= str' ""))
 
-(def length gleam-ffi/str-length)
+(def ^{:malli/schema [:=> [:cat :string] :int]} length gleam-ffi/str-length)
 
 (defn reverse
   "Reverses a `String`.
@@ -41,6 +42,7 @@
   ```gleam
   assert string.reverse(\"stressed\") == \"desserts\"
   ```"
+  {:malli/schema [:=> [:cat :string] :string]}
   [string]
   (-> string
       string_tree/from-string
@@ -60,15 +62,16 @@
   ```gleam
   assert string.replace(\"a,b,c,d,e\", each: \",\", with: \"/\") == \"a/b/c/d/e\"
   ```"
+  {:malli/schema [:=> [:cat :string :string :string] :string]}
   [string pattern substitute]
   (-> string
       string_tree/from-string
       (string_tree/replace pattern substitute)
       string_tree/to-string))
 
-(def lowercase gleam-ffi/str-lowercase)
+(def ^{:malli/schema [:=> [:cat :string] :string]} lowercase gleam-ffi/str-lowercase)
 
-(def uppercase gleam-ffi/str-uppercase)
+(def ^{:malli/schema [:=> [:cat :string] :string]} uppercase gleam-ffi/str-uppercase)
 
 (def less-than gleam-ffi/str-less-than)
 
@@ -90,6 +93,7 @@
   
   assert string.compare(\"A\", \"B\") == order.Lt
   ```"
+  {:malli/schema [:=> [:cat :string :string] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]}
   [a b]
   (let [subject (= a b)]
     (if subject
@@ -128,22 +132,22 @@
   ```gleam
   assert string.slice(from: \"gleam\", at_index: -12, length: 2) == \"\"
   ```"
+  {:malli/schema [:=> [:cat :string :int :int] :string]}
   [string idx len]
   (let [subject (<= len 0)]
     (if subject
       ""
       (let [subject (< idx 0)]
         (if subject
-          (let [translated-idx (+' (length string) idx)]
-            (let [subject (< translated-idx 0)]
-              (if subject "" (grapheme-slice string translated-idx len))))
+          (let [translated-idx (+' (length string) idx) subject (< translated-idx 0)]
+            (if subject "" (grapheme-slice string translated-idx len)))
           (grapheme-slice string idx len))))))
 
 (def unsafe-byte-slice gleam-ffi/unsafe-byte-slice)
 
-(def crop gleam-ffi/crop)
+(def ^{:malli/schema [:=> [:cat :string :string] :string]} crop gleam-ffi/crop)
 
-(def byte-size gleam-ffi/byte-size)
+(def ^{:malli/schema [:=> [:cat :string] :int]} byte-size gleam-ffi/byte-size)
 
 (defn drop-start
   "Drops *n* graphemes from the start of a `String`.
@@ -155,6 +159,7 @@
   ```gleam
   assert string.drop_start(from: \"The Lone Gunmen\", up_to: 2) == \"e Lone Gunmen\"
   ```"
+  {:malli/schema [:=> [:cat :string :int] :string]}
   [string num-graphemes]
   (let [subject (<= num-graphemes 0)]
     (if subject
@@ -177,17 +182,18 @@
   assert string.drop_end(from: \"Cigarette Smoking Man\", up_to: 2)
   == \"Cigarette Smoking M\"
   ```"
+  {:malli/schema [:=> [:cat :string :int] :string]}
   [string num-graphemes]
   (let [subject (<= num-graphemes 0)]
     (if subject string (slice string 0 (-' (length string) num-graphemes)))))
 
-(def contains gleam-ffi/str-contains)
+(def ^{:malli/schema [:=> [:cat :string :string] :boolean]} contains gleam-ffi/str-contains)
 
-(def starts-with gleam-ffi/starts-with)
+(def ^{:malli/schema [:=> [:cat :string :string] :boolean]} starts-with gleam-ffi/starts-with)
 
-(def ends-with gleam-ffi/ends-with)
+(def ^{:malli/schema [:=> [:cat :string :string] :boolean]} ends-with gleam-ffi/ends-with)
 
-(def pop-grapheme gleam-ffi/pop-grapheme)
+(def ^{:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]} pop-grapheme gleam-ffi/pop-grapheme)
 
 (defn- to-graphemes-loop [string acc]
   (let [subject (pop-grapheme string)]
@@ -203,6 +209,7 @@
   ```gleam
   assert string.to_graphemes(\"abc\") == [\"a\", \"b\", \"c\"]
   ```"
+  {:malli/schema [:=> [:cat :string] [:sequential :string]]}
   [string]
   (-> string (to-graphemes-loop (list)) list/reverse))
 
@@ -215,6 +222,7 @@
   assert string.split(\"home/gleam/desktop/\", on: \"/\")
   == [\"home\", \"gleam\", \"desktop\", \"\"]
   ```"
+  {:malli/schema [:=> [:cat :string :string] [:sequential :string]]}
   [x substring]
   (if (= substring "")
     (to-graphemes x)
@@ -240,6 +248,7 @@
   ```gleam
   assert string.split_once(\"home/gleam/desktop/\", on: \"?\") == Error(Nil)
   ```"
+  {:malli/schema [:=> [:cat :string :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [string substring]
   (let [subject (erl-split string substring)]
     (if (= (count subject) 2)
@@ -264,6 +273,7 @@
   ```gleam
   assert string.append(to: \"butter\", suffix: \"fly\") == \"butterfly\"
   ```"
+  {:malli/schema [:=> [:cat :string :string] :string]}
   [first' second]
   (str first' second))
 
@@ -283,15 +293,15 @@
   ```gleam
   assert string.concat([\"never\", \"the\", \"less\"]) == \"nevertheless\"
   ```"
+  {:malli/schema [:=> [:cat [:sequential :string]] :string]}
   [strings]
   (concat-loop strings ""))
 
 (defn- repeat-loop [times doubling-acc acc]
   (let [acc (let [subject (rem times 2)]
               (if (= subject 0) acc (str acc doubling-acc)))
-        times (quot times 2)]
-    (let [subject (<= times 0)]
-      (if subject acc (recur times (str doubling-acc doubling-acc) acc)))))
+        times (quot times 2) subject (<= times 0)]
+    (if subject acc (recur times (str doubling-acc doubling-acc) acc))))
 
 (defn repeat
   "Creates a new `String` by repeating a `String` a given number of times.
@@ -303,6 +313,7 @@
   ```gleam
   assert string.repeat(\"ha\", times: 3) == \"hahaha\"
   ```"
+  {:malli/schema [:=> [:cat :string :int] :string]}
   [string times]
   (let [subject (<= times 0)]
     (if subject "" (repeat-loop times string ""))))
@@ -324,6 +335,7 @@
   assert string.join([\"home\", \"evan\", \"Desktop\"], with: \"/\")
   == \"home/evan/Desktop\"
   ```"
+  {:malli/schema [:=> [:cat [:sequential :string] :string] :string]}
   [strings separator]
   (if (empty? strings)
     ""
@@ -352,11 +364,11 @@
   ```gleam
   assert string.pad_start(\"121\", to: 2, with: \".\") == \"121\"
   ```"
+  {:malli/schema [:=> [:cat :string :int :string] :string]}
   [string desired-length pad-string]
   (let [current-length (length string)
-        to-pad-length (-' desired-length current-length)]
-    (let [subject (<= to-pad-length 0)]
-      (if subject string (str (padding to-pad-length pad-string) string)))))
+        to-pad-length (-' desired-length current-length) subject (<= to-pad-length 0)]
+    (if subject string (str (padding to-pad-length pad-string) string))))
 
 (defn pad-end
   "Pads the end of a `String` until it has a given length.
@@ -374,11 +386,11 @@
   ```gleam
   assert string.pad_end(\"123\", to: 2, with: \".\") == \"123\"
   ```"
+  {:malli/schema [:=> [:cat :string :int :string] :string]}
   [string desired-length pad-string]
   (let [current-length (length string)
-        to-pad-length (-' desired-length current-length)]
-    (let [subject (<= to-pad-length 0)]
-      (if subject string (str string (padding to-pad-length pad-string))))))
+        to-pad-length (-' desired-length current-length) subject (<= to-pad-length 0)]
+    (if subject string (str string (padding to-pad-length pad-string)))))
 
 (def erl-trim gleam-ffi/erl-trim)
 
@@ -390,6 +402,7 @@
   ```gleam
   assert string.trim_end(\"  hats  \\n\") == \"  hats\"
   ```"
+  {:malli/schema [:=> [:cat :string] :string]}
   [string]
   (erl-trim string (->Trailing)))
 
@@ -401,6 +414,7 @@
   ```gleam
   assert string.trim_start(\"  hats  \\n\") == \"hats  \\n\"
   ```"
+  {:malli/schema [:=> [:cat :string] :string]}
   [string]
   (erl-trim string (->Leading)))
 
@@ -417,24 +431,21 @@
   ```gleam
   assert string.trim(\"  hats  \\n\") == \"hats\"
   ```"
+  {:malli/schema [:=> [:cat :string] :string]}
   [string]
   (-> string trim-start trim-end))
 
 (def unsafe-int-to-utf-codepoint gleam-ffi/identity1)
 
-(def to-utf-codepoints-loop gleam-ffi/to-utf-codepoints)
+(def ^{:malli/schema [:=> [:cat :string] [:sequential :int]]} to-utf-codepoints gleam-ffi/to-utf-codepoints)
 
-(defn- do-to-utf-codepoints [string]
-  (to-utf-codepoints-loop (p/bit-array (p/ba-utf8 string)) (list)))
-
-(def to-utf-codepoints gleam-ffi/to-utf-codepoints)
-
-(def from-utf-codepoints gleam-ffi/from-utf-codepoints)
+(def ^{:malli/schema [:=> [:cat [:sequential :int]] :string]} from-utf-codepoints gleam-ffi/from-utf-codepoints)
 
 (defn utf-codepoint
   "Converts an integer to a `UtfCodepoint`.
   
   Returns an `Error` if the integer does not represent a valid UTF codepoint."
+  {:malli/schema [:=> [:cat :int] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [value]
   (cond
     (> value 1114111) (p/->Error nil)
@@ -443,7 +454,7 @@
     :else (let [i value]
             (p/->Ok (unsafe-int-to-utf-codepoint i)))))
 
-(def utf-codepoint-to-int gleam-ffi/identity1)
+(def ^{:malli/schema [:=> [:cat :int] :int]} utf-codepoint-to-int gleam-ffi/identity1)
 
 (defn to-option
   "Converts a `String` into `Option(String)` where an empty `String` becomes
@@ -458,6 +469,7 @@
   ```gleam
   assert string.to_option(\"hats\") == Some(\"hats\")
   ```"
+  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]}
   [string]
   (if (= string "") (option/->None) (option/->Some string)))
 
@@ -475,6 +487,7 @@
   ```gleam
   assert string.first(\"icecream\") == Ok(\"i\")
   ```"
+  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [string]
   (let [subject (pop-grapheme string)]
     (if (instance? Ok subject)
@@ -500,6 +513,7 @@
   ```gleam
   assert string.last(\"icecream\") == Ok(\"m\")
   ```"
+  {:malli/schema [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)] [:fn (partial instance? gleam.prelude.Error)]]]}
   [string]
   (let [subject (pop-grapheme string)]
     (cond
@@ -519,6 +533,7 @@
   ```gleam
   assert string.capitalise(\"mamouna\") == \"Mamouna\"
   ```"
+  {:malli/schema [:=> [:cat :string] :string]}
   [string]
   (let [subject (pop-grapheme string)]
     (if (instance? Ok subject)
@@ -552,51 +567,10 @@
   Be careful not to call this function with large data structures or you
   could use very large amounts of memory, potentially causing runtime
   problems."
+  {:malli/schema [:=> [:cat :any] :string]}
   [term]
   (-> term do-inspect string_tree/to-string))
 
-(def remove-prefix gleam-ffi/remove-prefix)
+(def ^{:malli/schema [:=> [:cat :string :string] :string]} remove-prefix gleam-ffi/remove-prefix)
 
-(def remove-suffix gleam-ffi/remove-suffix)
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'append [:=> [:cat :string :string] :string]
-   'byte-size [:=> [:cat :string] :int]
-   'capitalise [:=> [:cat :string] :string]
-   'compare [:=> [:cat :string :string] [:or [:fn (partial instance? gleam.order.Lt)] [:fn (partial instance? gleam.order.Eq)] [:fn (partial instance? gleam.order.Gt)]]]
-   'concat [:=> [:cat [:sequential :string]] :string]
-   'contains [:=> [:cat :string :string] :boolean]
-   'crop [:=> [:cat :string :string] :string]
-   'drop-end [:=> [:cat :string :int] :string]
-   'drop-start [:=> [:cat :string :int] :string]
-   'ends-with [:=> [:cat :string :string] :boolean]
-   'first' [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'from-utf-codepoints [:=> [:cat [:sequential :int]] :string]
-   'inspect [:=> [:cat :any] :string]
-   'is-empty [:=> [:cat :string] :boolean]
-   'join [:=> [:cat [:sequential :string] :string] :string]
-   'last [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'length [:=> [:cat :string] :int]
-   'lowercase [:=> [:cat :string] :string]
-   'pad-end [:=> [:cat :string :int :string] :string]
-   'pad-start [:=> [:cat :string :int :string] :string]
-   'pop-grapheme [:=> [:cat :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'remove-prefix [:=> [:cat :string :string] :string]
-   'remove-suffix [:=> [:cat :string :string] :string]
-   'repeat [:=> [:cat :string :int] :string]
-   'replace [:=> [:cat :string :string :string] :string]
-   'reverse [:=> [:cat :string] :string]
-   'slice [:=> [:cat :string :int :int] :string]
-   'split [:=> [:cat :string :string] [:sequential :string]]
-   'split-once [:=> [:cat :string :string] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'starts-with [:=> [:cat :string :string] :boolean]
-   'to-graphemes [:=> [:cat :string] [:sequential :string]]
-   'to-option [:=> [:cat :string] [:or [:fn (partial instance? gleam.option.Some)] [:fn (partial instance? gleam.option.None)]]]
-   'to-utf-codepoints [:=> [:cat :string] [:sequential :int]]
-   'trim [:=> [:cat :string] :string]
-   'trim-end [:=> [:cat :string] :string]
-   'trim-start [:=> [:cat :string] :string]
-   'uppercase [:=> [:cat :string] :string]
-   'utf-codepoint [:=> [:cat :int] [:or [:fn (partial instance? gleam.prelude.Ok)]                      [:fn (partial instance? gleam.prelude.Error)]]]
-   'utf-codepoint-to-int [:=> [:cat :int] :int]})
+(def ^{:malli/schema [:=> [:cat :string :string] :string]} remove-suffix gleam-ffi/remove-suffix)

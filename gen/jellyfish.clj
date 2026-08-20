@@ -1,8 +1,6 @@
 (ns jellyfish
   (:require
-   [gleam.io :as io]
-   [gleam.prelude :as p])
-  (:import (gleam.prelude Ok)))
+   [gleam.io :as io]))
 
 ;; type Fish
 (defrecord Starfish [name favourite-color])
@@ -17,14 +15,12 @@
     (and (instance? Jellyfish fish) (not (:jiggly fish))) (let [name (:name fish)]
                                                             (str name " is not jiggly"))))
 
-(defn main []
+(defn main
+  {:malli/schema [:=> [:cat] :nil]}
+  []
   (io/println (describe (->Starfish "Sandy" "pink")))
   (io/println (describe (->Jellyfish "Jelly" true)))
   (io/println (describe (->Jellyfish "Bob" false))))
 
 (defn -main [& _]
   (main))
-
-(def malli-schemas
-  "Malli schemas for this module's public fns, derived from Gleam's types."
-  {'main [:=> [:cat] :nil]})

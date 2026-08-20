@@ -25,14 +25,27 @@ exactly Gleam's semantics.
 
 ## Malli schemas
 
-Every emitted module ends with `malli-schemas`: a map from public fn name
-to a [malli](https://github.com/metosin/malli) `[:=> ...]` schema derived
-from the checked Gleam types (custom types become `instance?` predicates
-over their variant records). Pure data + predicates — malli is only needed
-if you choose to validate or instrument:
+Every public fn is emitted with `{:malli/schema [:=> ...]}` metadata,
+derived from the checked Gleam types (custom types become `instance?`
+predicates over their variant records) — the standard
+[malli function-schema metadata](https://github.com/metosin/malli/blob/master/docs/function-schemas.md#function-schema-metadata),
+so the whole malli toolchain just works:
 
-    (require '[malli.core :as mc])
-    (mc/validate (get coin-change/malli-schemas 'min-coins) ...)
+    (require '[malli.instrument :as mi])
+    (mi/collect! {:ns ['coin-change]})
+    (mi/instrument!)
+    (coin-change/min-coins :bogus :nope)
+    ;; => ex-info :malli.core/invalid-input
+
+malli is not a dependency of the generated code; the metadata is inert
+until you collect it.
+
+The same metadata feeds clj-kondo's type linter: `mi/collect!` +
+`malli.clj-kondo/emit!` writes a type-mismatch config, after which a call
+like `(min-coins "not a list" :nope)` is a **static lint error** in your
+editor and CI (`Expected: sequential collection, received: string`).
+All generated code — stdlib included — lints clean: zero errors, zero
+warnings, enforced by check.sh.
 
 ## Licences and provenance
 
