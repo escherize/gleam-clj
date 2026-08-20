@@ -33,7 +33,7 @@
 (defn main []
   (let [[attrs total] (attributes)]
     (p/echo attrs "rpg_attributes_generator.gleam:6")
-    (io/print-line (str "Total: " (int/to-string total)))))
+    (io/println (str "Total: " (int/to-string total)))))
 
 (defn -main [& _]
   (main))

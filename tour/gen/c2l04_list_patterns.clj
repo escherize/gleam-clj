@@ -6,7 +6,7 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (let [x (list/repeated (int/random 5) (int/random 3))]
+  (let [x (list/repeat (int/random 5) (int/random 3))]
     (p/echo x "c2l04_list_patterns.gleam:6")
     (let [result (cond
                    (empty? x) "Empty list"

@@ -17,9 +17,9 @@
     (cond
       (= n 71) nil
       (not s1) (recur (+' m 1) n)
-      s1 (do (io/write (-> (int/to-string m) (string/pad-start 9 " ")))
+      s1 (do (io/print (-> (int/to-string m) (string/pad-start 9 " ")))
              (let [subject (= (rem n 10) 0)]
-               (if subject (io/print-line "") nil))
+               (if subject (io/println "") nil))
              (recur 1 (+' n 1))))))
 
 (defn main []

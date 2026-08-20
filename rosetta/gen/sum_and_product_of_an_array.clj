@@ -9,8 +9,8 @@
   (let [list' (list 1 2 3 4 5)
         sum (int/sum list')
         product (int/product list')]
-    (io/print-line (str "sum = " (int/to-string sum)))
-    (io/print-line (str "product = " (int/to-string product)))))
+    (io/println (str "sum = " (int/to-string sum)))
+    (io/println (str "product = " (int/to-string product)))))
 
 (defn -main [& _]
   (main))

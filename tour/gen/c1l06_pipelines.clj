@@ -6,12 +6,12 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (io/print-line (string/drop-start (string/drop-end "Hello, Joe!" 1) 7))
-  (-> "Hello, Mike!" (string/drop-end 1) (string/drop-start 7) io/print-line)
+  (io/println (string/drop-start (string/drop-end "Hello, Joe!" 1) 7))
+  (-> "Hello, Mike!" (string/drop-end 1) (string/drop-start 7) io/println)
   (-> "1"
       (string/append "2")
       ((fn [-capture] (string/append "3" -capture)))
-      io/print-line))
+      io/println))
 
 (defn -main [& _]
   (main))

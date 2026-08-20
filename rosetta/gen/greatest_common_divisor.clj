@@ -12,7 +12,7 @@
   (gcd-loop (int/absolute-value a) (int/absolute-value b)))
 
 (defn main []
-  (-> (gcd 40902 24140) int/to-string io/print-line))
+  (-> (gcd 40902 24140) int/to-string io/println))
 
 (defn -main [& _]
   (main))

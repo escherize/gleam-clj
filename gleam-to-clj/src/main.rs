@@ -96,9 +96,18 @@ fn stdlib_registry() -> HashMap<String, ModuleInfo> {
     g
 }
 
+
+/// Definitions active on this backend: untargeted or erlang-targeted (BEAM
+/// semantics are the reference); javascript-only definitions are dropped.
+fn active_defs(module: &UntypedModule) -> impl Iterator<Item = &gleam_core::ast::TargetedDefinition> {
+    module.definitions.iter().filter(|d| {
+        d.target.is_none() || d.target == Some(gleam_core::build::Target::Erlang)
+    })
+}
+
 fn register_module(global: &mut HashMap<String, ModuleInfo>, path: &str, module: &UntypedModule) {
     let mut info = ModuleInfo::default();
-    for def in &module.definitions {
+    for def in active_defs(module) {
         match &def.definition {
             Definition::CustomType(t) => {
                 for c in &t.constructors {
@@ -194,7 +203,7 @@ fn build_project(proj: &str, out_dir: &str) {
         let path = camino::Utf8PathBuf::from(file.to_string_lossy().to_string());
         let parsed = parse::parse_module(path, &src, &WarningEmitter::null())
             .unwrap_or_else(|e| panic!("parse error in {module_path}: {e:?}"));
-        for def in &parsed.module.definitions {
+        for def in active_defs(&parsed.module) {
             if let Definition::Import(import) = &def.definition {
                 let m = import.module.to_string();
                 // gleam/* and gleeunit are shimmed; everything else must be
@@ -302,7 +311,7 @@ const SPECIAL_FORMS: &[&str] = &[
 /// shadow them, so it gets a `'` suffix everywhere.
 const CORE_SHADOW: &[&str] = &[
     "list", "min", "max", "nth", "first", "rest", "count", "seq", "str", "quot", "rem", "abs",
-    "nthrest",
+    "nthrest", "nil", "true", "false",
 ];
 
 fn local_fn_name(kebab_name: &str) -> String {
@@ -345,6 +354,9 @@ struct Ctx<'a> {
     externals: &'a HashMap<(String, String), String>,
     /// every known module's public shape
     global: &'a HashMap<String, ModuleInfo>,
+    /// names bound anywhere in the function currently being emitted (flat,
+    /// per top-level fn) — locals shadow module fns, as in Gleam
+    scope: std::cell::RefCell<std::collections::HashSet<String>>,
     /// source file name, for echo location prefixes
     file: String,
     /// byte offset of each line start, for byte-offset -> line-number lookup
@@ -357,49 +369,10 @@ impl Ctx<'_> {
         self.line_starts.partition_point(|&s| s <= byte)
     }
 
-    /// Module function reference, applying the clojure.core-collision rename table.
+    /// Module function reference: every compiled module (stdlib included)
+    /// applies the same defn rename rules the target module itself used.
     fn module_fn(&self, alias: &str, label: &str) -> String {
-        let module = self.aliases.get(alias).cloned().unwrap_or_default();
-        match (module.as_str(), label) {
-            ("gleam/int", "min") => "min".into(),
-            ("gleam/int", "max") => "max".into(),
-            ("gleam/int", "range") => format!("{alias}/fold-range"),
-            ("gleam/int", "compare") => format!("{alias}/cmp"),
-            ("gleam/float", "compare") => format!("{alias}/cmp"),
-            ("gleam/list", "reduce") => format!("{alias}/reduce1"),
-            ("gleam/list", "map") => format!("{alias}/map-over"),
-            ("gleam/list", "filter") => format!("{alias}/keep-if"),
-            ("gleam/list", "sort") => format!("{alias}/sort-with"),
-            ("gleam/list", "max") => format!("{alias}/largest"),
-            ("gleam/list", "first") => format!("{alias}/head"),
-            ("gleam/list", "last") => format!("{alias}/final"),
-            ("gleam/list", "count") => format!("{alias}/count-if"),
-            ("gleam/list", "partition") => format!("{alias}/separate"),
-            ("gleam/list", "reverse") => format!("{alias}/reversed"),
-            ("gleam/list", "repeat") => format!("{alias}/repeated"),
-            ("gleam/list", "find") => format!("{alias}/find-first"),
-            ("gleam/string", "reverse") => format!("{alias}/reversed"),
-            ("gleam/string", "concat") => format!("{alias}/concat-all"),
-            ("gleam/float", "min") => "min".into(),
-            ("gleam/float", "max") => "max".into(),
-            ("gleam/dict", "get") => format!("{alias}/lookup"),
-            ("gleam/string", "repeat") => format!("{alias}/repeat-str"),
-            ("gleam/result", "map") => format!("{alias}/map-ok"),
-            ("gleam/result", "try") => format!("{alias}/attempt"),
-            ("gleam/io", "println") => format!("{alias}/print-line"),
-            ("gleam/io", "print") => format!("{alias}/write"),
-            ("gleam/io", "println_error") => format!("{alias}/print-line-error"),
-            ("gleam/io", "print_error") => format!("{alias}/write-error"),
-            _ => {
-                // Compiled (non-shim) modules apply the same defn rename rules
-                // the target module itself used.
-                if !module.starts_with("gleam") && self.global.contains_key(&module) {
-                    format!("{alias}/{}", local_fn_name(&kebab(label)))
-                } else {
-                    format!("{alias}/{}", kebab(label))
-                }
-            }
-        }
+        format!("{alias}/{}", local_fn_name(&kebab(label)))
     }
 }
 
@@ -497,7 +470,7 @@ fn emit_module(
         constructors.insert(name.clone(), (fields.clone(), Origin::Local));
     }
     let mut local_fns = std::collections::HashSet::new();
-    for def in &module.definitions {
+    for def in active_defs(module) {
         if let Definition::Function(f) = &def.definition {
             if let Some((_, n)) = &f.name {
                 local_fns.insert(kebab(n.as_str()));
@@ -514,6 +487,7 @@ fn emit_module(
         is_dep,
         externals,
         global,
+        scope: std::cell::RefCell::new(std::collections::HashSet::new()),
         file: file_name.to_string(),
         line_starts,
     };
@@ -521,9 +495,7 @@ fn emit_module(
 
     // @external(javascript, "some.clojure.ns", "fn") is interpreted as the
     // Clojure binding on this backend; its namespace must be required.
-    let mut external_nses: Vec<String> = module
-        .definitions
-        .iter()
+    let mut external_nses: Vec<String> = active_defs(module)
         .filter_map(|def| match &def.definition {
             Definition::Function(f) => {
                 let name = f.name.as_ref().map(|(_, n)| n.to_string())?;
@@ -545,7 +517,7 @@ fn emit_module(
     external_nses.sort();
     external_nses.dedup();
 
-    for def in &module.definitions {
+    for def in active_defs(module) {
         if let Definition::Import(import) = &def.definition {
             let alias = match import.used_name() {
                 Some(a) => a.to_string(),
@@ -592,7 +564,7 @@ fn emit_module(
     // (the emitter never emits these bare; names it does emit bare are
     // renamed via CORE_SHADOW instead).
     let mut excludes: Vec<String> = Vec::new();
-    for def in &module.definitions {
+    for def in active_defs(module) {
         let name = match &def.definition {
             Definition::Function(f) => {
                 f.name.as_ref().map(|(_, n)| local_fn_name(&kebab(n.as_str())))
@@ -621,7 +593,7 @@ fn emit_module(
     }
     let _ = writeln!(out, "  (:import (gleam.prelude Ok)))");
 
-    for def in &module.definitions {
+    for def in active_defs(module) {
         if let Definition::CustomType(t) = &def.definition {
             let _ = write!(out, "\n;; type {}\n", t.name);
             for c in &t.constructors {
@@ -636,17 +608,13 @@ fn emit_module(
 
     // Emit definitions in call-dependency order (gleam-core's call graph),
     // so forward declarations are only needed for mutual-recursion groups.
-    let functions: Vec<_> = module
-        .definitions
-        .iter()
+    let functions: Vec<_> = active_defs(module)
         .filter_map(|def| match &def.definition {
             Definition::Function(f) => Some(f.clone()),
             _ => None,
         })
         .collect();
-    let constants: Vec<_> = module
-        .definitions
-        .iter()
+    let constants: Vec<_> = active_defs(module)
         .filter_map(|def| match &def.definition {
             Definition::ModuleConstant(c) => Some(c.clone()),
             _ => None,
@@ -698,6 +666,146 @@ fn emit_module(
     out
 }
 
+
+/// Every name bound anywhere inside a function body (params are added by the
+/// caller): let/case/use patterns. Used as a flat per-function scope so local
+/// variables shadow same-named module fns, as they do in Gleam.
+fn collect_bound_names(stmts: &[&UntypedStatement], out: &mut std::collections::HashSet<String>) {
+    fn pattern_vars(p: &UntypedPattern, out: &mut std::collections::HashSet<String>) {
+        match p {
+            Pattern::Variable { name, .. } => {
+                out.insert(name.to_string());
+            }
+            Pattern::Assign { name, pattern, .. } => {
+                out.insert(name.to_string());
+                pattern_vars(pattern, out);
+            }
+            Pattern::Tuple { elements, .. } => {
+                for e in elements {
+                    pattern_vars(e, out);
+                }
+            }
+            Pattern::List { elements, tail, .. } => {
+                for e in elements {
+                    pattern_vars(e, out);
+                }
+                if let Some(t) = tail {
+                    pattern_vars(&t.pattern, out);
+                }
+            }
+            Pattern::Constructor { arguments, .. } => {
+                for a in arguments {
+                    pattern_vars(&a.value, out);
+                }
+            }
+            Pattern::StringPrefix {
+                left_side_assignment,
+                right_side_assignment,
+                ..
+            } => {
+                if let Some((n, _)) = left_side_assignment {
+                    out.insert(n.to_string());
+                }
+                if let gleam_core::ast::AssignName::Variable(n) = right_side_assignment {
+                    out.insert(n.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    fn walk_expr(e: &UntypedExpr, out: &mut std::collections::HashSet<String>) {
+        match e {
+            UntypedExpr::Block { statements, .. } => {
+                let v: Vec<&UntypedStatement> = statements.iter().collect();
+                collect_bound_names(&v, out);
+            }
+            UntypedExpr::Fn { body, .. } => {
+                let v: Vec<&UntypedStatement> = body.iter().collect();
+                collect_bound_names(&v, out);
+            }
+            UntypedExpr::Case { subjects, clauses, .. } => {
+                for s in subjects {
+                    walk_expr(s, out);
+                }
+                for c in clauses.as_deref().unwrap_or_default() {
+                    for ps in std::iter::once(&c.pattern).chain(c.alternative_patterns.iter()) {
+                        for p in ps {
+                            pattern_vars(p, out);
+                        }
+                    }
+                    walk_expr(&c.then, out);
+                }
+            }
+            UntypedExpr::Call { fun, arguments, .. } => {
+                walk_expr(fun, out);
+                for a in arguments {
+                    walk_expr(&a.value, out);
+                }
+            }
+            UntypedExpr::BinOp { left, right, .. } => {
+                walk_expr(left, out);
+                walk_expr(right, out);
+            }
+            UntypedExpr::PipeLine { expressions } => {
+                for x in expressions {
+                    walk_expr(x, out);
+                }
+            }
+            UntypedExpr::List { elements, tail, .. } => {
+                for x in elements {
+                    walk_expr(x, out);
+                }
+                if let Some(t) = tail {
+                    walk_expr(t, out);
+                }
+            }
+            UntypedExpr::Tuple { elements, .. } => {
+                for x in elements {
+                    walk_expr(x, out);
+                }
+            }
+            UntypedExpr::TupleIndex { tuple, .. } => walk_expr(tuple, out),
+            UntypedExpr::FieldAccess { container, .. } => walk_expr(container, out),
+            UntypedExpr::NegateBool { value, .. } | UntypedExpr::NegateInt { value, .. } => {
+                walk_expr(value, out)
+            }
+            UntypedExpr::Echo { expression, .. } => {
+                if let Some(x) = expression {
+                    walk_expr(x, out);
+                }
+            }
+            UntypedExpr::RecordUpdate { record, arguments, .. } => {
+                walk_expr(&record.base, out);
+                for a in arguments {
+                    walk_expr(&a.value, out);
+                }
+            }
+            UntypedExpr::BitArray { segments, .. } => {
+                for seg in segments {
+                    walk_expr(&seg.value, out);
+                }
+            }
+            _ => {}
+        }
+    }
+    for stmt in stmts {
+        match stmt {
+            Statement::Expression(e) => walk_expr(e, out),
+            Statement::Assignment(a) => {
+                pattern_vars(&a.pattern, out);
+                walk_expr(&a.value, out);
+            }
+            Statement::Use(u) => {
+                for a in &u.assignments {
+                    pattern_vars(&a.pattern, out);
+                }
+                walk_expr(&u.call, out);
+            }
+            Statement::Assert(a) => walk_expr(&a.value, out),
+        }
+    }
+}
+
 fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
     let name = local_fn_name(&kebab(f.name.as_ref().expect("function name").1.as_str()));
     if let Some(target) = ctx.externals.get(&(
@@ -707,20 +815,20 @@ fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
         return format!("(def {name} {target})\n");
     }
     if let Some((module, fun, _)) = &f.external_javascript {
-        if ctx.is_dep {
-            // Dependency externals target real JS; use the Gleam fallback
-            // body when there is one, otherwise refuse loudly.
-            if f.body.is_empty() {
-                panic!(
-                    "dependency module {} fn {name} requires a native external \
-                     ({module}/{fun}) and has no Gleam fallback body — supply a \
-                     Clojure implementation via clojure-externals.txt",
-                    ctx.module_path
-                );
-            }
-        } else {
-            // Project convention: the javascript slot IS the Clojure binding.
+        // Project convention: a javascript external that looks like a Clojure
+        // namespace (no path separators) IS the Clojure binding. Real .mjs
+        // externals need a Gleam fallback body or an externals-map entry.
+        let looks_clojure = !module.contains('/') && !module.ends_with(".mjs");
+        if looks_clojure && !ctx.is_dep {
             return format!("(def {name} {module}/{fun})\n");
+        }
+        if f.body.is_empty() {
+            panic!(
+                "module {} fn {name} requires a native external ({module}/{fun}) \
+                 and has no Gleam fallback body — supply a Clojure implementation \
+                 via clojure-externals.txt",
+                ctx.module_path
+            );
         }
     }
     if f.body.is_empty() {
@@ -729,7 +837,9 @@ fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
             ctx.module_path
         );
     }
-    let defn = if f.publicity == Publicity::Public { "defn" } else { "defn-" };
+    // Internal = public within the package in Gleam; other compiled modules
+    // call it, so it must be a public var.
+    let defn = if matches!(f.publicity, Publicity::Private) { "defn-" } else { "defn" };
     let args: Vec<String> = f
         .arguments
         .iter()
@@ -756,6 +866,18 @@ fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
         }
     }
     let stmts: Vec<&UntypedStatement> = f.body.iter().collect();
+    {
+        let mut scope = std::collections::HashSet::new();
+        for a in &f.arguments {
+            if let ArgNames::Named { name, .. } | ArgNames::NamedLabelled { name, .. } =
+                &a.names
+            {
+                scope.insert(name.to_string());
+            }
+        }
+        collect_bound_names(&stmts, &mut scope);
+        *ctx.scope.borrow_mut() = scope;
+    }
     let tail = Tail { name: name.clone() };
     out.push_str(&emit_body_t(ctx, &stmts, 2, Some(&tail)));
     out.push_str(")\n");
@@ -908,6 +1030,19 @@ fn emit_body_t(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize, tail: Option<
 /// when the pattern could fail to match.
 fn destructure_binding(ctx: &Ctx, pattern: &UntypedPattern) -> Option<String> {
     match pattern {
+        Pattern::Assign { name, pattern, .. } => {
+            let inner = destructure_binding(ctx, pattern)?;
+            let name = user_var(&kebab(name.as_str()));
+            if let Some(body) = inner.strip_suffix(']') {
+                Some(format!("{body} :as {name}]"))
+            } else if let Some(body) = inner.strip_suffix('}') {
+                Some(format!("{body} :as {name}}}"))
+            } else if inner == "_" {
+                Some(name)
+            } else {
+                panic!("unsupported `as` binding over non-destructuring pattern");
+            }
+        }
         Pattern::Variable { name, .. } => Some(user_var(&kebab(name.as_str()))),
         Pattern::Discard { .. } => Some("_".into()),
         Pattern::Tuple { elements, .. } => {
@@ -1314,7 +1449,9 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
             },
             n => {
                 let k = kebab(n);
-                if ctx.local_fns.contains(&k) {
+                if ctx.scope.borrow().contains(n) {
+                    user_var(&k)
+                } else if ctx.local_fns.contains(&k) {
                     local_fn_name(&k)
                 } else if let Some((alias, label)) = ctx.unqualified_fns.get(&k) {
                     ctx.module_fn(alias, label)
@@ -1530,22 +1667,8 @@ fn reorder_labelled<'x, T>(
              positional arguments"
         );
     };
-    // A pipe fills the first parameter, so labelled reordering works
-    // against the remaining ones.
-    let sig: Vec<Option<String>> = if piped {
-        if let Some(first) = sig.first().and_then(|l| l.as_ref()) {
-            for arg in arguments {
-                if arg.label.as_ref().is_some_and(|l| kebab(l.as_str()) == *first) {
-                    panic!(
-                        "piped call to `{head}` also labels its first parameter {first}"
-                    );
-                }
-            }
-        }
-        sig[1..].to_vec()
-    } else {
-        sig.clone()
-    };
+    assert!(!piped, "piped labelled calls are handled by emit_call_t");
+    let sig: Vec<Option<String>> = sig.clone();
     if arguments.len() != sig.len() {
         panic!(
             "call to `{head}` has {} args but signature has {} parameters",
@@ -1587,7 +1710,9 @@ fn emit_call_t(
 ) -> String {
     // Self-call in tail position -> recur (constant stack, matches BEAM TCO).
     if let (Some(t), UntypedExpr::Var { name, .. }) = (tail, fun) {
-        if !name.starts_with(char::is_uppercase) && local_fn_name(&kebab(name.as_str())) == t.name
+        if !name.starts_with(char::is_uppercase)
+            && !ctx.scope.borrow().contains(name.as_str())
+            && local_fn_name(&kebab(name.as_str())) == t.name
         {
             let args: Vec<String> = arguments
                 .iter()
@@ -1648,7 +1773,63 @@ fn emit_call_t(
         _ => (emit_expr(ctx, fun, ind), None),
     };
 
-    let ordered = reorder_labelled(&head, sig.as_ref(), arguments, piped);
+    // A piped call's threaded value fills the first parameter not taken by a
+    // labelled argument. When that slot is not position 0, `->` threading
+    // cannot express the call directly; wrap it in a unary fn.
+    if piped && arguments.iter().any(|a| a.label.is_some()) {
+        let Some(sig) = &sig else {
+            panic!(
+                "labelled arguments to piped `{head}` cannot be verified without \
+                 type information (parse-only)"
+            );
+        };
+        if arguments.len() + 1 != sig.len() {
+            panic!(
+                "piped call to `{head}` has {} args (+1 piped) but signature has \
+                 {} parameters",
+                arguments.len(),
+                sig.len()
+            );
+        }
+        let mut slots: Vec<Option<&CallArg<UntypedExpr>>> = vec![None; sig.len()];
+        for arg in arguments.iter().filter(|a| a.label.is_some()) {
+            let label = kebab(arg.label.as_ref().expect("label").as_str());
+            let i = sig
+                .iter()
+                .position(|l| l.as_deref() == Some(label.as_str()))
+                .unwrap_or_else(|| panic!("`{head}` has no parameter labelled {label}"));
+            slots[i] = Some(arg);
+        }
+        let piped_slot = slots
+            .iter()
+            .position(|s| s.is_none())
+            .expect("piped slot");
+        let mut positional = arguments.iter().filter(|a| a.label.is_none());
+        for (i, slot) in slots.iter_mut().enumerate() {
+            if i != piped_slot && slot.is_none() {
+                *slot = positional.next();
+            }
+        }
+        let arg_ind = ind + 1 + head.len() + 1;
+        let rendered: Vec<String> = slots
+            .iter()
+            .enumerate()
+            .map(|(i, slot)| match slot {
+                Some(a) => emit_expr(ctx, &a.value, arg_ind),
+                None => {
+                    assert_eq!(i, piped_slot);
+                    "piped".to_string()
+                }
+            })
+            .collect();
+        if piped_slot == 0 {
+            let rest = rendered[1..].join(" ");
+            return format!("({head} {rest})");
+        }
+        return format!("((fn [piped] ({head} {})))", rendered.join(" "));
+    }
+
+    let ordered = reorder_labelled(&head, sig.as_ref(), arguments, false);
 
     let arg_ind = ind + 1 + head.len() + 1;
     let args: Vec<String> = ordered
@@ -1733,6 +1914,16 @@ fn emit_case(
             if used.is_empty() {
                 emit_expr_t(ctx, then, body_ind, tail)
             } else {
+                // A bind that shadows a name other binds' accessor exprs still
+                // reference must come last, or it poisons them (sequential let).
+                let orig: Vec<(String, String)> = used.to_vec();
+                let mentions = |expr: &str, name: &str| {
+                    expr.contains(&format!("{name} ")) || expr.contains(&format!("{name})"))
+                };
+                let mut used = orig.clone();
+                used.sort_by_key(|(n, _)| {
+                    orig.iter().any(|(n2, v2)| n2 != n && mentions(v2, n))
+                });
                 let binds_str = used
                     .iter()
                     .map(|(n, v)| format!("{n} {v}"))
@@ -1844,6 +2035,13 @@ fn emit_constant(ctx: &Ctx, c: &gleam_core::ast::Constant<()>) -> String {
             } else {
                 format!("(list {})", parts.join(" "))
             }
+        }
+        C::Var { name, module: None, .. } => {
+            let k = kebab(name.as_str());
+            if ctx.local_fns.contains(&k) { local_fn_name(&k) } else { user_var(&k) }
+        }
+        C::Var { name, module: Some((alias, _)), .. } => {
+            ctx.module_fn(alias.as_str(), name.as_str())
         }
         other => panic!("unsupported constant (v0): {other:?}"),
     }

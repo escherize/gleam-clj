@@ -11,14 +11,14 @@
 (defn main []
   (let [subject (safe-div 10 5)]
     (if (and (instance? gleam.prelude.Error subject) (nil? (:value subject)))
-      (io/write-error "Division by zero")
+      (io/print-error "Division by zero")
       (let [d (:value subject)]
-        (io/print-line (str "result of division is " (-> d int/to-string))))))
+        (io/println (str "result of division is " (-> d int/to-string))))))
   (let [subject (safe-div 10 0)]
     (if (and (instance? gleam.prelude.Error subject) (nil? (:value subject)))
-      (io/write-error "Division by zero")
+      (io/print-error "Division by zero")
       (let [d (:value subject)]
-        (io/print-line (str "result of division is " (-> d int/to-string)))))))
+        (io/println (str "result of division is " (-> d int/to-string)))))))
 
 (defn -main [& _]
   (main))

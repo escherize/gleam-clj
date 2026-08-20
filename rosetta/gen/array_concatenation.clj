@@ -9,9 +9,9 @@
 
 (defn main []
   (-> (list/append (list 1 2 3) (list 4 5 6))
-      (list/map-over int/to-string)
+      (list/map int/to-string)
       (string/join " ")
-      io/print-line))
+      io/println))
 
 (defn -main [& _]
   (main))

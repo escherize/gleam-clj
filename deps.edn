@@ -1,4 +1,4 @@
-{:paths ["src"]
+{:paths ["src" "stdlib-clj"]
  :aliases
  {:golden {:extra-paths ["golden"]}
   :gen {:extra-paths ["gen"]}

@@ -33,11 +33,11 @@
 
 (defn task []
   (let [ns (list 627615 39390 588225 393900588225)
-        res (list/map-over ns (fn [x] [x (persistance-root x)]))]
+        res (list/map ns (fn [x] [x (persistance-root x)]))]
     (list/each res
                (fn [pair]
                  (let [[x [y z]] pair]
-                   (io/print-line (str (str (str (str (-> x int/to-string) " has additive persitence ") (-> y int/to-string)) " and digital root of ") (-> z int/to-string))))))))
+                   (io/println (str (str (str (str (-> x int/to-string) " has additive persitence ") (-> y int/to-string)) " and digital root of ") (-> z int/to-string))))))))
 
 (defn main []
   (task))

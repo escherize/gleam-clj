@@ -12,7 +12,7 @@
   (let [jewels (-> (string/to-graphemes jewels) set/from-list)]
     (-> stones
         string/to-graphemes
-        (list/count-if (fn [-capture] (set/contains jewels -capture))))))
+        (list/count' (fn [-capture] (set/contains jewels -capture))))))
 
 (defn main []
   (p/echo (count-jewels "aAAbbbb" "aA") "jewels_and_stones.gleam:6"))

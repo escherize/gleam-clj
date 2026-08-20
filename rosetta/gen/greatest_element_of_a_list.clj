@@ -6,7 +6,7 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (-> (list 1 99 136 4 3 22 111) (list/largest int/cmp) (p/echo)))
+  (-> (list 1 99 136 4 3 22 111) (list/max' int/compare) (p/echo)))
 
 (defn -main [& _]
   (main))

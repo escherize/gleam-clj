@@ -5,8 +5,8 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (io/print-line "This is qualified")
-  (io/print-line "This is unqualified"))
+  (io/println "This is qualified")
+  (io/println "This is unqualified"))
 
 (defn -main [& _]
   (main))

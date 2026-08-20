@@ -74,6 +74,22 @@ fns, project modules, and a table generated from gleam_stdlib) and
 reordered; calls whose labels cannot be verified fail the build loudly —
 nothing is silently assumed positional.
 
+## Self-hosted stdlib
+
+`stdlib-clj/` is gleam_stdlib itself, compiled by this compiler from the
+vendored sources in `stdlib-src/` (Apache-2.0, see stdlib-src/LICENCE) over
+a ~110-fn native core in `src/gleam_ffi.clj`, wired by
+`stdlib-src/clojure-externals.txt`. Regenerate after emitter changes:
+
+    ./gleam-to-clj/target/debug/gleam-to-clj build stdlib-src stdlib-clj
+
+Stdlib fns keep their Gleam names (`list/map`, `dict/get`); names that
+would shadow clojure.core get `(:refer-clojure :exclude ...)` in the
+generated ns, and names the emitter itself emits bare (`first`, `rest`,
+`count`...) carry a `'` suffix (`list/first'`). The hand-written rename
+table is gone. Graphemes are real (BreakIterator). A few bit-level fns are
+whole-fn overrides in the externals map (sub-byte bit patterns).
+
 ## Dependencies and tests
 
 `build` walks `src/` and `test/`, then follows the import graph into the

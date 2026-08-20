@@ -17,7 +17,7 @@
     (p/echo (= 3.0 (* 1.5 2.0)) "c0l06_floats.gleam:18")
     (p/echo (= 2.1 (+ 1.2 1.0)) "c0l06_floats.gleam:19")
     (p/echo (/ 3.14 0.0) "c0l06_floats.gleam:22")
-    (p/echo (max 2.0 9.5) "c0l06_floats.gleam:25")
+    (p/echo (float/max' 2.0 9.5) "c0l06_floats.gleam:25")
     (p/echo (float/ceiling 5.4) "c0l06_floats.gleam:26")))
 
 (defn -main [& _]

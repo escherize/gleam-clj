@@ -13,14 +13,14 @@
 
 (defn- handle-ice-cream [ice-cream]
   (let [{flavour :flavour} ice-cream]
-    (io/print-line flavour)))
+    (io/println flavour)))
 
 (defn- handle-fish [fish]
   (if (instance? Starfish fish)
     (let [favourite-colour (:favourite-colour fish)]
-      (io/print-line favourite-colour))
+      (io/println favourite-colour))
     (let [name (:name fish)]
-      (io/print-line name))))
+      (io/println name))))
 
 (defn main []
   (handle-fish (->Starfish "Lucy" "Pink"))

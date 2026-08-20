@@ -8,10 +8,10 @@
 (defn conditional-example [x]
   (cond
     (< x 0) (let [x x]
-              (io/print-line (str (-> x int/to-string) " is negative")))
+              (io/println (str (-> x int/to-string) " is negative")))
     (= x 0) (let [x x]
-              (io/print-line (str (-> x int/to-string) " is zero")))
-    :else (io/print-line (str (-> x int/to-string) " is positive"))))
+              (io/println (str (-> x int/to-string) " is zero")))
+    :else (io/println (str (-> x int/to-string) " is positive"))))
 
 (defn main []
   (conditional-example -10)

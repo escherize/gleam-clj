@@ -6,8 +6,8 @@
 
 (defn print-score [score]
   (cond
-    (> score 1000) (io/print-line "High score!")
-    (> score 0) (io/print-line "Still working on it")
+    (> score 1000) (io/println "High score!")
+    (> score 0) (io/println "Still working on it")
     :else (throw (ex-info "Scores should never be negative!" {:gleam/panic true}))))
 
 (defn main []

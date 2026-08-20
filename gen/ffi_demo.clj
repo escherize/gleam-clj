@@ -8,7 +8,7 @@
 (def shout clojure.string/upper-case)
 
 (defn main []
-  (io/print-line (shout "hello from clojure interop")))
+  (io/println (shout "hello from clojure interop")))
 
 (defn -main [& _]
   (main))

@@ -9,8 +9,8 @@
 (defn- step [coins table a]
   (p/echo ["step" "a: " a ", table: " table] "coin_change.gleam:20")
   (let [best (-> coins
-                 (list/filter-map (fn [c] (dict/lookup table (-' a c))))
-                 (list/reduce1 min))]
+                 (list/filter-map (fn [c] (dict/get table (-' a c))))
+                 (list/reduce int/min'))]
     (if (instance? Ok best)
       (let [b (:value best)]
         (dict/insert table a (+' b 1)))
@@ -22,11 +22,11 @@
   (cond
     (= amount 0) (p/->Ok 0)
     (< amount 0) (p/->Error nil)
-    :else (-> (int/fold-range 1
-                              (+' amount 1)
-                              (dict/from-list (list [0 0]))
-                              (fn [table a] (step coins table a)))
-              (dict/lookup amount))))
+    :else (-> (int/range 1
+                         (+' amount 1)
+                         (dict/from-list (list [0 0]))
+                         (fn [table a] (step coins table a)))
+              (dict/get amount))))
 
 (defn main []
   (p/let-assert (p/->Ok 0) (min-coins (list 1 5 10) 0))

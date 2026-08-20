@@ -10,16 +10,16 @@
 (defn next-looknsay [list']
   (-> (list/chunk list' (fn [x] x))
       (list/flat-map (fn [x]
-                       (list (list/length x) (-> (list/head x) (result/unwrap 0)))))))
+                       (list (list/length x) (-> (list/first' x) (result/unwrap 0)))))))
 
 (defn main []
-  (int/fold-range 1
-                  11
-                  (list 1)
-                  (fn [acc _]
-                    (list/each acc (fn [x] (io/write (int/to-string x))))
-                    (io/print-line "")
-                    (next-looknsay acc))))
+  (int/range 1
+             11
+             (list 1)
+             (fn [acc _]
+               (list/each acc (fn [x] (io/print (int/to-string x))))
+               (io/println "")
+               (next-looknsay acc))))
 
 (defn -main [& _]
   (main))

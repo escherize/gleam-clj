@@ -6,7 +6,7 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (io/print-line "")
+  (io/println "")
   (when-not (= (string/length "") 0)
     (throw (ex-info "assert failed" {:gleam/assert true}))))
 

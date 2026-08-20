@@ -6,13 +6,13 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (io/print-line "👩‍💻 こんにちは Gleam 🏳️‍🌈")
-  (io/print-line "multi\n    line\n    string")
-  (io/print-line "😀")
-  (io/print-line "\"X\" marks the spot")
-  (io/print-line (str "One " "Two"))
-  (io/print-line (string/reversed "1 2 3 4 5"))
-  (io/print-line (string/append "abc" "def")))
+  (io/println "👩‍💻 こんにちは Gleam 🏳️‍🌈")
+  (io/println "multi\n    line\n    string")
+  (io/println "😀")
+  (io/println "\"X\" marks the spot")
+  (io/println (str "One " "Two"))
+  (io/println (string/reverse "1 2 3 4 5"))
+  (io/println (string/append "abc" "def")))
 
 (defn -main [& _]
   (main))

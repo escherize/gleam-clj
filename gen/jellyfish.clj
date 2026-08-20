@@ -18,9 +18,9 @@
                                                             (str name " is not jiggly"))))
 
 (defn main []
-  (io/print-line (describe (->Starfish "Sandy" "pink")))
-  (io/print-line (describe (->Jellyfish "Jelly" true)))
-  (io/print-line (describe (->Jellyfish "Bob" false))))
+  (io/println (describe (->Starfish "Sandy" "pink")))
+  (io/println (describe (->Jellyfish "Jelly" true)))
+  (io/println (describe (->Jellyfish "Bob" false))))
 
 (defn -main [& _]
   (main))

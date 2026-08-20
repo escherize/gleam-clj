@@ -16,8 +16,8 @@
 (defn main []
   (let [p1 (->Point 10 5)
         p2 (->Point 10.0 5.0)]
-    (io/print-line (point-to-string p1 int/to-string))
-    (io/print-line (point-to-string p2 float/to-string))))
+    (io/println (point-to-string p1 int/to-string))
+    (io/println (point-to-string p2 float/to-string))))
 
 (defn -main [& _]
   (main))

@@ -7,15 +7,15 @@
 
 (defn main []
   (let [ints (list 0 1 2 3 4 5)]
-    (io/print-line "=== map ===")
-    (p/echo (list/map-over ints (fn [x] (*' x 2))) "c4l01_list_module.gleam:8")
-    (io/print-line "=== filter ===")
-    (p/echo (list/keep-if ints (fn [x] (= (rem x 2) 0))) "c4l01_list_module.gleam:11")
-    (io/print-line "=== fold ===")
+    (io/println "=== map ===")
+    (p/echo (list/map ints (fn [x] (*' x 2))) "c4l01_list_module.gleam:8")
+    (io/println "=== filter ===")
+    (p/echo (list/filter ints (fn [x] (= (rem x 2) 0))) "c4l01_list_module.gleam:11")
+    (io/println "=== fold ===")
     (p/echo (list/fold ints 0 (fn [count' e] (+' count' e))) "c4l01_list_module.gleam:14")
-    (io/print-line "=== find ===")
-    (let [_ (p/echo (list/find-first ints (fn [x] (> x 3))) "c4l01_list_module.gleam:17")]
-      (p/echo (list/find-first ints (fn [x] (> x 13))) "c4l01_list_module.gleam:18"))))
+    (io/println "=== find ===")
+    (let [_ (p/echo (list/find ints (fn [x] (> x 3))) "c4l01_list_module.gleam:17")]
+      (p/echo (list/find ints (fn [x] (> x 13))) "c4l01_list_module.gleam:18"))))
 
 (defn -main [& _]
   (main))

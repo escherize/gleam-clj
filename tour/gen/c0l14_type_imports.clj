@@ -6,8 +6,8 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (let [_ (bytes_tree/new)
-        _ (string_tree/new)]
+  (let [_ (bytes_tree/new*)
+        _ (string_tree/new*)]
     nil))
 
 (defn -main [& _]

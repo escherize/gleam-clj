@@ -5,8 +5,8 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (io/print-line "Hello, Joe!")
-  (io/print-line "Hello, Mike!"))
+  (io/println "Hello, Joe!")
+  (io/println "Hello, Mike!"))
 
 (defn -main [& _]
   (main))

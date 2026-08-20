@@ -6,12 +6,12 @@
 
 (defn main []
   (let [x "Original"]
-    (io/print-line x)
+    (io/println x)
     (let [y x]
-      (io/print-line y)
+      (io/println y)
       (let [x "New"]
-        (io/print-line x)
-        (io/print-line y)))))
+        (io/println x)
+        (io/println y)))))
 
 (defn -main [& _]
   (main))

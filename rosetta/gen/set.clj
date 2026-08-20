@@ -5,7 +5,7 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (let [s (set/new)
+  (let [s (set/new*)
         sa (set/insert s "a")
         sab (set/from-list (list "a" "b"))]
     (p/echo (set/contains sa "a") "set.gleam:7")

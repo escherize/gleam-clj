@@ -5,7 +5,7 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (p/echo (string/repeat-str "hello" 3) "repeat_a_string.gleam:4"))
+  (p/echo (string/repeat "hello" 3) "repeat_a_string.gleam:4"))
 
 (defn -main [& _]
   (main))

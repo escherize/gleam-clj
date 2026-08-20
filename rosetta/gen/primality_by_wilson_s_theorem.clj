@@ -15,9 +15,7 @@
   (if (< n 2) false (= (rem (+' (factorial (-' n 1)) 1) n) 0)))
 
 (defn main []
-  (-> (int/fold-range 100 1 (list) list/prepend)
-      (list/keep-if is-wprime)
-      (p/echo)))
+  (-> (int/range 100 1 (list) list/prepend) (list/filter is-wprime) (p/echo)))
 
 (defn -main [& _]
   (main))

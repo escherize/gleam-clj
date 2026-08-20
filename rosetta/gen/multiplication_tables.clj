@@ -7,17 +7,17 @@
   (:import (gleam.prelude Ok)))
 
 (defn- show [n padding]
-  (-> n int/to-string (string/pad-start padding " ") io/write))
+  (-> n int/to-string (string/pad-start padding " ") io/print))
 
 (defn main []
-  (io/write " x |")
-  (int/fold-range 1 13 nil (fn [_ x] (show x 4)))
-  (io/print-line (str "\n---+" (string/repeat-str "-" 48)))
-  (p/with-use [[_ x] (int/fold-range 1 13 nil)]
+  (io/print " x |")
+  (int/range 1 13 nil (fn [_ x] (show x 4)))
+  (io/println (str "\n---+" (string/repeat "-" 48)))
+  (p/with-use [[_ x] (int/range 1 13 nil)]
     (show x 2)
-    (io/write (str " |" (string/repeat-str " " (*' (-' x 1) 4))))
-    (int/fold-range x 13 nil (fn [_ y] (show (*' x y) 4)))
-    (io/print-line "")))
+    (io/print (str " |" (string/repeat " " (*' (-' x 1) 4))))
+    (int/range x 13 nil (fn [_ y] (show (*' x y) 4)))
+    (io/println "")))
 
 (defn -main [& _]
   (main))

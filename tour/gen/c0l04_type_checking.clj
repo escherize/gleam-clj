@@ -5,7 +5,7 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (io/print-line "My lucky number is:"))
+  (io/println "My lucky number is:"))
 
 (defn -main [& _]
   (main))

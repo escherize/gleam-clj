@@ -12,7 +12,7 @@
       (result/unwrap -1)
       (int/add 1)
       int/to-string
-      io/print-line))
+      io/println))
 
 (defn -main [& _]
   (main))

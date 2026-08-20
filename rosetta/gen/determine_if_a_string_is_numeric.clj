@@ -8,8 +8,8 @@
 (defn main []
   (let [subject (int/base-parse "1234" 10)]
     (if (instance? Ok subject)
-      (io/print-line "String is numeric")
-      (io/print-line "String isn't numeric"))))
+      (io/println "String is numeric")
+      (io/println "String isn't numeric"))))
 
 (defn -main [& _]
   (main))

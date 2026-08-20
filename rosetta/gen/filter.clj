@@ -6,7 +6,7 @@
 
 (defn main []
   (-> (list 1 2 3 4 5 6 7 8 9 10)
-      (list/keep-if (fn [x] (= (rem x 2) 0)))
+      (list/filter (fn [x] (= (rem x 2) 0)))
       (p/echo)))
 
 (defn -main [& _]

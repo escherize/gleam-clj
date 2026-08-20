@@ -9,7 +9,7 @@
 (defn main []
   (-> (list/fold (list 3 1 4 1 5 9) 0 (fn [acc e] (+' (*' e e) acc)))
       int/to-string
-      io/print-line))
+      io/println))
 
 (defn -main [& _]
   (main))

@@ -11,7 +11,7 @@
       (float/to-precision 2)
       float/to-string
       (string/append (str " °" unit))
-      io/print-line))
+      io/println))
 
 (defn convert [kelvin]
   (let [rankine (/ (* kelvin 9.0) 5.0)]

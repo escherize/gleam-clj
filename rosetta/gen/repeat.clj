@@ -12,7 +12,7 @@
         (recur (-' times 1) func))))
 
 (defn main []
-  (repeat 3 (fn [] (io/print-line "hello"))))
+  (repeat 3 (fn [] (io/println "hello"))))
 
 (defn -main [& _]
   (main))

@@ -7,8 +7,8 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (-> 1 int/is-odd bool/to-string io/print-line)
-  (-> 2 int/is-even bool/to-string io/print-line))
+  (-> 1 int/is-odd bool/to-string io/println)
+  (-> 2 int/is-even bool/to-string io/println))
 
 (defn -main [& _]
   (main))

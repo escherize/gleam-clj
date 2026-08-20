@@ -6,8 +6,8 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (io/print-line "Hello, Mike!")
-  (io/print-line (text/reversed "Hello, Joe!")))
+  (io/println "Hello, Mike!")
+  (io/println (text/reverse "Hello, Joe!")))
 
 (defn -main [& _]
   (main))

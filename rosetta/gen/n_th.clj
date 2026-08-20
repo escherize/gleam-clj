@@ -16,8 +16,8 @@
       :else "th"))))
 
 (defn- show-nths [x y]
-  (int/fold-range x y nil (fn [_ x] (io/write (str (nth' x) " "))))
-  (io/print-line ""))
+  (int/range x y nil (fn [_ x] (io/print (str (nth' x) " "))))
+  (io/println ""))
 
 (defn main []
   (show-nths 0 25)

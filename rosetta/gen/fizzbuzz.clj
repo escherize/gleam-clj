@@ -16,9 +16,9 @@
       :else (int/to-string i))))
 
 (defn main []
-  (-> (int/fold-range 100 0 (list) list/prepend)
-      (list/map-over fizz-buzz)
-      (list/each io/print-line)))
+  (-> (int/range 100 0 (list) list/prepend)
+      (list/map fizz-buzz)
+      (list/each io/println)))
 
 (defn -main [& _]
   (main))

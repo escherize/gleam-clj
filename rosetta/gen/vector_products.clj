@@ -32,10 +32,10 @@
   (let [a (->Vector3 3.0 4.0 5.0)
         b (->Vector3 4.0 3.0 5.0)
         c (->Vector3 -5.0 -12.0 -13.0)]
-    (io/print-line (str "dot_product(a, b) = " (-> (dot-product a b) float/to-string)))
-    (io/print-line (str "cross_product(a, b) = " (-> (cross-product a b) to-string)))
-    (io/print-line (str "scalar_triple_product(a, b) = " (-> (scalar-triple-product a b c) float/to-string)))
-    (io/print-line (str "vector_triple_product(a, b) = " (-> (vector-triple-product a b c) to-string)))))
+    (io/println (str "dot_product(a, b) = " (-> (dot-product a b) float/to-string)))
+    (io/println (str "cross_product(a, b) = " (-> (cross-product a b) to-string)))
+    (io/println (str "scalar_triple_product(a, b) = " (-> (scalar-triple-product a b c) float/to-string)))
+    (io/println (str "vector_triple_product(a, b) = " (-> (vector-triple-product a b c) to-string)))))
 
 (defn -main [& _]
   (main))

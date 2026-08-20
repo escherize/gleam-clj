@@ -7,7 +7,7 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (-> (list "apple" "orange") list/length int/to-string io/print-line))
+  (-> (list "apple" "orange") list/length int/to-string io/println))
 
 (defn -main [& _]
   (main))

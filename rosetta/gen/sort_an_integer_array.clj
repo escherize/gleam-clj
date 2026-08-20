@@ -9,10 +9,10 @@
 
 (defn main []
   (-> (list 2 1 5 3 4)
-      (list/sort-with int/cmp)
-      (list/map-over int/to-string)
+      (list/sort int/compare)
+      (list/map int/to-string)
       (string/join " ")
-      io/print-line))
+      io/println))
 
 (defn -main [& _]
   (main))

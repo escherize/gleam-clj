@@ -14,19 +14,18 @@
   (p/->Ok "alice"))
 
 (defn without-use []
-  (result/attempt (get-username)
-                  (fn [username]
-                    (result/attempt (get-password)
-                                    (fn [password]
-                                      (result/map-ok (log-in username
-                                                             password)
-                                                     (fn [greeting]
-                                                       (str (str greeting ", ") username))))))))
+  (result/try* (get-username)
+               (fn [username]
+                 (result/try* (get-password)
+                              (fn [password]
+                                (result/map (log-in username password)
+                                            (fn [greeting]
+                                              (str (str greeting ", ") username))))))))
 
 (defn with-use []
-  (p/with-use [[username] (result/attempt (get-username))
-               [password] (result/attempt (get-password))
-               [greeting] (result/map-ok (log-in username password))]
+  (p/with-use [[username] (result/try* (get-username))
+               [password] (result/try* (get-password))
+               [greeting] (result/map (log-in username password))]
     (str (str greeting ", ") username)))
 
 (defn main []

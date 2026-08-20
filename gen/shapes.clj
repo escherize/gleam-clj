@@ -26,7 +26,7 @@
       (+ x (sum rest')))))
 
 (defn total-area [shapes]
-  (-> shapes (list/map-over area) sum))
+  (-> shapes (list/map area) sum))
 
 (defn main []
   (p/let-assert 12.0 (area (->Circle 2.0)))
