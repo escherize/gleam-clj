@@ -17,11 +17,16 @@
                       :double]}
   [shape]
   (cond
-    (instance? Circle shape) (let [r (:value shape)]
-                               (* (* 3.0 r) r))
-    (instance? Rect shape) (let [w (:width shape) h (:height shape)]
-                             (* w h))
-    (instance? Point shape) 0.0))
+    (instance? Circle shape)
+    (let [r (:value shape)]
+      (* (* 3.0 r) r))
+
+    (instance? Rect shape)
+    (let [w (:width shape) h (:height shape)]
+      (* w h))
+
+    (instance? Point shape)
+    0.0))
 
 (defn- sum [xs]
   (if (empty? xs)

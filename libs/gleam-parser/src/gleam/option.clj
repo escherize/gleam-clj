@@ -21,10 +21,15 @@
 
 (defn- all-loop [list' acc]
   (cond
-    (empty? list') (->Some (reverse acc))
-    (and (seq list') (instance? None (first list'))) (->None)
-    (and (seq list') (instance? Some (first list'))) (let [first' (:value (first list')) rest' (rest list')]
-                                                       (recur rest' (list* first' acc)))))
+    (empty? list')
+    (->Some (reverse acc))
+
+    (and (seq list') (instance? None (first list')))
+    (->None)
+
+    (and (seq list') (instance? Some (first list')))
+    (let [first' (:value (first list')) rest' (rest list')]
+      (recur rest' (list* first' acc)))))
 
 (defn all
   "Combines a list of `Option`s into a single `Option`.
@@ -292,11 +297,16 @@
 
 (defn- values-loop [list' acc]
   (cond
-    (empty? list') (reverse acc)
-    (and (seq list') (instance? None (first list'))) (let [rest' (rest list')]
-                                                       (recur rest' acc))
-    (and (seq list') (instance? Some (first list'))) (let [first' (:value (first list')) rest' (rest list')]
-                                                       (recur rest' (list* first' acc)))))
+    (empty? list')
+    (reverse acc)
+
+    (and (seq list') (instance? None (first list')))
+    (let [rest' (rest list')]
+      (recur rest' acc))
+
+    (and (seq list') (instance? Some (first list')))
+    (let [first' (:value (first list')) rest' (rest list')]
+      (recur rest' (list* first' acc)))))
 
 (defn values
   "Given a list of `Option`s,

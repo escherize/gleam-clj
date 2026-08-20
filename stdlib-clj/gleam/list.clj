@@ -173,10 +173,15 @@
   {:malli/schema [:=> [:cat [:sequential :any] :any] :boolean]}
   [list' elem]
   (cond
-    (empty? list') false
-    (and (seq list') (= (first list') elem)) true
-    (seq list') (let [rest' (rest list')]
-                  (recur rest' elem))))
+    (empty? list')
+    false
+
+    (and (seq list') (= (first list') elem))
+    true
+
+    (seq list')
+    (let [rest' (rest list')]
+      (recur rest' elem))))
 
 (defn first'
   "Gets the first element from the start of the list, if there is one.
@@ -887,10 +892,15 @@
 
 (defn- strict-zip-loop [one other acc]
   (cond
-    (and (empty? one) (empty? other)) (p/->Ok (reverse acc))
-    (or (empty? one) (empty? other)) (p/->Error nil)
-    (and (seq one) (seq other)) (let [first-one (first one) rest-one (rest one) first-other (first other) rest-other (rest other)]
-                                  (recur rest-one rest-other (list* [first-one first-other] acc)))))
+    (and (empty? one) (empty? other))
+    (p/->Ok (reverse acc))
+
+    (or (empty? one) (empty? other))
+    (p/->Error nil)
+
+    (and (seq one) (seq other))
+    (let [first-one (first one) rest-one (rest one) first-other (first other) rest-other (rest other)]
+      (recur rest-one rest-other (list* [first-one first-other] acc)))))
 
 (defn strict-zip
   "Takes two lists and returns a single list of 2-element tuples.
@@ -1002,24 +1012,34 @@
   algorithm has to play around this."
   [list1 list2 compare acc]
   (cond
-    (empty? list1) (let [list' list2]
-                     (reverse-and-prepend list' acc))
-    (empty? list2) (let [list' list1]
-                     (reverse-and-prepend list' acc))
-    (and (seq list1) (seq list2)) (let [first1 (first list1) rest1 (rest list1) first2 (first list2) rest2 (rest list2) subject (compare first1 first2)]
-                                    (if (instance? gleam.order.Lt subject)
-                                      (recur list1 rest2 compare (list* first2 acc))
-                                      (recur rest1 list2 compare (list* first1 acc))))))
+    (empty? list1)
+    (let [list' list2]
+      (reverse-and-prepend list' acc))
+
+    (empty? list2)
+    (let [list' list1]
+      (reverse-and-prepend list' acc))
+
+    (and (seq list1) (seq list2))
+    (let [first1 (first list1) rest1 (rest list1) first2 (first list2) rest2 (rest list2) subject (compare first1 first2)]
+      (if (instance? gleam.order.Lt subject)
+        (recur list1 rest2 compare (list* first2 acc))
+        (recur rest1 list2 compare (list* first1 acc))))))
 
 (defn- merge-descending-pairs
   "This is the same as merge_ascending_pairs but flipped for descending lists."
   [sequences compare acc]
   (cond
-    (empty? sequences) (reverse acc)
-    (= (count sequences) 1) (let [sequence (first sequences)]
-                              (reverse (list* (reverse sequence) acc)))
-    (<= 2 (count sequences)) (let [descending1 (first sequences) descending2 (nth sequences 1) rest' (nthrest sequences 2) ascending (merge-descendings descending1 descending2 compare (list))]
-                               (recur rest' compare (list* ascending acc)))))
+    (empty? sequences)
+    (reverse acc)
+
+    (= (count sequences) 1)
+    (let [sequence (first sequences)]
+      (reverse (list* (reverse sequence) acc)))
+
+    (<= 2 (count sequences))
+    (let [descending1 (first sequences) descending2 (nth sequences 1) rest' (nthrest sequences 2) ascending (merge-descendings descending1 descending2 compare (list))]
+      (recur rest' compare (list* ascending acc)))))
 
 (defn- merge-ascendings
   "Merges two lists sorted in ascending order into a single list sorted in
@@ -1031,14 +1051,19 @@
   algorithm has to play around this."
   [list1 list2 compare acc]
   (cond
-    (empty? list1) (let [list' list2]
-                     (reverse-and-prepend list' acc))
-    (empty? list2) (let [list' list1]
-                     (reverse-and-prepend list' acc))
-    (and (seq list1) (seq list2)) (let [first1 (first list1) rest1 (rest list1) first2 (first list2) rest2 (rest list2) subject (compare first1 first2)]
-                                    (if (instance? gleam.order.Lt subject)
-                                      (recur rest1 list2 compare (list* first1 acc))
-                                      (recur list1 rest2 compare (list* first2 acc))))))
+    (empty? list1)
+    (let [list' list2]
+      (reverse-and-prepend list' acc))
+
+    (empty? list2)
+    (let [list' list1]
+      (reverse-and-prepend list' acc))
+
+    (and (seq list1) (seq list2))
+    (let [first1 (first list1) rest1 (rest list1) first2 (first list2) rest2 (rest list2) subject (compare first1 first2)]
+      (if (instance? gleam.order.Lt subject)
+        (recur rest1 list2 compare (list* first1 acc))
+        (recur list1 rest2 compare (list* first2 acc))))))
 
 (defn- merge-ascending-pairs
   "Given a list of ascending lists, it merges adjacent pairs into a single
@@ -1046,11 +1071,16 @@
   It returns a list of the remaining descending lists."
   [sequences compare acc]
   (cond
-    (empty? sequences) (reverse acc)
-    (= (count sequences) 1) (let [sequence (first sequences)]
-                              (reverse (list* (reverse sequence) acc)))
-    (<= 2 (count sequences)) (let [ascending1 (first sequences) ascending2 (nth sequences 1) rest' (nthrest sequences 2) descending (merge-ascendings ascending1 ascending2 compare (list))]
-                               (recur rest' compare (list* descending acc)))))
+    (empty? sequences)
+    (reverse acc)
+
+    (= (count sequences) 1)
+    (let [sequence (first sequences)]
+      (reverse (list* (reverse sequence) acc)))
+
+    (<= 2 (count sequences))
+    (let [ascending1 (first sequences) ascending2 (nth sequences 1) rest' (nthrest sequences 2) descending (merge-ascendings ascending1 ascending2 compare (list))]
+      (recur rest' compare (list* descending acc)))))
 
 (defn- merge-all
   "Given some some sorted sequences (assumed to be sorted in `direction`) it
@@ -1058,19 +1088,24 @@
   ascending order."
   [sequences direction compare]
   (cond
-    (empty? sequences) (list)
-    (and (= (count sequences) 1) (instance? Ascending direction)) (let [sequence (first sequences)]
-                                                                    sequence)
-    (and (= (count sequences) 1) (instance? Descending direction)) (let [sequence (first sequences)]
-                                                                     (reverse sequence))
-    (instance? Ascending direction) (let [sequences (merge-ascending-pairs sequences
-                                                                           compare
-                                                                           (list))]
-                                      (recur sequences (->Descending) compare))
-    (instance? Descending direction) (let [sequences (merge-descending-pairs sequences
-                                                                             compare
-                                                                             (list))]
-                                       (recur sequences (->Ascending) compare))))
+    (empty? sequences)
+    (list)
+
+    (and (= (count sequences) 1) (instance? Ascending direction))
+    (let [sequence (first sequences)]
+      sequence)
+
+    (and (= (count sequences) 1) (instance? Descending direction))
+    (let [sequence (first sequences)]
+      (reverse sequence))
+
+    (instance? Ascending direction)
+    (let [sequences (merge-ascending-pairs sequences compare (list))]
+      (recur sequences (->Descending) compare))
+
+    (instance? Descending direction)
+    (let [sequences (merge-descending-pairs sequences compare (list))]
+      (recur sequences (->Ascending) compare))))
 
 (defn- sequences
   "Given a list it returns slices of it that are locally sorted in ascending
@@ -1128,11 +1163,16 @@
                       [:sequential :any]]}
   [list' compare]
   (cond
-    (empty? list') (list)
-    (= (count list') 1) (let [x (first list')]
-                          (list x))
-    (<= 2 (count list')) (let [x (first list') y (nth list' 1) rest' (nthrest list' 2) direction (let [subject (compare x y)] (if (or (instance? gleam.order.Lt subject) (instance? gleam.order.Eq subject)) (->Ascending) (->Descending))) sequences (sequences rest' compare (list x) direction y (list))]
-                           (merge-all sequences (->Ascending) compare))))
+    (empty? list')
+    (list)
+
+    (= (count list') 1)
+    (let [x (first list')]
+      (list x))
+
+    (<= 2 (count list'))
+    (let [x (first list') y (nth list' 1) rest' (nthrest list' 2) direction (let [subject (compare x y)] (if (or (instance? gleam.order.Lt subject) (instance? gleam.order.Eq subject)) (->Ascending) (->Descending))) sequences (sequences rest' compare (list x) direction y (list))]
+      (merge-all sequences (->Ascending) compare))))
 
 (defn- repeat-loop [item times acc]
   (let [subject (<= times 0)]
@@ -1272,12 +1312,16 @@
 
 (defn- key-pop-loop [list' key checked]
   (cond
-    (empty? list') (p/->Error nil)
-    (and (seq list') (= (nth (first list') 0) key)) (let [v (nth (first list') 1) rest' (rest list')]
-                                                      (p/->Ok [v (reverse-and-prepend checked
-                                                                                    rest')]))
-    (seq list') (let [first' (first list') rest' (rest list')]
-                  (recur rest' key (list* first' checked)))))
+    (empty? list')
+    (p/->Error nil)
+
+    (and (seq list') (= (nth (first list') 0) key))
+    (let [v (nth (first list') 1) rest' (rest list')]
+      (p/->Ok [v (reverse-and-prepend checked rest')]))
+
+    (seq list')
+    (let [first' (first list') rest' (rest list')]
+      (recur rest' key (list* first' checked)))))
 
 (defn key-pop
   "Given a list of 2-element tuples, finds the first tuple that has a given
@@ -1306,12 +1350,16 @@
 
 (defn- key-set-loop [list' key value inspected]
   (cond
-    (and (seq list') (= (nth (first list') 0) key)) (let [k (nth (first list') 0) rest' (rest list')]
-                                                      (reverse-and-prepend inspected
-                                                                           (list* [k value] rest')))
-    (seq list') (let [first' (first list') rest' (rest list')]
-                  (recur rest' key value (list* first' inspected)))
-    (empty? list') (reverse (list* [key value] inspected))))
+    (and (seq list') (= (nth (first list') 0) key))
+    (let [k (nth (first list') 0) rest' (rest list')]
+      (reverse-and-prepend inspected (list* [k value] rest')))
+
+    (seq list')
+    (let [first' (first list') rest' (rest list')]
+      (recur rest' key value (list* first' inspected)))
+
+    (empty? list')
+    (reverse (list* [key value] inspected))))
 
 (defn key-set
   "Given a list of 2-element tuples, inserts a key and value into the list.
@@ -1639,11 +1687,16 @@
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list']
   (cond
-    (empty? list') (p/->Error nil)
-    (= (count list') 1) (let [last (first list')]
-                          (p/->Ok last))
-    (seq list') (let [rest' (rest list')]
-                  (recur rest'))))
+    (empty? list')
+    (p/->Error nil)
+
+    (= (count list') 1)
+    (let [last (first list')]
+      (p/->Ok last))
+
+    (seq list')
+    (let [rest' (rest list')]
+      (recur rest'))))
 
 (defn combinations
   "Return unique combinations of elements in the list.
@@ -1662,14 +1715,19 @@
                       [:sequential [:sequential :any]]]}
   [items n]
   (cond
-    (= n 0) (list (list))
-    (empty? items) (list)
-    (seq items) (let [first' (first items) rest' (rest items)]
-                  (-> rest'
-                      (combinations (-' n 1))
-                      (map (fn [combination] (list* first' combination)))
-                      reverse
-                      (fold (combinations rest' n) (fn [acc c] (list* c acc)))))))
+    (= n 0)
+    (list (list))
+
+    (empty? items)
+    (list)
+
+    (seq items)
+    (let [first' (first items) rest' (rest items)]
+      (-> rest'
+          (combinations (-' n 1))
+          (map (fn [combination] (list* first' combination)))
+          reverse
+          (fold (combinations rest' n) (fn [acc c] (list* c acc)))))))
 
 (defn- combination-pairs-loop [items acc]
   (if (empty? items)
@@ -1692,11 +1750,16 @@
 
 (defn- take-firsts [rows column remaining-rows]
   (cond
-    (empty? rows) [(reverse column) (reverse remaining-rows)]
-    (and (seq rows) (empty? (first rows))) (let [rest' (rest rows)]
-                                             (recur rest' column remaining-rows))
-    (and (seq rows) (seq (first rows))) (let [first' (first (first rows)) remaining-row (rest (first rows)) rest-rows (rest rows) remaining-rows (list* remaining-row remaining-rows)]
-                                          (recur rest-rows (list* first' column) remaining-rows))))
+    (empty? rows)
+    [(reverse column) (reverse remaining-rows)]
+
+    (and (seq rows) (empty? (first rows)))
+    (let [rest' (rest rows)]
+      (recur rest' column remaining-rows))
+
+    (and (seq rows) (seq (first rows)))
+    (let [first' (first (first rows)) remaining-row (rest (first rows)) rest-rows (rest rows) remaining-rows (list* remaining-row remaining-rows)]
+      (recur rest-rows (list* first' column) remaining-rows))))
 
 (defn- transpose-loop [rows columns]
   (if (empty? rows)

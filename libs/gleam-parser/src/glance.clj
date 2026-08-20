@@ -336,14 +336,29 @@
                       :int]}
   [operator]
   (cond
-    (instance? Or operator) 1
-    (instance? And operator) 2
-    (or (instance? Eq operator) (instance? NotEq operator)) 3
-    (or (instance? LtInt operator) (instance? LtEqInt operator) (instance? LtFloat operator) (instance? LtEqFloat operator) (instance? GtEqInt operator) (instance? GtInt operator) (instance? GtEqFloat operator) (instance? GtFloat operator)) 4
-    (instance? Concatenate operator) 5
-    (instance? Pipe operator) 6
-    (or (instance? AddInt operator) (instance? AddFloat operator) (instance? SubInt operator) (instance? SubFloat operator)) 7
-    (or (instance? MultInt operator) (instance? MultFloat operator) (instance? DivInt operator) (instance? DivFloat operator) (instance? RemainderInt operator)) 8))
+    (instance? Or operator)
+    1
+
+    (instance? And operator)
+    2
+
+    (or (instance? Eq operator) (instance? NotEq operator))
+    3
+
+    (or (instance? LtInt operator) (instance? LtEqInt operator) (instance? LtFloat operator) (instance? LtEqFloat operator) (instance? GtEqInt operator) (instance? GtInt operator) (instance? GtEqFloat operator) (instance? GtFloat operator))
+    4
+
+    (instance? Concatenate operator)
+    5
+
+    (instance? Pipe operator)
+    6
+
+    (or (instance? AddInt operator) (instance? AddFloat operator) (instance? SubInt operator) (instance? SubFloat operator))
+    7
+
+    (or (instance? MultInt operator) (instance? MultFloat operator) (instance? DivInt operator) (instance? DivFloat operator) (instance? RemainderInt operator))
+    8))
 
 (defn- unexpected-error [tokens]
   (if (seq tokens)
@@ -353,77 +368,98 @@
 
 (defn- expect [expected tokens next]
   (cond
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))
-    (and (seq tokens) (= (nth (first tokens) 0) expected)) (let [position (nth (first tokens) 1) tokens (rest tokens)]
-                                                             (next position
-                                                                   tokens))
-    (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                   (p/->Error (->UnexpectedToken other position)))))
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))
+
+    (and (seq tokens) (= (nth (first tokens) 0) expected))
+    (let [position (nth (first tokens) 1) tokens (rest tokens)]
+      (next position tokens))
+
+    (seq tokens)
+    (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+      (p/->Error (->UnexpectedToken other position)))))
 
 (defn- list' [parser discard acc tokens]
   (cond
-    (and (seq tokens) (instance? glexer.token.RightSquare (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                        (p/->Ok (->ParsedList (list/reverse acc)
-                                                                                                                                                              (option/->None)
-                                                                                                                                                              tokens
-                                                                                                                                                              (+' end 1))))
-    (and (<= 2 (count tokens)) (instance? glexer.token.Comma (nth (first tokens) 0)) (instance? glexer.token.RightSquare (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)) (not= acc (list))) (let [end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
-                                                                                                                                                                                                                         (p/->Ok (->ParsedList (list/reverse acc)
-                                                                                                                                                                                                                                               (option/->None)
-                                                                                                                                                                                                                                               tokens
-                                                                                                                                                                                                                                               (+' end 1))))
-    (and (<= 2 (count tokens)) (instance? glexer.token.DotDot (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.RightSquare (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1))) (let [start (:byte-offset (nth (first tokens) 1)) close (nth tokens 1) end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
-                                                                                                                                                                                                                                                           (if (instance? gleam.option.None discard)
-                                                                                                                                                                                                                                                             (unexpected-error (list* close tokens))
-                                                                                                                                                                                                                                                             (let [discard (:value discard) value (discard (->Span start (+' start 1))) parsed-list (->ParsedList (list/reverse acc) (option/->Some value) tokens (+' end 1))]
-                                                                                                                                                                                                                                                               (p/->Ok parsed-list))))
-    (and (seq tokens) (instance? glexer.token.DotDot (nth (first tokens) 0))) (let [tokens (rest tokens)]
-                                                                                (p/with-use [[_use0] (result/try* (parser tokens))]
-                                                                                  (let [[rest' tokens] _use0]
-                                                                                    (p/with-use [[_use0 tokens] (expect (t/->RightSquare)
-                                                                                                                        tokens)]
-                                                                                      (let [{end :byte-offset} _use0]
-                                                                                        (p/->Ok (->ParsedList (list/reverse acc)
-                                                                                                              (option/->Some rest')
-                                                                                                              tokens
-                                                                                                              (+' end 1))))))))
-    :else (p/with-use [[_use0] (result/try* (parser tokens))]
-            (let [[element tokens] _use0
-                  acc (list* element acc)]
-              (cond
-                (and (seq tokens) (instance? glexer.token.RightSquare (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                    (p/->Ok (->ParsedList (list/reverse acc)
-                                                                                                                                                                          (option/->None)
-                                                                                                                                                                          tokens
-                                                                                                                                                                          (+' end 1))))
-                (and (<= 2 (count tokens)) (instance? glexer.token.Comma (nth (first tokens) 0)) (instance? glexer.token.RightSquare (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1))) (let [end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
-                                                                                                                                                                                                                   (p/->Ok (->ParsedList (list/reverse acc)
-                                                                                                                                                                                                                                         (option/->None)
-                                                                                                                                                                                                                                         tokens
-                                                                                                                                                                                                                                         (+' end 1))))
-                (and (<= 3 (count tokens)) (instance? glexer.token.Comma (nth (first tokens) 0)) (instance? glexer.token.DotDot (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)) (instance? glexer.token.RightSquare (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1))) (let [start (:byte-offset (nth (nth tokens 1) 1)) close (nth tokens 2) end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3)]
-                                                                                                                                                                                                                                                                                                                             (if (instance? gleam.option.None discard)
-                                                                                                                                                                                                                                                                                                                               (unexpected-error (list* close tokens))
-                                                                                                                                                                                                                                                                                                                               (let [discard (:value discard) value (discard (->Span start (+' start 1))) parsed-list (->ParsedList (list/reverse acc) (option/->Some value) tokens (+' end 1))]
-                                                                                                                                                                                                                                                                                                                                 (p/->Ok parsed-list))))
-                (and (<= 2 (count tokens)) (instance? glexer.token.Comma (nth (first tokens) 0)) (instance? glexer.token.DotDot (nth (nth tokens 1) 0))) (let [tokens (nthrest tokens 2)]
-                                                                                                                                                           (p/with-use [[_use0] (result/try* (parser tokens))]
-                                                                                                                                                             (let [[rest' tokens] _use0]
-                                                                                                                                                               (p/with-use [[_use0 tokens] (expect (t/->RightSquare)
-                                                                                                                                                                                                   tokens)]
-                                                                                                                                                                 (let [{end :byte-offset} _use0]
-                                                                                                                                                                   (p/->Ok (->ParsedList (list/reverse acc)
-                                                                                                                                                                                         (option/->Some rest')
-                                                                                                                                                                                         tokens
-                                                                                                                                                                                         (+' end 1))))))))
-                (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0))) (let [tokens (rest tokens)]
-                                                                                           (list' parser
-                                                                                                  discard
-                                                                                                  acc
-                                                                                                  tokens))
-                (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                               (p/->Error (->UnexpectedToken other position)))
-                (empty? tokens) (p/->Error (->UnexpectedEndOfInput)))))))
+    (and (seq tokens) (instance? glexer.token.RightSquare (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (p/->Ok (->ParsedList (list/reverse acc)
+                            (option/->None)
+                            tokens
+                            (+' end 1))))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.Comma (nth (first tokens) 0)) (instance? glexer.token.RightSquare (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)) (not= acc (list)))
+    (let [end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
+      (p/->Ok (->ParsedList (list/reverse acc)
+                            (option/->None)
+                            tokens
+                            (+' end 1))))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.DotDot (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.RightSquare (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
+    (let [start (:byte-offset (nth (first tokens) 1)) close (nth tokens 1) end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
+      (if (instance? gleam.option.None discard)
+        (unexpected-error (list* close tokens))
+        (let [discard (:value discard) value (discard (->Span start (+' start 1))) parsed-list (->ParsedList (list/reverse acc) (option/->Some value) tokens (+' end 1))]
+          (p/->Ok parsed-list))))
+
+    (and (seq tokens) (instance? glexer.token.DotDot (nth (first tokens) 0)))
+    (let [tokens (rest tokens)]
+      (p/with-use [[_use0] (result/try* (parser tokens))]
+        (let [[rest' tokens] _use0]
+          (p/with-use [[_use0 tokens] (expect (t/->RightSquare) tokens)]
+            (let [{end :byte-offset} _use0]
+              (p/->Ok (->ParsedList (list/reverse acc)
+                                    (option/->Some rest')
+                                    tokens
+                                    (+' end 1))))))))
+
+    :else
+    (p/with-use [[_use0] (result/try* (parser tokens))]
+      (let [[element tokens] _use0
+            acc (list* element acc)]
+        (cond
+          (and (seq tokens) (instance? glexer.token.RightSquare (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+          (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+            (p/->Ok (->ParsedList (list/reverse acc)
+                                  (option/->None)
+                                  tokens
+                                  (+' end 1))))
+
+          (and (<= 2 (count tokens)) (instance? glexer.token.Comma (nth (first tokens) 0)) (instance? glexer.token.RightSquare (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
+          (let [end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
+            (p/->Ok (->ParsedList (list/reverse acc)
+                                  (option/->None)
+                                  tokens
+                                  (+' end 1))))
+
+          (and (<= 3 (count tokens)) (instance? glexer.token.Comma (nth (first tokens) 0)) (instance? glexer.token.DotDot (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)) (instance? glexer.token.RightSquare (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1)))
+          (let [start (:byte-offset (nth (nth tokens 1) 1)) close (nth tokens 2) end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3)]
+            (if (instance? gleam.option.None discard)
+              (unexpected-error (list* close tokens))
+              (let [discard (:value discard) value (discard (->Span start (+' start 1))) parsed-list (->ParsedList (list/reverse acc) (option/->Some value) tokens (+' end 1))]
+                (p/->Ok parsed-list))))
+
+          (and (<= 2 (count tokens)) (instance? glexer.token.Comma (nth (first tokens) 0)) (instance? glexer.token.DotDot (nth (nth tokens 1) 0)))
+          (let [tokens (nthrest tokens 2)]
+            (p/with-use [[_use0] (result/try* (parser tokens))]
+              (let [[rest' tokens] _use0]
+                (p/with-use [[_use0 tokens] (expect (t/->RightSquare) tokens)]
+                  (let [{end :byte-offset} _use0]
+                    (p/->Ok (->ParsedList (list/reverse acc)
+                                          (option/->Some rest')
+                                          tokens
+                                          (+' end 1))))))))
+
+          (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0)))
+          (let [tokens (rest tokens)]
+            (list' parser discard acc tokens))
+
+          (seq tokens)
+          (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+            (p/->Error (->UnexpectedToken other position)))
+
+          (empty? tokens)
+          (p/->Error (->UnexpectedEndOfInput)))))))
 
 (defn- push-function [module attributes function]
   (->Module (:imports module) (:custom-types module) (:type-aliases module) (:constants module) (list* (->Definition (list/reverse attributes) function) (:functions module))))
@@ -432,25 +468,32 @@
   "Simple-Precedence-Parser, handle seeing an operator or end"
   [next operators values]
   (cond
-    (and (instance? gleam.option.Some next) (empty? operators)) (let [operator (:value next)]
-                                                                  [(option/->None) (list operator) values])
-    (and (instance? gleam.option.Some next) (seq operators) (<= 2 (count values))) (let [next (:value next) previous (first operators) a (first values) b (nth values 1) rest-values (nthrest values 2) operators (rest operators) subject (>= (precedence previous) (precedence next))]
-                                                                                     (if subject
-                                                                                       (let [span (->Span (:start (:location b))
-                                                                                                          (:end (:location a)))
-                                                                                             expression (->BinaryOperator span
-                                                                                                                          previous
-                                                                                                                          b
-                                                                                                                          a)
-                                                                                             values (list* expression rest-values)]
-                                                                                         (recur (option/->Some next) operators values))
-                                                                                       [(option/->None) (list* next previous operators) values]))
-    (and (instance? gleam.option.None next) (seq operators) (<= 2 (count values))) (let [operator (first operators) a (first values) b (nth values 1) operators (rest operators) values (nthrest values 2) values (list* (->BinaryOperator (->Span (:start (:location b)) (:end (:location a))) operator b a) values)]
-                                                                                     (recur (option/->None) operators values))
-    (and (instance? gleam.option.None next) (empty? operators) (= (count values) 1)) (let [expression (first values)]
-                                                                                       [(option/->Some expression) operators values])
-    (and (instance? gleam.option.None next) (empty? operators) (empty? values)) [(option/->None) operators values]
-    :else (throw (ex-info "parser bug, expression not full reduced" {:gleam/panic true}))))
+    (and (instance? gleam.option.Some next) (empty? operators))
+    (let [operator (:value next)]
+      [(option/->None) (list operator) values])
+
+    (and (instance? gleam.option.Some next) (seq operators) (<= 2 (count values)))
+    (let [next (:value next) previous (first operators) a (first values) b (nth values 1) rest-values (nthrest values 2) operators (rest operators) subject (>= (precedence previous) (precedence next))]
+      (if subject
+        (let [span (->Span (:start (:location b)) (:end (:location a)))
+              expression (->BinaryOperator span previous b a)
+              values (list* expression rest-values)]
+          (recur (option/->Some next) operators values))
+        [(option/->None) (list* next previous operators) values]))
+
+    (and (instance? gleam.option.None next) (seq operators) (<= 2 (count values)))
+    (let [operator (first operators) a (first values) b (nth values 1) operators (rest operators) values (nthrest values 2) values (list* (->BinaryOperator (->Span (:start (:location b)) (:end (:location a))) operator b a) values)]
+      (recur (option/->None) operators values))
+
+    (and (instance? gleam.option.None next) (empty? operators) (= (count values) 1))
+    (let [expression (first values)]
+      [(option/->Some expression) operators values])
+
+    (and (instance? gleam.option.None next) (empty? operators) (empty? values))
+    [(option/->None) operators values]
+
+    :else
+    (throw (ex-info "parser bug, expression not full reduced" {:gleam/panic true}))))
 
 (defn- binary-operator [token]
   (cond
@@ -511,82 +554,133 @@
 
 (defn- comma-delimited [items tokens parser final]
   (cond
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))
-    (and (seq tokens) (instance? glexer.Position (nth (first tokens) 1)) (= (nth (first tokens) 0) final)) (let [token (nth (first tokens) 0) token-start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                             (p/->Ok [(list/reverse items) (string-offset token-start
-                                                                                                                                     (t/to-source token)) tokens]))
-    :else (p/with-use [[_use0] (result/try* (parser tokens))]
-            (let [[element tokens] _use0]
-              (cond
-                (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0))) (let [tokens (rest tokens)]
-                                                                                           (comma-delimited (list* element items)
-                                                                                                            tokens
-                                                                                                            parser
-                                                                                                            final))
-                (and (seq tokens) (instance? glexer.Position (nth (first tokens) 1)) (= (nth (first tokens) 0) final)) (let [token (nth (first tokens) 0) token-start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) offset (string-offset token-start (t/to-source token))]
-                                                                                                                         (p/->Ok [(list/reverse (list* element items)) offset tokens]))
-                (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                               (p/->Error (->UnexpectedToken other position)))
-                (empty? tokens) (p/->Error (->UnexpectedEndOfInput)))))))
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))
+
+    (and (seq tokens) (instance? glexer.Position (nth (first tokens) 1)) (= (nth (first tokens) 0) final))
+    (let [token (nth (first tokens) 0) token-start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (p/->Ok [(list/reverse items) (string-offset token-start (t/to-source token)) tokens]))
+
+    :else
+    (p/with-use [[_use0] (result/try* (parser tokens))]
+      (let [[element tokens] _use0]
+        (cond
+          (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0)))
+          (let [tokens (rest tokens)]
+            (comma-delimited (list* element items) tokens parser final))
+
+          (and (seq tokens) (instance? glexer.Position (nth (first tokens) 1)) (= (nth (first tokens) 0) final))
+          (let [token (nth (first tokens) 0) token-start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) offset (string-offset token-start (t/to-source token))]
+            (p/->Ok [(list/reverse (list* element items)) offset tokens]))
+
+          (seq tokens)
+          (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+            (p/->Error (->UnexpectedToken other position)))
+
+          (empty? tokens)
+          (p/->Error (->UnexpectedEndOfInput)))))))
 
 (defn- bit-string-segment-options [size-parser options tokens]
   (p/with-use [[_use0] (result/try* (cond
-                                      (and (seq tokens) (instance? glexer.token.Int (nth (first tokens) 0))) (let [i (:value (nth (first tokens) 0)) position (nth (first tokens) 1) tokens (rest tokens) subject (int/parse i)]
-                                                                                                               (if (instance? Ok subject)
-                                                                                                                 (let [i (:value subject)]
-                                                                                                                   (p/->Ok [(->SizeOption i) tokens]))
-                                                                                                                 (p/->Error (->UnexpectedToken (t/->Int i)
-                                                                                                                                               position))))
-                                      (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "size") (instance? glexer.token.LeftParen (nth (nth tokens 1) 0))) (let [tokens (nthrest tokens 2)]
-                                                                                                                                                                                                                              (p/with-use [[_use0] (result/try* (size-parser tokens))]
-                                                                                                                                                                                                                                (let [[value tokens] _use0]
-                                                                                                                                                                                                                                  (p/with-use [[_ tokens] (expect (t/->RightParen)
-                                                                                                                                                                                                                                                                  tokens)]
-                                                                                                                                                                                                                                    (p/->Ok [(->SizeValueOption value) tokens])))))
-                                      (and (<= 4 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "unit") (instance? glexer.token.LeftParen (nth (nth tokens 1) 0)) (instance? glexer.token.Int (nth (nth tokens 2) 0)) (instance? glexer.token.RightParen (nth (nth tokens 3) 0))) (let [position (nth (first tokens) 1) i (:value (nth (nth tokens 2) 0)) tokens (nthrest tokens 4) subject (int/parse i)]
-                                                                                                                                                                                                                                                                                                                                             (if (instance? Ok subject)
-                                                                                                                                                                                                                                                                                                                                               (let [i (:value subject)]
-                                                                                                                                                                                                                                                                                                                                                 (p/->Ok [(->UnitOption i) tokens]))
-                                                                                                                                                                                                                                                                                                                                               (p/->Error (->UnexpectedToken (t/->Int i)
-                                                                                                                                                                                                                                                                                                                                                                             position))))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "bytes")) (let [tokens (rest tokens)]
-                                                                                                                                                            (p/->Ok [(->BytesOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "binary")) (let [tokens (rest tokens)]
-                                                                                                                                                             (p/->Ok [(->BytesOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "int")) (let [tokens (rest tokens)]
-                                                                                                                                                          (p/->Ok [(->IntOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "float")) (let [tokens (rest tokens)]
-                                                                                                                                                            (p/->Ok [(->FloatOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "bits")) (let [tokens (rest tokens)]
-                                                                                                                                                           (p/->Ok [(->BitsOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "bit_string")) (let [tokens (rest tokens)]
-                                                                                                                                                                 (p/->Ok [(->BitsOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf8")) (let [tokens (rest tokens)]
-                                                                                                                                                           (p/->Ok [(->Utf8Option) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf16")) (let [tokens (rest tokens)]
-                                                                                                                                                            (p/->Ok [(->Utf16Option) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf32")) (let [tokens (rest tokens)]
-                                                                                                                                                            (p/->Ok [(->Utf32Option) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf8_codepoint")) (let [tokens (rest tokens)]
-                                                                                                                                                                     (p/->Ok [(->Utf8CodepointOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf16_codepoint")) (let [tokens (rest tokens)]
-                                                                                                                                                                      (p/->Ok [(->Utf16CodepointOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf32_codepoint")) (let [tokens (rest tokens)]
-                                                                                                                                                                      (p/->Ok [(->Utf32CodepointOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "signed")) (let [tokens (rest tokens)]
-                                                                                                                                                             (p/->Ok [(->SignedOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "unsigned")) (let [tokens (rest tokens)]
-                                                                                                                                                               (p/->Ok [(->UnsignedOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "big")) (let [tokens (rest tokens)]
-                                                                                                                                                          (p/->Ok [(->BigOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "little")) (let [tokens (rest tokens)]
-                                                                                                                                                             (p/->Ok [(->LittleOption) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "native")) (let [tokens (rest tokens)]
-                                                                                                                                                             (p/->Ok [(->NativeOption) tokens]))
-                                      (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                                                     (p/->Error (->UnexpectedToken other
-                                                                                   position)))
-                                      (empty? tokens) (p/->Error (->UnexpectedEndOfInput))))]
+                                      (and (seq tokens) (instance? glexer.token.Int (nth (first tokens) 0)))
+                                      (let [i (:value (nth (first tokens) 0)) position (nth (first tokens) 1) tokens (rest tokens) subject (int/parse i)]
+                                        (if (instance? Ok subject)
+                                          (let [i (:value subject)]
+                                            (p/->Ok [(->SizeOption i) tokens]))
+                                          (p/->Error (->UnexpectedToken (t/->Int i)
+                                                                        position))))
+
+                                      (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "size") (instance? glexer.token.LeftParen (nth (nth tokens 1) 0)))
+                                      (let [tokens (nthrest tokens 2)]
+                                        (p/with-use [[_use0] (result/try* (size-parser tokens))]
+                                          (let [[value tokens] _use0]
+                                            (p/with-use [[_ tokens] (expect (t/->RightParen)
+                                                                            tokens)]
+                                              (p/->Ok [(->SizeValueOption value) tokens])))))
+
+                                      (and (<= 4 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "unit") (instance? glexer.token.LeftParen (nth (nth tokens 1) 0)) (instance? glexer.token.Int (nth (nth tokens 2) 0)) (instance? glexer.token.RightParen (nth (nth tokens 3) 0)))
+                                      (let [position (nth (first tokens) 1) i (:value (nth (nth tokens 2) 0)) tokens (nthrest tokens 4) subject (int/parse i)]
+                                        (if (instance? Ok subject)
+                                          (let [i (:value subject)]
+                                            (p/->Ok [(->UnitOption i) tokens]))
+                                          (p/->Error (->UnexpectedToken (t/->Int i)
+                                                                        position))))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "bytes"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->BytesOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "binary"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->BytesOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "int"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->IntOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "float"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->FloatOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "bits"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->BitsOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "bit_string"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->BitsOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf8"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->Utf8Option) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf16"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->Utf16Option) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf32"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->Utf32Option) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf8_codepoint"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->Utf8CodepointOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf16_codepoint"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->Utf16CodepointOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "utf32_codepoint"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->Utf32CodepointOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "signed"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->SignedOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "unsigned"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->UnsignedOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "big"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->BigOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "little"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->LittleOption) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "native"))
+                                      (let [tokens (rest tokens)]
+                                        (p/->Ok [(->NativeOption) tokens]))
+
+                                      (seq tokens)
+                                      (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+                                        (p/->Error (->UnexpectedToken other
+                                                                      position)))
+
+                                      (empty? tokens)
+                                      (p/->Error (->UnexpectedEndOfInput))))]
     (let [[option tokens] _use0
           options (list* option options)]
       (if (and (seq tokens) (instance? glexer.token.Minus (nth (first tokens) 0)))
@@ -624,25 +718,32 @@
 
 (defn- handle-bit-array-size-operator [next operators values]
   (cond
-    (and (instance? gleam.option.Some next) (empty? operators)) (let [operator (:value next)]
-                                                                  [(option/->None) (list operator) values])
-    (and (instance? gleam.option.Some next) (seq operators) (<= 2 (count values))) (let [next (:value next) previous (first operators) a (first values) b (nth values 1) rest-values (nthrest values 2) operators (rest operators) subject (>= (bit-array-size-precedence previous) (bit-array-size-precedence next))]
-                                                                                     (if subject
-                                                                                       (let [span (->Span (:start (:location b))
-                                                                                                          (:end (:location a)))
-                                                                                             size (->BitArraySizeBinaryOperator span
-                                                                                                                                previous
-                                                                                                                                b
-                                                                                                                                a)
-                                                                                             values (list* size rest-values)]
-                                                                                         (recur (option/->Some next) operators values))
-                                                                                       [(option/->None) (list* next previous operators) values]))
-    (and (instance? gleam.option.None next) (seq operators) (<= 2 (count values))) (let [operator (first operators) a (first values) b (nth values 1) operators (rest operators) values (nthrest values 2) values (list* (->BitArraySizeBinaryOperator (->Span (:start (:location b)) (:end (:location a))) operator b a) values)]
-                                                                                     (recur (option/->None) operators values))
-    (and (instance? gleam.option.None next) (empty? operators) (= (count values) 1)) (let [size (first values)]
-                                                                                       [(option/->Some size) operators values])
-    (and (instance? gleam.option.None next) (empty? operators) (empty? values)) [(option/->None) operators values]
-    :else (throw (ex-info "parser bug, bit array size not fully reduced" {:gleam/panic true}))))
+    (and (instance? gleam.option.Some next) (empty? operators))
+    (let [operator (:value next)]
+      [(option/->None) (list operator) values])
+
+    (and (instance? gleam.option.Some next) (seq operators) (<= 2 (count values)))
+    (let [next (:value next) previous (first operators) a (first values) b (nth values 1) rest-values (nthrest values 2) operators (rest operators) subject (>= (bit-array-size-precedence previous) (bit-array-size-precedence next))]
+      (if subject
+        (let [span (->Span (:start (:location b)) (:end (:location a)))
+              size (->BitArraySizeBinaryOperator span previous b a)
+              values (list* size rest-values)]
+          (recur (option/->Some next) operators values))
+        [(option/->None) (list* next previous operators) values]))
+
+    (and (instance? gleam.option.None next) (seq operators) (<= 2 (count values)))
+    (let [operator (first operators) a (first values) b (nth values 1) operators (rest operators) values (nthrest values 2) values (list* (->BitArraySizeBinaryOperator (->Span (:start (:location b)) (:end (:location a))) operator b a) values)]
+      (recur (option/->None) operators values))
+
+    (and (instance? gleam.option.None next) (empty? operators) (= (count values) 1))
+    (let [size (first values)]
+      [(option/->Some size) operators values])
+
+    (and (instance? gleam.option.None next) (empty? operators) (empty? values))
+    [(option/->None) operators values]
+
+    :else
+    (throw (ex-info "parser bug, bit array size not fully reduced" {:gleam/panic true}))))
 
 (defn- bit-array-size-operator [token]
   (cond
@@ -664,26 +765,28 @@
 
 (defn- bit-array-size-unit [tokens]
   (cond
-    (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                 (p/->Ok [(->BitArraySizeVariable (span-from-string start
-                                                                                                                                                                                    name)
-                                                                                                                                                                  name) tokens]))
-    (and (seq tokens) (instance? glexer.token.Int (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                (p/->Ok [(->BitArraySizeInt (span-from-string start
-                                                                                                                                                                              value)
-                                                                                                                                                            value) tokens]))
-    (and (seq tokens) (instance? glexer.token.LeftBrace (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                      (p/with-use [[_use0] (result/try* (bit-array-size tokens))]
-                                                                                                                                        (let [[inner tokens] _use0]
-                                                                                                                                          (p/with-use [[_use0 tokens] (expect (t/->RightBrace)
-                                                                                                                                                                              tokens)]
-                                                                                                                                            (let [{end :byte-offset} _use0]
-                                                                                                                                              (p/->Ok [(->BitArraySizeBlock (->Span start
-                                                                                                                                                                                    (+' end 1))
-                                                                                                                                                                            inner) tokens]))))))
-    (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                   (p/->Error (->UnexpectedToken other position)))
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))))
+    (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (p/->Ok [(->BitArraySizeVariable (span-from-string start name) name) tokens]))
+
+    (and (seq tokens) (instance? glexer.token.Int (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (p/->Ok [(->BitArraySizeInt (span-from-string start value) value) tokens]))
+
+    (and (seq tokens) (instance? glexer.token.LeftBrace (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (p/with-use [[_use0] (result/try* (bit-array-size tokens))]
+        (let [[inner tokens] _use0]
+          (p/with-use [[_use0 tokens] (expect (t/->RightBrace) tokens)]
+            (let [{end :byte-offset} _use0]
+              (p/->Ok [(->BitArraySizeBlock (->Span start (+' end 1)) inner) tokens]))))))
+
+    (seq tokens)
+    (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+      (p/->Error (->UnexpectedToken other position)))
+
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))))
 
 (defn- bit-array-size-loop [tokens operators values]
   (p/with-use [[_use0] (result/try* (bit-array-size-unit tokens))]
@@ -709,42 +812,51 @@
 
 (defn- pattern-constructor-arguments [arguments tokens]
   (cond
-    (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                       (p/->Ok (->PatternConstructorArguments arguments
-                                                                                                                                                                              false
-                                                                                                                                                                              (+' end 1)
-                                                                                                                                                                              tokens)))
-    (and (<= 3 (count tokens)) (instance? glexer.token.DotDot (nth (first tokens) 0)) (instance? glexer.token.Comma (nth (nth tokens 1) 0)) (instance? glexer.token.RightParen (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1))) (let [end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3)]
-                                                                                                                                                                                                                                                             (p/->Ok (->PatternConstructorArguments arguments
-                                                                                                                                                                                                                                                                                                    true
-                                                                                                                                                                                                                                                                                                    (+' end 1)
-                                                                                                                                                                                                                                                                                                    tokens)))
-    (and (<= 2 (count tokens)) (instance? glexer.token.DotDot (nth (first tokens) 0)) (instance? glexer.token.RightParen (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1))) (let [end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
-                                                                                                                                                                                                       (p/->Ok (->PatternConstructorArguments arguments
-                                                                                                                                                                                                                                              true
-                                                                                                                                                                                                                                              (+' end 1)
-                                                                                                                                                                                                                                              tokens)))
-    :else (let [tokens tokens]
-            (p/with-use [[_use0] (result/try* (field tokens pattern))]
-              (let [[pattern tokens] _use0
-                    arguments (list* pattern arguments)]
-                (cond
-                  (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                     (p/->Ok (->PatternConstructorArguments arguments
-                                                                                                                                                                                            false
-                                                                                                                                                                                            (+' end 1)
-                                                                                                                                                                                            tokens)))
-                  (and (<= 3 (count tokens)) (instance? glexer.token.Comma (nth (first tokens) 0)) (instance? glexer.token.DotDot (nth (nth tokens 1) 0)) (instance? glexer.token.RightParen (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1))) (let [end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3)]
-                                                                                                                                                                                                                                                                           (p/->Ok (->PatternConstructorArguments arguments
-                                                                                                                                                                                                                                                                                                                  true
-                                                                                                                                                                                                                                                                                                                  (+' end 1)
-                                                                                                                                                                                                                                                                                                                  tokens)))
-                  (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0))) (let [tokens (rest tokens)]
-                                                                                             (pattern-constructor-arguments arguments
-                                                                                                                            tokens))
-                  (seq tokens) (let [token (nth (first tokens) 0) position (nth (first tokens) 1)]
-                                 (p/->Error (->UnexpectedToken token position)))
-                  (empty? tokens) (p/->Error (->UnexpectedEndOfInput))))))))
+    (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (p/->Ok (->PatternConstructorArguments arguments
+                                             false
+                                             (+' end 1)
+                                             tokens)))
+
+    (and (<= 3 (count tokens)) (instance? glexer.token.DotDot (nth (first tokens) 0)) (instance? glexer.token.Comma (nth (nth tokens 1) 0)) (instance? glexer.token.RightParen (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1)))
+    (let [end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3)]
+      (p/->Ok (->PatternConstructorArguments arguments true (+' end 1) tokens)))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.DotDot (nth (first tokens) 0)) (instance? glexer.token.RightParen (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
+    (let [end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
+      (p/->Ok (->PatternConstructorArguments arguments true (+' end 1) tokens)))
+
+    :else
+    (let [tokens tokens]
+      (p/with-use [[_use0] (result/try* (field tokens pattern))]
+        (let [[pattern tokens] _use0
+              arguments (list* pattern arguments)]
+          (cond
+            (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+            (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+              (p/->Ok (->PatternConstructorArguments arguments
+                                                     false
+                                                     (+' end 1)
+                                                     tokens)))
+
+            (and (<= 3 (count tokens)) (instance? glexer.token.Comma (nth (first tokens) 0)) (instance? glexer.token.DotDot (nth (nth tokens 1) 0)) (instance? glexer.token.RightParen (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1)))
+            (let [end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3)]
+              (p/->Ok (->PatternConstructorArguments arguments
+                                                     true
+                                                     (+' end 1)
+                                                     tokens)))
+
+            (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0)))
+            (let [tokens (rest tokens)]
+              (pattern-constructor-arguments arguments tokens))
+
+            (seq tokens)
+            (let [token (nth (first tokens) 0) position (nth (first tokens) 1)]
+              (p/->Error (->UnexpectedToken token position)))
+
+            (empty? tokens)
+            (p/->Error (->UnexpectedEndOfInput))))))))
 
 (defn- pattern-constructor [module constructor tokens start name-start]
   (if (and (seq tokens) (instance? glexer.token.LeftParen (nth (first tokens) 0)))
@@ -764,73 +876,106 @@
 
 (defn- pattern [tokens]
   (p/with-use [[_use0] (result/try* (cond
-                                      (and (seq tokens) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                        (pattern-constructor (option/->None)
-                                                                                                                                                                                             name
-                                                                                                                                                                                             tokens
-                                                                                                                                                                                             start
-                                                                                                                                                                                             start))
-                                      (and (<= 3 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Dot (nth (nth tokens 1) 0)) (instance? glexer.token.UpperName (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1))) (let [module (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) name (:value (nth (nth tokens 2) 0)) name-start (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3)]
-                                                                                                                                                                                                                                                                                                                                             (pattern-constructor (option/->Some module)
-                                                                                                                                                                                                                                                                                                                                                                  name
-                                                                                                                                                                                                                                                                                                                                                                  tokens
-                                                                                                                                                                                                                                                                                                                                                                  start
-                                                                                                                                                                                                                                                                                                                                                                  name-start))
-                                      (and (<= 5 (count tokens)) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0)) (instance? glexer.token.LessGreater (nth (nth tokens 3) 0)) (instance? glexer.token.Name (nth (nth tokens 4) 0)) (instance? glexer.Position (nth (nth tokens 4) 1))) (let [v (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) l (:value (nth (nth tokens 2) 0)) r (:value (nth (nth tokens 4) 0)) name-start (:byte-offset (nth (nth tokens 4) 1)) tokens (nthrest tokens 5) span (->Span start (string-offset name-start r)) pattern (->PatternConcatenate span v (option/->Some (->Named l)) (->Named r))]
-                                                                                                                                                                                                                                                                                                                                                                                                                                                          (p/->Ok [pattern tokens]))
-                                      (and (<= 5 (count tokens)) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (instance? glexer.token.LessGreater (nth (nth tokens 3) 0)) (instance? glexer.token.Name (nth (nth tokens 4) 0)) (instance? glexer.Position (nth (nth tokens 4) 1))) (let [v (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) l (:value (nth (nth tokens 2) 0)) r (:value (nth (nth tokens 4) 0)) name-start (:byte-offset (nth (nth tokens 4) 1)) tokens (nthrest tokens 5) span (->Span start (string-offset name-start r)) pattern (->PatternConcatenate span v (option/->Some (->Discarded l)) (->Named r))]
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (p/->Ok [pattern tokens]))
-                                      (and (<= 5 (count tokens)) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0)) (instance? glexer.token.LessGreater (nth (nth tokens 3) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 4) 0)) (instance? glexer.Position (nth (nth tokens 4) 1))) (let [v (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) l (:value (nth (nth tokens 2) 0)) r (:value (nth (nth tokens 4) 0)) name-start (:byte-offset (nth (nth tokens 4) 1)) tokens (nthrest tokens 5) span (->Span start (+' (string-offset name-start r) 1)) pattern (->PatternConcatenate span v (option/->Some (->Named l)) (->Discarded r))]
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (p/->Ok [pattern tokens]))
-                                      (and (<= 3 (count tokens)) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LessGreater (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1))) (let [v (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) n (:value (nth (nth tokens 2) 0)) name-start (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3) span (->Span start (string-offset name-start n)) pattern (->PatternConcatenate span v (option/->None) (->Named n))]
-                                                                                                                                                                                                                                                                                                                                                  (p/->Ok [pattern tokens]))
-                                      (and (<= 3 (count tokens)) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LessGreater (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1))) (let [v (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) n (:value (nth (nth tokens 2) 0)) name-start (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3) span (->Span start (+' (string-offset name-start n) 1)) pattern (->PatternConcatenate span v (option/->None) (->Discarded n))]
-                                                                                                                                                                                                                                                                                                                                                         (p/->Ok [pattern tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Int (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                  (p/->Ok [(->PatternInt (span-from-string start
-                                                                                                                                                                                                           value)
-                                                                                                                                                                                         value) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Float (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                    (p/->Ok [(->PatternFloat (span-from-string start
-                                                                                                                                                                                                               value)
-                                                                                                                                                                                             value) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                     (p/->Ok [(->PatternString (->Span start
-                                                                                                                                                                                                       (+' (string-offset start
-                                                                                                                                                                                                                      value) 2))
-                                                                                                                                                                                               value) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                          (p/->Ok [(->PatternDiscard (->Span start
-                                                                                                                                                                                                             (+' (string-offset start
-                                                                                                                                                                                                                            name) 1))
-                                                                                                                                                                                                     name) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                   (p/->Ok [(->PatternVariable (span-from-string start
-                                                                                                                                                                                                                 name)
-                                                                                                                                                                                               name) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.LeftSquare (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (list' pattern (option/->Some (fn [_capture] (->PatternDiscard _capture ""))) (list) tokens)]
-                                                                                                                                                                         (p/with-use [[_use0] (result/map result)]
-                                                                                                                                                                           (let [{elements :values rest' :spread tokens :remaining-tokens end :end} _use0]
-                                                                                                                                                                             [(->PatternList (->Span start
-                                                                                                                                                                                                     end)
-                                                                                                                                                                                             elements
-                                                                                                                                                                                             rest') tokens])))
-                                      (and (<= 2 (count tokens)) (instance? glexer.token.Hash (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LeftParen (nth (nth tokens 1) 0))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2) result (comma-delimited (list) tokens pattern (t/->RightParen))]
-                                                                                                                                                                                                                                      (p/with-use [[_use0] (result/try* result)]
-                                                                                                                                                                                                                                        (let [[patterns end tokens] _use0]
-                                                                                                                                                                                                                                          (p/->Ok [(->PatternTuple (->Span start
-                                                                                                                                                                                                                                                                           end)
-                                                                                                                                                                                                                                                                   patterns) tokens]))))
-                                      (and (seq tokens) (instance? glexer.token.LessLess (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) parser (fn [_capture] (bit-string-segment pattern bit-array-size _capture)) result (comma-delimited (list) tokens parser (t/->GreaterGreater))]
-                                                                                                                                                                       (p/with-use [[_use0] (result/try* result)]
-                                                                                                                                                                         (let [[segments end tokens] _use0]
-                                                                                                                                                                           (p/->Ok [(->PatternBitString (->Span start
-                                                                                                                                                                                                                end)
-                                                                                                                                                                                                        segments) tokens]))))
-                                      (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                                                     (p/->Error (->UnexpectedToken other
-                                                                                   position)))
-                                      (empty? tokens) (p/->Error (->UnexpectedEndOfInput))))]
+                                      (and (seq tokens) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (pattern-constructor (option/->None)
+                                                             name
+                                                             tokens
+                                                             start
+                                                             start))
+
+                                      (and (<= 3 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Dot (nth (nth tokens 1) 0)) (instance? glexer.token.UpperName (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1)))
+                                      (let [module (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) name (:value (nth (nth tokens 2) 0)) name-start (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3)]
+                                        (pattern-constructor (option/->Some module)
+                                                             name
+                                                             tokens
+                                                             start
+                                                             name-start))
+
+                                      (and (<= 5 (count tokens)) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0)) (instance? glexer.token.LessGreater (nth (nth tokens 3) 0)) (instance? glexer.token.Name (nth (nth tokens 4) 0)) (instance? glexer.Position (nth (nth tokens 4) 1)))
+                                      (let [v (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) l (:value (nth (nth tokens 2) 0)) r (:value (nth (nth tokens 4) 0)) name-start (:byte-offset (nth (nth tokens 4) 1)) tokens (nthrest tokens 5) span (->Span start (string-offset name-start r)) pattern (->PatternConcatenate span v (option/->Some (->Named l)) (->Named r))]
+                                        (p/->Ok [pattern tokens]))
+
+                                      (and (<= 5 (count tokens)) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (instance? glexer.token.LessGreater (nth (nth tokens 3) 0)) (instance? glexer.token.Name (nth (nth tokens 4) 0)) (instance? glexer.Position (nth (nth tokens 4) 1)))
+                                      (let [v (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) l (:value (nth (nth tokens 2) 0)) r (:value (nth (nth tokens 4) 0)) name-start (:byte-offset (nth (nth tokens 4) 1)) tokens (nthrest tokens 5) span (->Span start (string-offset name-start r)) pattern (->PatternConcatenate span v (option/->Some (->Discarded l)) (->Named r))]
+                                        (p/->Ok [pattern tokens]))
+
+                                      (and (<= 5 (count tokens)) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0)) (instance? glexer.token.LessGreater (nth (nth tokens 3) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 4) 0)) (instance? glexer.Position (nth (nth tokens 4) 1)))
+                                      (let [v (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) l (:value (nth (nth tokens 2) 0)) r (:value (nth (nth tokens 4) 0)) name-start (:byte-offset (nth (nth tokens 4) 1)) tokens (nthrest tokens 5) span (->Span start (+' (string-offset name-start r) 1)) pattern (->PatternConcatenate span v (option/->Some (->Named l)) (->Discarded r))]
+                                        (p/->Ok [pattern tokens]))
+
+                                      (and (<= 3 (count tokens)) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LessGreater (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1)))
+                                      (let [v (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) n (:value (nth (nth tokens 2) 0)) name-start (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3) span (->Span start (string-offset name-start n)) pattern (->PatternConcatenate span v (option/->None) (->Named n))]
+                                        (p/->Ok [pattern tokens]))
+
+                                      (and (<= 3 (count tokens)) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LessGreater (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1)))
+                                      (let [v (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) n (:value (nth (nth tokens 2) 0)) name-start (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3) span (->Span start (+' (string-offset name-start n) 1)) pattern (->PatternConcatenate span v (option/->None) (->Discarded n))]
+                                        (p/->Ok [pattern tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Int (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (p/->Ok [(->PatternInt (span-from-string start
+                                                                                 value)
+                                                               value) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Float (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (p/->Ok [(->PatternFloat (span-from-string start
+                                                                                   value)
+                                                                 value) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (p/->Ok [(->PatternString (->Span start
+                                                                          (+' (string-offset start
+                                                                                         value) 2))
+                                                                  value) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (p/->Ok [(->PatternDiscard (->Span start
+                                                                           (+' (string-offset start
+                                                                                          name) 1))
+                                                                   name) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (p/->Ok [(->PatternVariable (span-from-string start
+                                                                                      name)
+                                                                    name) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.LeftSquare (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (list' pattern (option/->Some (fn [_capture] (->PatternDiscard _capture ""))) (list) tokens)]
+                                        (p/with-use [[_use0] (result/map result)]
+                                          (let [{elements :values rest' :spread tokens :remaining-tokens end :end} _use0]
+                                            [(->PatternList (->Span start
+                                                                    end)
+                                                            elements
+                                                            rest') tokens])))
+
+                                      (and (<= 2 (count tokens)) (instance? glexer.token.Hash (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LeftParen (nth (nth tokens 1) 0)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2) result (comma-delimited (list) tokens pattern (t/->RightParen))]
+                                        (p/with-use [[_use0] (result/try* result)]
+                                          (let [[patterns end tokens] _use0]
+                                            (p/->Ok [(->PatternTuple (->Span start
+                                                                             end)
+                                                                     patterns) tokens]))))
+
+                                      (and (seq tokens) (instance? glexer.token.LessLess (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) parser (fn [_capture] (bit-string-segment pattern bit-array-size _capture)) result (comma-delimited (list) tokens parser (t/->GreaterGreater))]
+                                        (p/with-use [[_use0] (result/try* result)]
+                                          (let [[segments end tokens] _use0]
+                                            (p/->Ok [(->PatternBitString (->Span start
+                                                                                 end)
+                                                                         segments) tokens]))))
+
+                                      (seq tokens)
+                                      (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+                                        (p/->Error (->UnexpectedToken other
+                                                                      position)))
+
+                                      (empty? tokens)
+                                      (p/->Error (->UnexpectedEndOfInput))))]
     (let [[pattern tokens] _use0]
       (if (and (<= 2 (count tokens)) (instance? glexer.token.As (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
         (let [name (:value (nth (nth tokens 1) 0)) name-start (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) span (->Span (:start (:location pattern)) (string-offset name-start name)) pattern (->PatternAssignment span pattern name)]
@@ -871,31 +1016,36 @@
 
 (defn- type- [tokens]
   (cond
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))
-    (and (<= 2 (count tokens)) (instance? glexer.token.Fn (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LeftParen (nth (nth tokens 1) 0))) (let [i (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2)]
-                                                                                                                                                                                                  (fn-type i
-                                                                                                                                                                                                           tokens))
-    (and (<= 2 (count tokens)) (instance? glexer.token.Hash (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LeftParen (nth (nth tokens 1) 0))) (let [i (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2)]
-                                                                                                                                                                                                    (tuple-type i
-                                                                                                                                                                                                                tokens))
-    (and (<= 3 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Dot (nth (nth tokens 1) 0)) (instance? glexer.token.UpperName (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1))) (let [module (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) name (:value (nth (nth tokens 2) 0)) end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3)]
-                                                                                                                                                                                                                                                                                                           (named-type name
-                                                                                                                                                                                                                                                                                                                       (option/->Some module)
-                                                                                                                                                                                                                                                                                                                       tokens
-                                                                                                                                                                                                                                                                                                                       start
-                                                                                                                                                                                                                                                                                                                       end))
-    (and (seq tokens) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                      (named-type name
-                                                                                                                                                  (option/->None)
-                                                                                                                                                  tokens
-                                                                                                                                                  start
-                                                                                                                                                  start))
-    (and (seq tokens) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [name (:value (nth (first tokens) 0)) i (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) value (->HoleType (->Span i (+' (string-offset i name) 1)) name)]
-                                                                                                                                        (p/->Ok [value tokens]))
-    (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [name (:value (nth (first tokens) 0)) i (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) value (->VariableType (span-from-string i name) name)]
-                                                                                                                                 (p/->Ok [value tokens]))
-    (seq tokens) (let [token (nth (first tokens) 0) position (nth (first tokens) 1)]
-                   (p/->Error (->UnexpectedToken token position)))))
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.Fn (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LeftParen (nth (nth tokens 1) 0)))
+    (let [i (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2)]
+      (fn-type i tokens))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.Hash (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LeftParen (nth (nth tokens 1) 0)))
+    (let [i (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2)]
+      (tuple-type i tokens))
+
+    (and (<= 3 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Dot (nth (nth tokens 1) 0)) (instance? glexer.token.UpperName (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1)))
+    (let [module (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) name (:value (nth (nth tokens 2) 0)) end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3)]
+      (named-type name (option/->Some module) tokens start end))
+
+    (and (seq tokens) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (named-type name (option/->None) tokens start start))
+
+    (and (seq tokens) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [name (:value (nth (first tokens) 0)) i (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) value (->HoleType (->Span i (+' (string-offset i name) 1)) name)]
+      (p/->Ok [value tokens]))
+
+    (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [name (:value (nth (first tokens) 0)) i (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) value (->VariableType (span-from-string i name) name)]
+      (p/->Ok [value tokens]))
+
+    (seq tokens)
+    (let [token (nth (first tokens) 0) position (nth (first tokens) 1)]
+      (p/->Error (->UnexpectedToken token position)))))
 
 (defn- optional-return-annotation [end tokens]
   (if (and (seq tokens) (instance? glexer.token.RightArrow (nth (first tokens) 0)))
@@ -915,14 +1065,21 @@
 
 (defn- fn-parameter [tokens]
   (p/with-use [[_use0] (result/try* (cond
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0))) (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
-                                                                                                                (p/->Ok [(->Named name) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.DiscardName (nth (first tokens) 0))) (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
-                                                                                                                       (p/->Ok [(->Discarded name) tokens]))
-                                      (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                                                     (p/->Error (->UnexpectedToken other
-                                                                                   position)))
-                                      (empty? tokens) (p/->Error (->UnexpectedEndOfInput))))]
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)))
+                                      (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
+                                        (p/->Ok [(->Named name) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.DiscardName (nth (first tokens) 0)))
+                                      (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
+                                        (p/->Ok [(->Discarded name) tokens]))
+
+                                      (seq tokens)
+                                      (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+                                        (p/->Error (->UnexpectedToken other
+                                                                      position)))
+
+                                      (empty? tokens)
+                                      (p/->Error (->UnexpectedEndOfInput))))]
     (let [[name tokens] _use0]
       (p/with-use [[_use0] (result/try* (optional-type-annotation tokens))]
         (let [[type- tokens] _use0]
@@ -939,101 +1096,133 @@
 
 (defn- fn-capture [label function before after tokens]
   (cond
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))
-    (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span (:start (:location function)) (+' end 1)) capture (->FnCapture span label function before (list/reverse after))]
-                                                                                                                                       (after-expression capture
-                                                                                                                                                         tokens))
-    :else (p/with-use [[_use0] (result/try* (field tokens expression))]
-            (let [[argument tokens] _use0
-                  after (list* argument after)]
-              (cond
-                (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0))) (let [tokens (rest tokens)]
-                                                                                           (fn-capture label
-                                                                                                       function
-                                                                                                       before
-                                                                                                       after
-                                                                                                       tokens))
-                (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span (:start (:location function)) (+' end 1)) call (->FnCapture span label function before (list/reverse after))]
-                                                                                                                                                   (after-expression call
-                                                                                                                                                                     tokens))
-                (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                               (p/->Error (->UnexpectedToken other position)))
-                (empty? tokens) (p/->Error (->UnexpectedEndOfInput)))))))
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))
+
+    (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span (:start (:location function)) (+' end 1)) capture (->FnCapture span label function before (list/reverse after))]
+      (after-expression capture tokens))
+
+    :else
+    (p/with-use [[_use0] (result/try* (field tokens expression))]
+      (let [[argument tokens] _use0
+            after (list* argument after)]
+        (cond
+          (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0)))
+          (let [tokens (rest tokens)]
+            (fn-capture label function before after tokens))
+
+          (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+          (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span (:start (:location function)) (+' end 1)) call (->FnCapture span label function before (list/reverse after))]
+            (after-expression call tokens))
+
+          (seq tokens)
+          (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+            (p/->Error (->UnexpectedToken other position)))
+
+          (empty? tokens)
+          (p/->Error (->UnexpectedEndOfInput)))))))
 
 (defn- call [arguments function tokens]
   (cond
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))
-    (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span (:start (:location function)) (+' end 1)) call (->Call span function (list/reverse arguments))]
-                                                                                                                                       (after-expression call
-                                                                                                                                                         tokens))
-    (and (<= 5 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (= (:value (nth (nth tokens 2) 0)) "") (instance? glexer.token.Comma (nth (nth tokens 3) 0)) (instance? glexer.token.RightParen (nth (nth tokens 4) 0)) (instance? glexer.Position (nth (nth tokens 4) 1))) (let [label (:value (nth (first tokens) 0)) end (:byte-offset (nth (nth tokens 4) 1)) tokens (nthrest tokens 5) span (->Span (:start (:location function)) (+' end 1)) capture (->FnCapture span (option/->Some label) function (list/reverse arguments) (list))]
-                                                                                                                                                                                                                                                                                                                                                                                                                    (after-expression capture
-                                                                                                                                                                                                                                                                                                                                                                                                                                      tokens))
-    (and (<= 4 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (= (:value (nth (nth tokens 2) 0)) "") (instance? glexer.token.RightParen (nth (nth tokens 3) 0)) (instance? glexer.Position (nth (nth tokens 3) 1))) (let [label (:value (nth (first tokens) 0)) end (:byte-offset (nth (nth tokens 3) 1)) tokens (nthrest tokens 4) span (->Span (:start (:location function)) (+' end 1)) capture (->FnCapture span (option/->Some label) function (list/reverse arguments) (list))]
-                                                                                                                                                                                                                                                                                                                                                              (after-expression capture
-                                                                                                                                                                                                                                                                                                                                                                                tokens))
-    (and (<= 4 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (= (:value (nth (nth tokens 2) 0)) "") (instance? glexer.token.Comma (nth (nth tokens 3) 0))) (let [label (:value (nth (first tokens) 0)) tokens (nthrest tokens 4)]
-                                                                                                                                                                                                                                                                                                      (fn-capture (option/->Some label)
-                                                                                                                                                                                                                                                                                                                  function
-                                                                                                                                                                                                                                                                                                                  (list/reverse arguments)
-                                                                                                                                                                                                                                                                                                                  (list)
-                                                                                                                                                                                                                                                                                                                  tokens))
-    (and (<= 3 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (= (:value (nth (nth tokens 2) 0)) "")) (let [label (:value (nth (first tokens) 0)) tokens (nthrest tokens 3)]
-                                                                                                                                                                                                                                                (fn-capture (option/->Some label)
-                                                                                                                                                                                                                                                            function
-                                                                                                                                                                                                                                                            (list/reverse arguments)
-                                                                                                                                                                                                                                                            (list)
-                                                                                                                                                                                                                                                            tokens))
-    (and (<= 3 (count tokens)) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "") (instance? glexer.token.Comma (nth (nth tokens 1) 0)) (instance? glexer.token.RightParen (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1))) (let [end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3) span (->Span (:start (:location function)) (+' end 1)) capture (->FnCapture span (option/->None) function (list/reverse arguments) (list))]
-                                                                                                                                                                                                                                                                                                         (after-expression capture
-                                                                                                                                                                                                                                                                                                                           tokens))
-    (and (<= 2 (count tokens)) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "") (instance? glexer.token.RightParen (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1))) (let [end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) span (->Span (:start (:location function)) (+' end 1)) capture (->FnCapture span (option/->None) function (list/reverse arguments) (list))]
-                                                                                                                                                                                                                                                   (after-expression capture
-                                                                                                                                                                                                                                                                     tokens))
-    (and (<= 2 (count tokens)) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "") (instance? glexer.token.Comma (nth (nth tokens 1) 0))) (let [tokens (nthrest tokens 2)]
-                                                                                                                                                                                           (fn-capture (option/->None)
-                                                                                                                                                                                                       function
-                                                                                                                                                                                                       (list/reverse arguments)
-                                                                                                                                                                                                       (list)
-                                                                                                                                                                                                       tokens))
-    (and (seq tokens) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "")) (let [tokens (rest tokens)]
-                                                                                                                            (fn-capture (option/->None)
-                                                                                                                                        function
-                                                                                                                                        (list/reverse arguments)
-                                                                                                                                        (list)
-                                                                                                                                        tokens))
-    :else (p/with-use [[_use0] (result/try* (field tokens expression))]
-            (let [[argument tokens] _use0
-                  arguments (list* argument arguments)]
-              (cond
-                (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0))) (let [tokens (rest tokens)]
-                                                                                           (call arguments
-                                                                                                 function
-                                                                                                 tokens))
-                (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span (:start (:location function)) (+' end 1)) call (->Call span function (list/reverse arguments))]
-                                                                                                                                                   (after-expression call
-                                                                                                                                                                     tokens))
-                (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                               (p/->Error (->UnexpectedToken other position)))
-                (empty? tokens) (p/->Error (->UnexpectedEndOfInput)))))))
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))
+
+    (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span (:start (:location function)) (+' end 1)) call (->Call span function (list/reverse arguments))]
+      (after-expression call tokens))
+
+    (and (<= 5 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (= (:value (nth (nth tokens 2) 0)) "") (instance? glexer.token.Comma (nth (nth tokens 3) 0)) (instance? glexer.token.RightParen (nth (nth tokens 4) 0)) (instance? glexer.Position (nth (nth tokens 4) 1)))
+    (let [label (:value (nth (first tokens) 0)) end (:byte-offset (nth (nth tokens 4) 1)) tokens (nthrest tokens 5) span (->Span (:start (:location function)) (+' end 1)) capture (->FnCapture span (option/->Some label) function (list/reverse arguments) (list))]
+      (after-expression capture tokens))
+
+    (and (<= 4 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (= (:value (nth (nth tokens 2) 0)) "") (instance? glexer.token.RightParen (nth (nth tokens 3) 0)) (instance? glexer.Position (nth (nth tokens 3) 1)))
+    (let [label (:value (nth (first tokens) 0)) end (:byte-offset (nth (nth tokens 3) 1)) tokens (nthrest tokens 4) span (->Span (:start (:location function)) (+' end 1)) capture (->FnCapture span (option/->Some label) function (list/reverse arguments) (list))]
+      (after-expression capture tokens))
+
+    (and (<= 4 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (= (:value (nth (nth tokens 2) 0)) "") (instance? glexer.token.Comma (nth (nth tokens 3) 0)))
+    (let [label (:value (nth (first tokens) 0)) tokens (nthrest tokens 4)]
+      (fn-capture (option/->Some label)
+                  function
+                  (list/reverse arguments)
+                  (list)
+                  tokens))
+
+    (and (<= 3 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 2) 0)) (= (:value (nth (nth tokens 2) 0)) ""))
+    (let [label (:value (nth (first tokens) 0)) tokens (nthrest tokens 3)]
+      (fn-capture (option/->Some label)
+                  function
+                  (list/reverse arguments)
+                  (list)
+                  tokens))
+
+    (and (<= 3 (count tokens)) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "") (instance? glexer.token.Comma (nth (nth tokens 1) 0)) (instance? glexer.token.RightParen (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1)))
+    (let [end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3) span (->Span (:start (:location function)) (+' end 1)) capture (->FnCapture span (option/->None) function (list/reverse arguments) (list))]
+      (after-expression capture tokens))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "") (instance? glexer.token.RightParen (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
+    (let [end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) span (->Span (:start (:location function)) (+' end 1)) capture (->FnCapture span (option/->None) function (list/reverse arguments) (list))]
+      (after-expression capture tokens))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) "") (instance? glexer.token.Comma (nth (nth tokens 1) 0)))
+    (let [tokens (nthrest tokens 2)]
+      (fn-capture (option/->None)
+                  function
+                  (list/reverse arguments)
+                  (list)
+                  tokens))
+
+    (and (seq tokens) (instance? glexer.token.DiscardName (nth (first tokens) 0)) (= (:value (nth (first tokens) 0)) ""))
+    (let [tokens (rest tokens)]
+      (fn-capture (option/->None)
+                  function
+                  (list/reverse arguments)
+                  (list)
+                  tokens))
+
+    :else
+    (p/with-use [[_use0] (result/try* (field tokens expression))]
+      (let [[argument tokens] _use0
+            arguments (list* argument arguments)]
+        (cond
+          (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0)))
+          (let [tokens (rest tokens)]
+            (call arguments function tokens))
+
+          (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+          (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span (:start (:location function)) (+' end 1)) call (->Call span function (list/reverse arguments))]
+            (after-expression call tokens))
+
+          (seq tokens)
+          (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+            (p/->Error (->UnexpectedToken other position)))
+
+          (empty? tokens)
+          (p/->Error (->UnexpectedEndOfInput)))))))
 
 (defn- after-expression [parsed tokens]
   (cond
-    (and (<= 2 (count tokens)) (instance? glexer.token.Dot (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1))) (let [label (:value (nth (nth tokens 1) 0)) label-start (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) span (->Span (:start (:location parsed)) (string-offset label-start label)) expression (->FieldAccess span parsed label)]
-                                                                                                                                                                                              (recur expression tokens))
-    (and (<= 2 (count tokens)) (instance? glexer.token.Dot (nth (first tokens) 0)) (instance? glexer.token.UpperName (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1))) (let [label (:value (nth (nth tokens 1) 0)) label-start (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) span (->Span (:start (:location parsed)) (string-offset label-start label)) expression (->FieldAccess span parsed label)]
-                                                                                                                                                                                                   (recur expression tokens))
-    (and (<= 2 (count tokens)) (instance? glexer.token.Dot (nth (first tokens) 0)) (instance? glexer.token.Int (nth (nth tokens 1) 0))) (let [token (nth (nth tokens 1) 0) value (:value (nth (nth tokens 1) 0)) position (nth (nth tokens 1) 1) tokens (nthrest tokens 2) subject (int/parse value)]
-                                                                                                                                          (if (instance? Ok subject)
-                                                                                                                                            (let [i (:value subject) end (string-offset (:byte-offset position) value) span (->Span (:start (:location parsed)) end) expression (->TupleIndex span parsed i)]
-                                                                                                                                              (recur expression tokens))
-                                                                                                                                            (p/->Error (->UnexpectedToken token
-                                                                                                                                                                          position))))
-    (and (seq tokens) (instance? glexer.token.LeftParen (nth (first tokens) 0))) (let [tokens (rest tokens)]
-                                                                                   (call (list)
-                                                                                         parsed
-                                                                                         tokens))
-    :else (p/->Ok [parsed tokens])))
+    (and (<= 2 (count tokens)) (instance? glexer.token.Dot (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
+    (let [label (:value (nth (nth tokens 1) 0)) label-start (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) span (->Span (:start (:location parsed)) (string-offset label-start label)) expression (->FieldAccess span parsed label)]
+      (recur expression tokens))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.Dot (nth (first tokens) 0)) (instance? glexer.token.UpperName (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
+    (let [label (:value (nth (nth tokens 1) 0)) label-start (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) span (->Span (:start (:location parsed)) (string-offset label-start label)) expression (->FieldAccess span parsed label)]
+      (recur expression tokens))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.Dot (nth (first tokens) 0)) (instance? glexer.token.Int (nth (nth tokens 1) 0)))
+    (let [token (nth (nth tokens 1) 0) value (:value (nth (nth tokens 1) 0)) position (nth (nth tokens 1) 1) tokens (nthrest tokens 2) subject (int/parse value)]
+      (if (instance? Ok subject)
+        (let [i (:value subject) end (string-offset (:byte-offset position) value) span (->Span (:start (:location parsed)) end) expression (->TupleIndex span parsed i)]
+          (recur expression tokens))
+        (p/->Error (->UnexpectedToken token position))))
+
+    (and (seq tokens) (instance? glexer.token.LeftParen (nth (first tokens) 0)))
+    (let [tokens (rest tokens)]
+      (call (list) parsed tokens))
+
+    :else
+    (p/->Ok [parsed tokens])))
 
 (defn- todo-panic [tokens constructor start keyword-name]
   (if (and (seq tokens) (instance? glexer.token.As (nth (first tokens) 0)))
@@ -1112,139 +1301,181 @@
 
 (defn- record-update-field [tokens]
   (cond
-    (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0))) (let [name (:value (nth (first tokens) 0)) tokens (nthrest tokens 2)]
-                                                                                                                                             (if (or (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0))) (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0))))
-                                                                                                                                               (p/->Ok [(->RecordUpdateField name
-                                                                                                                                                                             (option/->None)) tokens])
-                                                                                                                                               (p/with-use [[_use0] (result/try* (expression tokens))]
-                                                                                                                                                 (let [[expression tokens] _use0]
-                                                                                                                                                   (p/->Ok [(->RecordUpdateField name
-                                                                                                                                                                                 (option/->Some expression)) tokens])))))
-    (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                   (p/->Error (->UnexpectedToken other position)))
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))))
+    (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)))
+    (let [name (:value (nth (first tokens) 0)) tokens (nthrest tokens 2)]
+      (if (or (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0))) (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0))))
+        (p/->Ok [(->RecordUpdateField name (option/->None)) tokens])
+        (p/with-use [[_use0] (result/try* (expression tokens))]
+          (let [[expression tokens] _use0]
+            (p/->Ok [(->RecordUpdateField name (option/->Some expression)) tokens])))))
+
+    (seq tokens)
+    (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+      (p/->Error (->UnexpectedToken other position)))
+
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))))
 
 (defn- record-update [module constructor tokens start]
   (p/with-use [[_use0] (result/try* (expression tokens))]
     (let [[record tokens] _use0]
       (cond
-        (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span start (+' end 1)) expression (->RecordUpdate span module constructor record (list))]
-                                                                                                                                           (p/->Ok [(option/->Some expression) tokens]))
-        (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0))) (let [tokens (rest tokens) result (comma-delimited (list) tokens record-update-field (t/->RightParen))]
-                                                                                   (p/with-use [[_use0] (result/try* result)]
-                                                                                     (let [[fields end tokens] _use0
-                                                                                           span (->Span start
-                                                                                                        end)
-                                                                                           expression (->RecordUpdate span
-                                                                                                                      module
-                                                                                                                      constructor
-                                                                                                                      record
-                                                                                                                      fields)]
-                                                                                       (p/->Ok [(option/->Some expression) tokens]))))
-        :else (p/->Ok [(option/->None) tokens])))))
+        (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+        (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span start (+' end 1)) expression (->RecordUpdate span module constructor record (list))]
+          (p/->Ok [(option/->Some expression) tokens]))
+
+        (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0)))
+        (let [tokens (rest tokens) result (comma-delimited (list) tokens record-update-field (t/->RightParen))]
+          (p/with-use [[_use0] (result/try* result)]
+            (let [[fields end tokens] _use0
+                  span (->Span start end)
+                  expression (->RecordUpdate span
+                                             module
+                                             constructor
+                                             record
+                                             fields)]
+              (p/->Ok [(option/->Some expression) tokens]))))
+
+        :else
+        (p/->Ok [(option/->None) tokens])))))
 
 (defn- expression-unit [tokens context]
   (p/with-use [[_use0] (result/try* (cond
-                                      (and (<= 5 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Dot (nth (nth tokens 1) 0)) (instance? glexer.token.UpperName (nth (nth tokens 2) 0)) (instance? glexer.token.LeftParen (nth (nth tokens 3) 0)) (instance? glexer.token.DotDot (nth (nth tokens 4) 0))) (let [module (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) constructor (:value (nth (nth tokens 2) 0)) tokens (nthrest tokens 5)]
-                                                                                                                                                                                                                                                                                                                                                                                                           (record-update (option/->Some module)
-                                                                                                                                                                                                                                                                                                                                                                                                                          constructor
-                                                                                                                                                                                                                                                                                                                                                                                                                          tokens
-                                                                                                                                                                                                                                                                                                                                                                                                                          start))
-                                      (and (<= 3 (count tokens)) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LeftParen (nth (nth tokens 1) 0)) (instance? glexer.token.DotDot (nth (nth tokens 2) 0))) (let [constructor (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 3)]
-                                                                                                                                                                                                                                                                                                  (record-update (option/->None)
-                                                                                                                                                                                                                                                                                                                 constructor
-                                                                                                                                                                                                                                                                                                                 tokens
-                                                                                                                                                                                                                                                                                                                 start))
-                                      (and (seq tokens) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                        (p/->Ok [(option/->Some (->Variable (span-from-string start
-                                                                                                                                                                                                                              name)
-                                                                                                                                                                                                            name)) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Int (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (span-from-string start value)]
-                                                                                                                                                                  (p/->Ok [(option/->Some (->Int span
-                                                                                                                                                                                                 value)) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Float (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (span-from-string start value)]
-                                                                                                                                                                    (p/->Ok [(option/->Some (->Float span
-                                                                                                                                                                                                     value)) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span start (+' (string-offset start value) 2))]
-                                                                                                                                                                     (p/->Ok [(option/->Some (->String span
-                                                                                                                                                                                                       value)) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (span-from-string start name)]
-                                                                                                                                                                   (p/->Ok [(option/->Some (->Variable span
-                                                                                                                                                                                                       name)) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Fn (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                 (fn- tokens
-                                                                                                                                                                      start))
-                                      (and (seq tokens) (instance? glexer.token.Case (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                   (case- tokens
-                                                                                                                                                                          start))
-                                      (and (seq tokens) (instance? glexer.token.Panic (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                    (todo-panic tokens
-                                                                                                                                                                                ->Panic
-                                                                                                                                                                                start
-                                                                                                                                                                                "panic"))
-                                      (and (seq tokens) (instance? glexer.token.Todo (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                   (todo-panic tokens
-                                                                                                                                                                               ->Todo
-                                                                                                                                                                               start
-                                                                                                                                                                               "todo"))
-                                      (and (seq tokens) (instance? glexer.token.LeftSquare (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (list' expression (option/->None) (list) tokens)]
-                                                                                                                                                                         (p/with-use [[_use0] (result/map result)]
-                                                                                                                                                                           (let [{elements :values rest' :spread tokens :remaining-tokens end :end} _use0]
-                                                                                                                                                                             [(option/->Some (->List (->Span start
-                                                                                                                                                                                                             end)
-                                                                                                                                                                                                     elements
-                                                                                                                                                                                                     rest')) tokens])))
-                                      (and (<= 2 (count tokens)) (instance? glexer.token.Hash (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LeftParen (nth (nth tokens 1) 0))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2) result (comma-delimited (list) tokens expression (t/->RightParen))]
-                                                                                                                                                                                                                                      (p/with-use [[_use0] (result/map result)]
-                                                                                                                                                                                                                                        (let [[expressions end tokens] _use0]
-                                                                                                                                                                                                                                          [(option/->Some (->Tuple (->Span start
-                                                                                                                                                                                                                                                                           end)
-                                                                                                                                                                                                                                                                   expressions)) tokens])))
-                                      (and (seq tokens) (instance? glexer.token.Bang (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) unit (expression-unit tokens (->RegularExpressionUnit))]
-                                                                                                                                                                   (p/with-use [[_use0] (result/try* unit)]
-                                                                                                                                                                     (let [[maybe-expression tokens] _use0]
-                                                                                                                                                                       (if (instance? gleam.option.Some maybe-expression)
-                                                                                                                                                                         (let [expression (:value maybe-expression) span (->Span start (:end (:location expression)))]
-                                                                                                                                                                           (p/->Ok [(option/->Some (->NegateBool span
-                                                                                                                                                                                                                 expression)) tokens]))
-                                                                                                                                                                         (unexpected-error tokens)))))
-                                      (and (seq tokens) (instance? glexer.token.Minus (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) unit (expression-unit tokens (->RegularExpressionUnit))]
-                                                                                                                                                                    (p/with-use [[_use0] (result/try* unit)]
-                                                                                                                                                                      (let [[maybe-expression tokens] _use0]
-                                                                                                                                                                        (if (instance? gleam.option.Some maybe-expression)
-                                                                                                                                                                          (let [expression (:value maybe-expression) span (->Span start (:end (:location expression)))]
-                                                                                                                                                                            (p/->Ok [(option/->Some (->NegateInt span
-                                                                                                                                                                                                                 expression)) tokens]))
-                                                                                                                                                                          (unexpected-error tokens)))))
-                                      (and (seq tokens) (instance? glexer.token.LeftBrace (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                                                        (p/with-use [[_use0] (result/map (statements (list)
-                                                                                                                                                                                                                     tokens))]
-                                                                                                                                                                          (let [[statements end tokens] _use0]
-                                                                                                                                                                            [(option/->Some (->Block (->Span start
-                                                                                                                                                                                                             end)
-                                                                                                                                                                                                     statements)) tokens])))
-                                      (and (seq tokens) (instance? glexer.token.LessLess (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) parser (fn [_capture] (bit-string-segment expression expression _capture)) result (comma-delimited (list) tokens parser (t/->GreaterGreater))]
-                                                                                                                                                                       (p/with-use [[_use0] (result/map result)]
-                                                                                                                                                                         (let [[segments end tokens] _use0]
-                                                                                                                                                                           [(option/->Some (->BitString (->Span start
-                                                                                                                                                                                                                end)
-                                                                                                                                                                                                        segments)) tokens])))
-                                      (and (seq tokens) (instance? glexer.token.Echo (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (if (instance? ExpressionUnitAfterPipe context) (let [span (span-from-string start "echo")] (p/->Ok [span (option/->None) tokens])) (result/map (expression tokens) (fn [expression-and-tokens] (let [[expression tokens] expression-and-tokens span (->Span start (:end (:location expression)))] [span (option/->Some expression) tokens]))))]
-                                                                                                                                                                   (p/with-use [[_use0] (result/try* result)]
-                                                                                                                                                                     (let [[span echo-expression tokens] _use0]
-                                                                                                                                                                       (if (and (seq tokens) (instance? glexer.token.As (nth (first tokens) 0)))
-                                                                                                                                                                         (let [tokens (rest tokens)]
-                                                                                                                                                                           (p/with-use [[_use0] (result/map (expression tokens))]
-                                                                                                                                                                             (let [[message tokens] _use0
-                                                                                                                                                                                   span (->Span (:start span)
-                                                                                                                                                                                                (:end (:location message)))]
-                                                                                                                                                                               [(option/->Some (->Echo span
-                                                                                                                                                                                                       echo-expression
-                                                                                                                                                                                                       (option/->Some message))) tokens])))
-                                                                                                                                                                         (p/->Ok [(option/->Some (->Echo span
-                                                                                                                                                                                                         echo-expression
-                                                                                                                                                                                                         (option/->None))) tokens])))))
-                                      :else (p/->Ok [(option/->None) tokens])))]
+                                      (and (<= 5 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Dot (nth (nth tokens 1) 0)) (instance? glexer.token.UpperName (nth (nth tokens 2) 0)) (instance? glexer.token.LeftParen (nth (nth tokens 3) 0)) (instance? glexer.token.DotDot (nth (nth tokens 4) 0)))
+                                      (let [module (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) constructor (:value (nth (nth tokens 2) 0)) tokens (nthrest tokens 5)]
+                                        (record-update (option/->Some module)
+                                                       constructor
+                                                       tokens
+                                                       start))
+
+                                      (and (<= 3 (count tokens)) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LeftParen (nth (nth tokens 1) 0)) (instance? glexer.token.DotDot (nth (nth tokens 2) 0)))
+                                      (let [constructor (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 3)]
+                                        (record-update (option/->None)
+                                                       constructor
+                                                       tokens
+                                                       start))
+
+                                      (and (seq tokens) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (p/->Ok [(option/->Some (->Variable (span-from-string start
+                                                                                              name)
+                                                                            name)) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Int (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (span-from-string start value)]
+                                        (p/->Ok [(option/->Some (->Int span
+                                                                       value)) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Float (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (span-from-string start value)]
+                                        (p/->Ok [(option/->Some (->Float span
+                                                                         value)) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.String (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [value (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (->Span start (+' (string-offset start value) 2))]
+                                        (p/->Ok [(option/->Some (->String span
+                                                                          value)) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) span (span-from-string start name)]
+                                        (p/->Ok [(option/->Some (->Variable span
+                                                                            name)) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Fn (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (fn- tokens start))
+
+                                      (and (seq tokens) (instance? glexer.token.Case (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (case- tokens start))
+
+                                      (and (seq tokens) (instance? glexer.token.Panic (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (todo-panic tokens
+                                                    ->Panic
+                                                    start
+                                                    "panic"))
+
+                                      (and (seq tokens) (instance? glexer.token.Todo (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (todo-panic tokens
+                                                    ->Todo
+                                                    start
+                                                    "todo"))
+
+                                      (and (seq tokens) (instance? glexer.token.LeftSquare (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (list' expression (option/->None) (list) tokens)]
+                                        (p/with-use [[_use0] (result/map result)]
+                                          (let [{elements :values rest' :spread tokens :remaining-tokens end :end} _use0]
+                                            [(option/->Some (->List (->Span start
+                                                                            end)
+                                                                    elements
+                                                                    rest')) tokens])))
+
+                                      (and (<= 2 (count tokens)) (instance? glexer.token.Hash (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.LeftParen (nth (nth tokens 1) 0)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2) result (comma-delimited (list) tokens expression (t/->RightParen))]
+                                        (p/with-use [[_use0] (result/map result)]
+                                          (let [[expressions end tokens] _use0]
+                                            [(option/->Some (->Tuple (->Span start
+                                                                             end)
+                                                                     expressions)) tokens])))
+
+                                      (and (seq tokens) (instance? glexer.token.Bang (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) unit (expression-unit tokens (->RegularExpressionUnit))]
+                                        (p/with-use [[_use0] (result/try* unit)]
+                                          (let [[maybe-expression tokens] _use0]
+                                            (if (instance? gleam.option.Some maybe-expression)
+                                              (let [expression (:value maybe-expression) span (->Span start (:end (:location expression)))]
+                                                (p/->Ok [(option/->Some (->NegateBool span
+                                                                                      expression)) tokens]))
+                                              (unexpected-error tokens)))))
+
+                                      (and (seq tokens) (instance? glexer.token.Minus (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) unit (expression-unit tokens (->RegularExpressionUnit))]
+                                        (p/with-use [[_use0] (result/try* unit)]
+                                          (let [[maybe-expression tokens] _use0]
+                                            (if (instance? gleam.option.Some maybe-expression)
+                                              (let [expression (:value maybe-expression) span (->Span start (:end (:location expression)))]
+                                                (p/->Ok [(option/->Some (->NegateInt span
+                                                                                     expression)) tokens]))
+                                              (unexpected-error tokens)))))
+
+                                      (and (seq tokens) (instance? glexer.token.LeftBrace (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+                                        (p/with-use [[_use0] (result/map (statements (list)
+                                                                                     tokens))]
+                                          (let [[statements end tokens] _use0]
+                                            [(option/->Some (->Block (->Span start
+                                                                             end)
+                                                                     statements)) tokens])))
+
+                                      (and (seq tokens) (instance? glexer.token.LessLess (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) parser (fn [_capture] (bit-string-segment expression expression _capture)) result (comma-delimited (list) tokens parser (t/->GreaterGreater))]
+                                        (p/with-use [[_use0] (result/map result)]
+                                          (let [[segments end tokens] _use0]
+                                            [(option/->Some (->BitString (->Span start
+                                                                                 end)
+                                                                         segments)) tokens])))
+
+                                      (and (seq tokens) (instance? glexer.token.Echo (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+                                      (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (if (instance? ExpressionUnitAfterPipe context) (let [span (span-from-string start "echo")] (p/->Ok [span (option/->None) tokens])) (result/map (expression tokens) (fn [expression-and-tokens] (let [[expression tokens] expression-and-tokens span (->Span start (:end (:location expression)))] [span (option/->Some expression) tokens]))))]
+                                        (p/with-use [[_use0] (result/try* result)]
+                                          (let [[span echo-expression tokens] _use0]
+                                            (if (and (seq tokens) (instance? glexer.token.As (nth (first tokens) 0)))
+                                              (let [tokens (rest tokens)]
+                                                (p/with-use [[_use0] (result/map (expression tokens))]
+                                                  (let [[message tokens] _use0
+                                                        span (->Span (:start span)
+                                                                     (:end (:location message)))]
+                                                    [(option/->Some (->Echo span
+                                                                            echo-expression
+                                                                            (option/->Some message))) tokens])))
+                                              (p/->Ok [(option/->Some (->Echo span
+                                                                              echo-expression
+                                                                              (option/->None))) tokens])))))
+
+                                      :else
+                                      (p/->Ok [(option/->None) tokens])))]
     (let [[parsed tokens] _use0]
       (if (instance? gleam.option.Some parsed)
         (let [expression (:value parsed) subject (after-expression expression tokens)]
@@ -1336,24 +1567,27 @@
 
 (defn- statement [tokens]
   (cond
-    (and (<= 2 (count tokens)) (instance? glexer.token.Let (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Assert (nth (nth tokens 1) 0))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2)]
-                                                                                                                                                                                                (assignment (->LetAssert (option/->None))
-                                                                                                                                                                                                            tokens
-                                                                                                                                                                                                            start))
-    (and (seq tokens) (instance? glexer.token.Let (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                (assignment (->Let)
-                                                                                                                                            tokens
-                                                                                                                                            start))
-    (and (seq tokens) (instance? glexer.token.Use (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                (use- tokens
-                                                                                                                                      start))
-    (and (seq tokens) (instance? glexer.token.Assert (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                   (assert- tokens
-                                                                                                                                            start))
-    :else (let [tokens tokens]
-            (p/with-use [[_use0] (result/try* (expression tokens))]
-              (let [[expression tokens] _use0]
-                (p/->Ok [(->Expression expression) tokens]))))))
+    (and (<= 2 (count tokens)) (instance? glexer.token.Let (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Assert (nth (nth tokens 1) 0)))
+    (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2)]
+      (assignment (->LetAssert (option/->None)) tokens start))
+
+    (and (seq tokens) (instance? glexer.token.Let (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (assignment (->Let) tokens start))
+
+    (and (seq tokens) (instance? glexer.token.Use (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (use- tokens start))
+
+    (and (seq tokens) (instance? glexer.token.Assert (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (assert- tokens start))
+
+    :else
+    (let [tokens tokens]
+      (p/with-use [[_use0] (result/try* (expression tokens))]
+        (let [[expression tokens] _use0]
+          (p/->Ok [(->Expression expression) tokens]))))))
 
 (defn- statements [acc tokens]
   (if (and (seq tokens) (instance? glexer.token.RightBrace (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
@@ -1365,18 +1599,29 @@
 
 (defn- function-parameter [tokens]
   (p/with-use [[_use0] (result/try* (cond
-                                      (empty? tokens) (p/->Error (->UnexpectedEndOfInput))
-                                      (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 1) 0))) (let [label (:value (nth (first tokens) 0)) name (:value (nth (nth tokens 1) 0)) tokens (nthrest tokens 2)]
-                                                                                                                                                                                     (p/->Ok [(option/->Some label) (->Discarded name) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.DiscardName (nth (first tokens) 0))) (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
-                                                                                                                       (p/->Ok [(option/->None) (->Discarded name) tokens]))
-                                      (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0))) (let [label (:value (nth (first tokens) 0)) name (:value (nth (nth tokens 1) 0)) tokens (nthrest tokens 2)]
-                                                                                                                                                                              (p/->Ok [(option/->Some label) (->Named name) tokens]))
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0))) (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
-                                                                                                                (p/->Ok [(option/->None) (->Named name) tokens]))
-                                      (seq tokens) (let [token (nth (first tokens) 0) position (nth (first tokens) 1)]
-                                                     (p/->Error (->UnexpectedToken token
-                                                                                   position)))))]
+                                      (empty? tokens)
+                                      (p/->Error (->UnexpectedEndOfInput))
+
+                                      (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 1) 0)))
+                                      (let [label (:value (nth (first tokens) 0)) name (:value (nth (nth tokens 1) 0)) tokens (nthrest tokens 2)]
+                                        (p/->Ok [(option/->Some label) (->Discarded name) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.DiscardName (nth (first tokens) 0)))
+                                      (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
+                                        (p/->Ok [(option/->None) (->Discarded name) tokens]))
+
+                                      (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)))
+                                      (let [label (:value (nth (first tokens) 0)) name (:value (nth (nth tokens 1) 0)) tokens (nthrest tokens 2)]
+                                        (p/->Ok [(option/->Some label) (->Named name) tokens]))
+
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)))
+                                      (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
+                                        (p/->Ok [(option/->None) (->Named name) tokens]))
+
+                                      (seq tokens)
+                                      (let [token (nth (first tokens) 0) position (nth (first tokens) 1)]
+                                        (p/->Error (->UnexpectedToken token
+                                                                      position)))))]
     (let [[label parameter tokens] _use0]
       (p/with-use [[_use0] (result/try* (optional-type-annotation tokens))]
         (let [[type- tokens] _use0]
@@ -1413,12 +1658,16 @@
 
 (defn- expect-name [tokens next]
   (cond
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))
-    (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0))) (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
-                                                                              (next name
-                                                                                    tokens))
-    (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                   (p/->Error (->UnexpectedToken other position)))))
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))
+
+    (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)))
+    (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
+      (next name tokens))
+
+    (seq tokens)
+    (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+      (p/->Error (->UnexpectedToken other position)))))
 
 (defn- const-definition [module attributes publicity tokens start]
   (p/with-use [[name tokens] (expect-name tokens)
@@ -1456,22 +1705,30 @@
 
 (defn- expect-upper-name [tokens next]
   (cond
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))
-    (and (seq tokens) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [name (:value (nth (first tokens) 0)) end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                      (next name
-                                                                                                                                            end
-                                                                                                                                            tokens))
-    (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                   (p/->Error (->UnexpectedToken other position)))))
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))
+
+    (and (seq tokens) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [name (:value (nth (first tokens) 0)) end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (next name end tokens))
+
+    (seq tokens)
+    (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+      (p/->Error (->UnexpectedToken other position)))))
 
 (defn- attribute [tokens]
   (p/with-use [[_use0] (result/try* (cond
-                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0))) (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
-                                                                                                                (p/->Ok [name tokens]))
-                                      (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                                                     (p/->Error (->UnexpectedToken other
-                                                                                   position)))
-                                      (empty? tokens) (p/->Error (->UnexpectedEndOfInput))))]
+                                      (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)))
+                                      (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
+                                        (p/->Ok [name tokens]))
+
+                                      (seq tokens)
+                                      (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+                                        (p/->Error (->UnexpectedToken other
+                                                                      position)))
+
+                                      (empty? tokens)
+                                      (p/->Error (->UnexpectedEndOfInput))))]
     (let [[name tokens] _use0]
       (if (and (seq tokens) (instance? glexer.token.LeftParen (nth (first tokens) 0)))
         (let [tokens (rest tokens) result (comma-delimited (list) tokens expression (t/->RightParen))]
@@ -1492,16 +1749,20 @@
 
 (defn- until [limit acc tokens callback]
   (cond
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))
-    (and (seq tokens) (instance? glexer.Position (nth (first tokens) 1)) (= (nth (first tokens) 0) limit)) (let [token (nth (first tokens) 0) i (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                             (p/->Ok [acc (string-offset i
-                                                                                                                                     (t/to-source token)) tokens]))
-    (seq tokens) (let [subject (callback acc tokens)]
-                   (if (instance? Ok subject)
-                     (let [acc (nth (:value subject) 0) tokens (nth (:value subject) 1)]
-                       (recur limit acc tokens callback))
-                     (let [error (:value subject)]
-                       (p/->Error error))))))
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))
+
+    (and (seq tokens) (instance? glexer.Position (nth (first tokens) 1)) (= (nth (first tokens) 0) limit))
+    (let [token (nth (first tokens) 0) i (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (p/->Ok [acc (string-offset i (t/to-source token)) tokens]))
+
+    (seq tokens)
+    (let [subject (callback acc tokens)]
+      (if (instance? Ok subject)
+        (let [acc (nth (:value subject) 0) tokens (nth (:value subject) 1)]
+          (recur limit acc tokens callback))
+        (let [error (:value subject)]
+          (p/->Error error))))))
 
 (defn- variants [ct tokens]
   (p/with-use [[ct tokens] (until (t/->RightBrace) ct tokens)
@@ -1509,14 +1770,19 @@
     (let [[attributes tokens] _use0]
       (p/with-use [[name _ tokens] (expect-upper-name tokens)
                    [_use0] (result/try* (cond
-                                          (and (<= 2 (count tokens)) (instance? glexer.token.LeftParen (nth (first tokens) 0)) (instance? glexer.token.RightParen (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1))) (let [i (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
-                                                                                                                                                                                                                                                (p/->Ok [(list) i tokens]))
-                                          (and (seq tokens) (instance? glexer.token.LeftParen (nth (first tokens) 0))) (let [tokens (rest tokens)]
-                                                                                                                         (comma-delimited (list)
-                                                                                                                                          tokens
-                                                                                                                                          variant-field
-                                                                                                                                          (t/->RightParen)))
-                                          :else (p/->Ok [(list) 0 tokens])))]
+                                          (and (<= 2 (count tokens)) (instance? glexer.token.LeftParen (nth (first tokens) 0)) (instance? glexer.token.RightParen (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
+                                          (let [i (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
+                                            (p/->Ok [(list) i tokens]))
+
+                                          (and (seq tokens) (instance? glexer.token.LeftParen (nth (first tokens) 0)))
+                                          (let [tokens (rest tokens)]
+                                            (comma-delimited (list)
+                                                             tokens
+                                                             variant-field
+                                                             (t/->RightParen)))
+
+                                          :else
+                                          (p/->Ok [(list) 0 tokens])))]
         (let [[fields _ tokens] _use0
               ct (push-variant ct (->Variant name fields attributes))]
           (p/->Ok [ct tokens]))))))
@@ -1547,11 +1813,16 @@
 
 (defn- name [tokens]
   (cond
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))
-    (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0))) (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
-                                                                              (p/->Ok [name tokens]))
-    (seq tokens) (let [token (nth (first tokens) 0) position (nth (first tokens) 1)]
-                   (p/->Error (->UnexpectedToken token position)))))
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))
+
+    (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)))
+    (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
+      (p/->Ok [name tokens]))
+
+    (seq tokens)
+    (let [token (nth (first tokens) 0) position (nth (first tokens) 1)]
+      (p/->Error (->UnexpectedToken token position)))))
 
 (defn- type-definition [module attributes publicity opaque- tokens start]
   (p/with-use [[name-value name-start tokens] (expect-upper-name tokens)
@@ -1565,95 +1836,132 @@
                                                               name-value) tokens])))]
     (let [[parameters end tokens] _use0]
       (cond
-        (and (seq tokens) (instance? glexer.token.Equal (nth (first tokens) 0))) (let [tokens (rest tokens)]
-                                                                                   (type-alias module
-                                                                                               attributes
-                                                                                               name-value
-                                                                                               parameters
-                                                                                               publicity
-                                                                                               start
-                                                                                               tokens))
-        (and (seq tokens) (instance? glexer.token.LeftBrace (nth (first tokens) 0))) (let [tokens (rest tokens)]
-                                                                                       (-> module
-                                                                                           (custom-type attributes
-                                                                                                        name-value
-                                                                                                        parameters
-                                                                                                        publicity
-                                                                                                        opaque-
-                                                                                                        tokens
-                                                                                                        start)))
-        :else (let [span (->Span start end)
-                    ct (->CustomType span
-                                     name-value
-                                     publicity
-                                     opaque-
-                                     parameters
-                                     (list))
-                    module (push-custom-type module attributes ct)]
-                (p/->Ok [module tokens]))))))
+        (and (seq tokens) (instance? glexer.token.Equal (nth (first tokens) 0)))
+        (let [tokens (rest tokens)]
+          (type-alias module
+                      attributes
+                      name-value
+                      parameters
+                      publicity
+                      start
+                      tokens))
+
+        (and (seq tokens) (instance? glexer.token.LeftBrace (nth (first tokens) 0)))
+        (let [tokens (rest tokens)]
+          (-> module
+              (custom-type attributes
+                           name-value
+                           parameters
+                           publicity
+                           opaque-
+                           tokens
+                           start)))
+
+        :else
+        (let [span (->Span start end)
+              ct (->CustomType span
+                               name-value
+                               publicity
+                               opaque-
+                               parameters
+                               (list))
+              module (push-custom-type module attributes ct)]
+          (p/->Ok [module tokens]))))))
 
 (defn- optional-module-alias [tokens end]
   (cond
-    (and (<= 2 (count tokens)) (instance? glexer.token.As (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1))) (let [alias (:value (nth (nth tokens 1) 0)) alias-start (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
-                                                                                                                                                                                             [(option/->Some (->Named alias)) (string-offset alias-start
-                                                                                                                                                                                                             alias) tokens])
-    (and (<= 2 (count tokens)) (instance? glexer.token.As (nth (first tokens) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1))) (let [alias (:value (nth (nth tokens 1) 0)) alias-start (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
-                                                                                                                                                                                                    [(option/->Some (->Discarded alias)) (+' (string-offset alias-start
-                                                                                                                                                                                                                    alias) 1) tokens])
-    :else [(option/->None) end tokens]))
+    (and (<= 2 (count tokens)) (instance? glexer.token.As (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
+    (let [alias (:value (nth (nth tokens 1) 0)) alias-start (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
+      [(option/->Some (->Named alias)) (string-offset alias-start alias) tokens])
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.As (nth (first tokens) 0)) (instance? glexer.token.DiscardName (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
+    (let [alias (:value (nth (nth tokens 1) 0)) alias-start (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
+      [(option/->Some (->Discarded alias)) (+' (string-offset alias-start alias) 1) tokens])
+
+    :else
+    [(option/->None) end tokens]))
 
 (defn- unqualified-imports [types values tokens]
   (cond
-    (empty? tokens) (p/->Error (->UnexpectedEndOfInput))
-    (and (seq tokens) (instance? glexer.token.RightBrace (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
-                                                                                                                                       (p/->Ok (->UnqualifiedImports (list/reverse types)
-                                                                                                                                                                     (list/reverse values)
-                                                                                                                                                                     (+' end 1)
-                                                                                                                                                                     tokens)))
-    (and (<= 4 (count tokens)) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.UpperName (nth (nth tokens 2) 0)) (instance? glexer.token.Comma (nth (nth tokens 3) 0))) (let [name (:value (nth (first tokens) 0)) alias (:value (nth (nth tokens 2) 0)) tokens (nthrest tokens 4) import- (->UnqualifiedImport name (option/->Some alias))]
-                                                                                                                                                                                                                                                               (recur types (list* import- values) tokens))
-    (and (<= 4 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0)) (instance? glexer.token.Comma (nth (nth tokens 3) 0))) (let [name (:value (nth (first tokens) 0)) alias (:value (nth (nth tokens 2) 0)) tokens (nthrest tokens 4) import- (->UnqualifiedImport name (option/->Some alias))]
-                                                                                                                                                                                                                                                     (recur types (list* import- values) tokens))
-    (and (<= 4 (count tokens)) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.UpperName (nth (nth tokens 2) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 3) 0)) (instance? glexer.Position (nth (nth tokens 3) 1))) (let [name (:value (nth (first tokens) 0)) alias (:value (nth (nth tokens 2) 0)) end (:byte-offset (nth (nth tokens 3) 1)) tokens (nthrest tokens 4) import- (->UnqualifiedImport name (option/->Some alias))]
-                                                                                                                                                                                                                                                                                                                       (p/->Ok (->UnqualifiedImports (list/reverse types)
-                                                                                                                                                                                                                                                                                                                                                     (list/reverse (list* import- values))
-                                                                                                                                                                                                                                                                                                                                                     (+' end 1)
-                                                                                                                                                                                                                                                                                                                                                     tokens)))
-    (and (<= 4 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 3) 0)) (instance? glexer.Position (nth (nth tokens 3) 1))) (let [name (:value (nth (first tokens) 0)) alias (:value (nth (nth tokens 2) 0)) end (:byte-offset (nth (nth tokens 3) 1)) tokens (nthrest tokens 4) import- (->UnqualifiedImport name (option/->Some alias))]
-                                                                                                                                                                                                                                                                                                             (p/->Ok (->UnqualifiedImports (list/reverse types)
-                                                                                                                                                                                                                                                                                                                                           (list/reverse (list* import- values))
-                                                                                                                                                                                                                                                                                                                                           (+' end 1)
-                                                                                                                                                                                                                                                                                                                                           tokens)))
-    (and (<= 2 (count tokens)) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.token.Comma (nth (nth tokens 1) 0))) (let [name (:value (nth (first tokens) 0)) tokens (nthrest tokens 2) import- (->UnqualifiedImport name (option/->None))]
-                                                                                                                                                  (recur types (list* import- values) tokens))
-    (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Comma (nth (nth tokens 1) 0))) (let [name (:value (nth (first tokens) 0)) tokens (nthrest tokens 2) import- (->UnqualifiedImport name (option/->None))]
-                                                                                                                                             (recur types (list* import- values) tokens))
-    (and (<= 2 (count tokens)) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1))) (let [name (:value (nth (first tokens) 0)) end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) import- (->UnqualifiedImport name (option/->None))]
-                                                                                                                                                                                                          (p/->Ok (->UnqualifiedImports (list/reverse types)
-                                                                                                                                                                                                                                        (list/reverse (list* import- values))
-                                                                                                                                                                                                                                        (+' end 1)
-                                                                                                                                                                                                                                        tokens)))
-    (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1))) (let [name (:value (nth (first tokens) 0)) end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) import- (->UnqualifiedImport name (option/->None))]
-                                                                                                                                                                                                     (p/->Ok (->UnqualifiedImports (list/reverse types)
-                                                                                                                                                                                                                                   (list/reverse (list* import- values))
-                                                                                                                                                                                                                                   (+' end 1)
-                                                                                                                                                                                                                                   tokens)))
-    (and (<= 5 (count tokens)) (instance? glexer.token.Type (nth (first tokens) 0)) (instance? glexer.token.UpperName (nth (nth tokens 1) 0)) (instance? glexer.token.As (nth (nth tokens 2) 0)) (instance? glexer.token.UpperName (nth (nth tokens 3) 0)) (instance? glexer.token.Comma (nth (nth tokens 4) 0))) (let [name (:value (nth (nth tokens 1) 0)) alias (:value (nth (nth tokens 3) 0)) tokens (nthrest tokens 5) import- (->UnqualifiedImport name (option/->Some alias))]
-                                                                                                                                                                                                                                                                                                                    (recur (list* import- types) values tokens))
-    (and (<= 5 (count tokens)) (instance? glexer.token.Type (nth (first tokens) 0)) (instance? glexer.token.UpperName (nth (nth tokens 1) 0)) (instance? glexer.token.As (nth (nth tokens 2) 0)) (instance? glexer.token.UpperName (nth (nth tokens 3) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 4) 0)) (instance? glexer.Position (nth (nth tokens 4) 1))) (let [name (:value (nth (nth tokens 1) 0)) alias (:value (nth (nth tokens 3) 0)) end (:byte-offset (nth (nth tokens 4) 1)) tokens (nthrest tokens 5) import- (->UnqualifiedImport name (option/->Some alias))]
-                                                                                                                                                                                                                                                                                                                                                                            (p/->Ok (->UnqualifiedImports (list/reverse (list* import- types))
-                                                                                                                                                                                                                                                                                                                                                                                                          (list/reverse values)
-                                                                                                                                                                                                                                                                                                                                                                                                          (+' end 1)
-                                                                                                                                                                                                                                                                                                                                                                                                          tokens)))
-    (and (<= 3 (count tokens)) (instance? glexer.token.Type (nth (first tokens) 0)) (instance? glexer.token.UpperName (nth (nth tokens 1) 0)) (instance? glexer.token.Comma (nth (nth tokens 2) 0))) (let [name (:value (nth (nth tokens 1) 0)) tokens (nthrest tokens 3) import- (->UnqualifiedImport name (option/->None))]
-                                                                                                                                                                                                       (recur (list* import- types) values tokens))
-    (and (<= 3 (count tokens)) (instance? glexer.token.Type (nth (first tokens) 0)) (instance? glexer.token.UpperName (nth (nth tokens 1) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1))) (let [name (:value (nth (nth tokens 1) 0)) end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3) import- (->UnqualifiedImport name (option/->None))]
-                                                                                                                                                                                                                                                               (p/->Ok (->UnqualifiedImports (list/reverse (list* import- types))
-                                                                                                                                                                                                                                                                                             (list/reverse values)
-                                                                                                                                                                                                                                                                                             (+' end 1)
-                                                                                                                                                                                                                                                                                             tokens)))
-    (seq tokens) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                   (p/->Error (->UnexpectedToken other position)))))
+    (empty? tokens)
+    (p/->Error (->UnexpectedEndOfInput))
+
+    (and (seq tokens) (instance? glexer.token.RightBrace (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
+      (p/->Ok (->UnqualifiedImports (list/reverse types)
+                                    (list/reverse values)
+                                    (+' end 1)
+                                    tokens)))
+
+    (and (<= 4 (count tokens)) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.UpperName (nth (nth tokens 2) 0)) (instance? glexer.token.Comma (nth (nth tokens 3) 0)))
+    (let [name (:value (nth (first tokens) 0)) alias (:value (nth (nth tokens 2) 0)) tokens (nthrest tokens 4) import- (->UnqualifiedImport name (option/->Some alias))]
+      (recur types (list* import- values) tokens))
+
+    (and (<= 4 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0)) (instance? glexer.token.Comma (nth (nth tokens 3) 0)))
+    (let [name (:value (nth (first tokens) 0)) alias (:value (nth (nth tokens 2) 0)) tokens (nthrest tokens 4) import- (->UnqualifiedImport name (option/->Some alias))]
+      (recur types (list* import- values) tokens))
+
+    (and (<= 4 (count tokens)) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.UpperName (nth (nth tokens 2) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 3) 0)) (instance? glexer.Position (nth (nth tokens 3) 1)))
+    (let [name (:value (nth (first tokens) 0)) alias (:value (nth (nth tokens 2) 0)) end (:byte-offset (nth (nth tokens 3) 1)) tokens (nthrest tokens 4) import- (->UnqualifiedImport name (option/->Some alias))]
+      (p/->Ok (->UnqualifiedImports (list/reverse types)
+                                    (list/reverse (list* import- values))
+                                    (+' end 1)
+                                    tokens)))
+
+    (and (<= 4 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.As (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 3) 0)) (instance? glexer.Position (nth (nth tokens 3) 1)))
+    (let [name (:value (nth (first tokens) 0)) alias (:value (nth (nth tokens 2) 0)) end (:byte-offset (nth (nth tokens 3) 1)) tokens (nthrest tokens 4) import- (->UnqualifiedImport name (option/->Some alias))]
+      (p/->Ok (->UnqualifiedImports (list/reverse types)
+                                    (list/reverse (list* import- values))
+                                    (+' end 1)
+                                    tokens)))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.token.Comma (nth (nth tokens 1) 0)))
+    (let [name (:value (nth (first tokens) 0)) tokens (nthrest tokens 2) import- (->UnqualifiedImport name (option/->None))]
+      (recur types (list* import- values) tokens))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Comma (nth (nth tokens 1) 0)))
+    (let [name (:value (nth (first tokens) 0)) tokens (nthrest tokens 2) import- (->UnqualifiedImport name (option/->None))]
+      (recur types (list* import- values) tokens))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
+    (let [name (:value (nth (first tokens) 0)) end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) import- (->UnqualifiedImport name (option/->None))]
+      (p/->Ok (->UnqualifiedImports (list/reverse types)
+                                    (list/reverse (list* import- values))
+                                    (+' end 1)
+                                    tokens)))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
+    (let [name (:value (nth (first tokens) 0)) end (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) import- (->UnqualifiedImport name (option/->None))]
+      (p/->Ok (->UnqualifiedImports (list/reverse types)
+                                    (list/reverse (list* import- values))
+                                    (+' end 1)
+                                    tokens)))
+
+    (and (<= 5 (count tokens)) (instance? glexer.token.Type (nth (first tokens) 0)) (instance? glexer.token.UpperName (nth (nth tokens 1) 0)) (instance? glexer.token.As (nth (nth tokens 2) 0)) (instance? glexer.token.UpperName (nth (nth tokens 3) 0)) (instance? glexer.token.Comma (nth (nth tokens 4) 0)))
+    (let [name (:value (nth (nth tokens 1) 0)) alias (:value (nth (nth tokens 3) 0)) tokens (nthrest tokens 5) import- (->UnqualifiedImport name (option/->Some alias))]
+      (recur (list* import- types) values tokens))
+
+    (and (<= 5 (count tokens)) (instance? glexer.token.Type (nth (first tokens) 0)) (instance? glexer.token.UpperName (nth (nth tokens 1) 0)) (instance? glexer.token.As (nth (nth tokens 2) 0)) (instance? glexer.token.UpperName (nth (nth tokens 3) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 4) 0)) (instance? glexer.Position (nth (nth tokens 4) 1)))
+    (let [name (:value (nth (nth tokens 1) 0)) alias (:value (nth (nth tokens 3) 0)) end (:byte-offset (nth (nth tokens 4) 1)) tokens (nthrest tokens 5) import- (->UnqualifiedImport name (option/->Some alias))]
+      (p/->Ok (->UnqualifiedImports (list/reverse (list* import- types))
+                                    (list/reverse values)
+                                    (+' end 1)
+                                    tokens)))
+
+    (and (<= 3 (count tokens)) (instance? glexer.token.Type (nth (first tokens) 0)) (instance? glexer.token.UpperName (nth (nth tokens 1) 0)) (instance? glexer.token.Comma (nth (nth tokens 2) 0)))
+    (let [name (:value (nth (nth tokens 1) 0)) tokens (nthrest tokens 3) import- (->UnqualifiedImport name (option/->None))]
+      (recur (list* import- types) values tokens))
+
+    (and (<= 3 (count tokens)) (instance? glexer.token.Type (nth (first tokens) 0)) (instance? glexer.token.UpperName (nth (nth tokens 1) 0)) (instance? glexer.token.RightBrace (nth (nth tokens 2) 0)) (instance? glexer.Position (nth (nth tokens 2) 1)))
+    (let [name (:value (nth (nth tokens 1) 0)) end (:byte-offset (nth (nth tokens 2) 1)) tokens (nthrest tokens 3) import- (->UnqualifiedImport name (option/->None))]
+      (p/->Ok (->UnqualifiedImports (list/reverse (list* import- types))
+                                    (list/reverse values)
+                                    (+' end 1)
+                                    tokens)))
+
+    (seq tokens)
+    (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+      (p/->Error (->UnexpectedToken other position)))))
 
 (defn- optional-unqualified-imports [tokens end]
   (if (and (<= 2 (count tokens)) (instance? glexer.token.Dot (nth (first tokens) 0)) (instance? glexer.token.LeftBrace (nth (nth tokens 1) 0)))
@@ -1663,15 +1971,23 @@
 
 (defn- module-name [name end tokens]
   (cond
-    (and (<= 2 (count tokens)) (instance? glexer.token.Slash (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)) (not= name "")) (let [i (:byte-offset (nth (nth tokens 1) 1)) s (:value (nth (nth tokens 1) 0)) tokens (nthrest tokens 2) end (+' i (string/byte-size s))]
-                                                                                                                                                                                                               (recur (str (str name "/") s) end tokens))
-    (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (= name "")) (let [i (:byte-offset (nth (first tokens) 1)) s (:value (nth (first tokens) 0)) tokens (rest tokens) end (+' i (string/byte-size s))]
-                                                                                                                                             (recur s end tokens))
-    (and (empty? tokens) (= name "")) (p/->Error (->UnexpectedEndOfInput))
-    (and (seq tokens) (= name "")) (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
-                                     (p/->Error (->UnexpectedToken other
-                                                                   position)))
-    :else (p/->Ok [name end tokens])))
+    (and (<= 2 (count tokens)) (instance? glexer.token.Slash (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)) (not= name ""))
+    (let [i (:byte-offset (nth (nth tokens 1) 1)) s (:value (nth (nth tokens 1) 0)) tokens (nthrest tokens 2) end (+' i (string/byte-size s))]
+      (recur (str (str name "/") s) end tokens))
+
+    (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (= name ""))
+    (let [i (:byte-offset (nth (first tokens) 1)) s (:value (nth (first tokens) 0)) tokens (rest tokens) end (+' i (string/byte-size s))]
+      (recur s end tokens))
+
+    (and (empty? tokens) (= name ""))
+    (p/->Error (->UnexpectedEndOfInput))
+
+    (and (seq tokens) (= name ""))
+    (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
+      (p/->Error (->UnexpectedToken other position)))
+
+    :else
+    (p/->Ok [name end tokens])))
 
 (defn- import-statement [module attributes tokens start]
   (p/with-use [[_use0] (result/try* (module-name "" 0 tokens))]
@@ -1688,63 +2004,66 @@
 
 (defn- slurp [module attributes tokens]
   (cond
-    (and (seq tokens) (instance? glexer.token.At (nth (first tokens) 0))) (let [tokens (rest tokens)]
-                                                                            (p/with-use [[_use0] (result/try* (attribute tokens))]
-                                                                              (let [[attribute tokens] _use0]
-                                                                                (slurp module
-                                                                                       (list* attribute attributes)
-                                                                                       tokens))))
-    (and (seq tokens) (instance? glexer.token.Import (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (import-statement module attributes tokens start)]
-                                                                                                                                   (p/with-use [[_use0] (result/try* result)]
-                                                                                                                                     (let [[module tokens] _use0]
-                                                                                                                                       (slurp module
-                                                                                                                                              (list)
-                                                                                                                                              tokens))))
-    (and (<= 2 (count tokens)) (instance? glexer.token.Pub (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Type (nth (nth tokens 1) 0))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2) result (type-definition module attributes (->Public) false tokens start)]
-                                                                                                                                                                                              (p/with-use [[_use0] (result/try* result)]
-                                                                                                                                                                                                (let [[module tokens] _use0]
-                                                                                                                                                                                                  (slurp module
-                                                                                                                                                                                                         (list)
-                                                                                                                                                                                                         tokens))))
-    (and (<= 3 (count tokens)) (instance? glexer.token.Pub (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Opaque (nth (nth tokens 1) 0)) (instance? glexer.token.Type (nth (nth tokens 2) 0))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 3) result (type-definition module attributes (->Public) true tokens start)]
-                                                                                                                                                                                                                                                     (p/with-use [[_use0] (result/try* result)]
-                                                                                                                                                                                                                                                       (let [[module tokens] _use0]
-                                                                                                                                                                                                                                                         (slurp module
-                                                                                                                                                                                                                                                                (list)
-                                                                                                                                                                                                                                                                tokens))))
-    (and (seq tokens) (instance? glexer.token.Type (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (type-definition module attributes (->Private) false tokens start)]
-                                                                                                                                 (p/with-use [[_use0] (result/try* result)]
-                                                                                                                                   (let [[module tokens] _use0]
-                                                                                                                                     (slurp module
-                                                                                                                                            (list)
-                                                                                                                                            tokens))))
-    (and (<= 2 (count tokens)) (instance? glexer.token.Pub (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Const (nth (nth tokens 1) 0))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2) result (const-definition module attributes (->Public) tokens start)]
-                                                                                                                                                                                               (p/with-use [[_use0] (result/try* result)]
-                                                                                                                                                                                                 (let [[module tokens] _use0]
-                                                                                                                                                                                                   (slurp module
-                                                                                                                                                                                                          (list)
-                                                                                                                                                                                                          tokens))))
-    (and (seq tokens) (instance? glexer.token.Const (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1))) (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (const-definition module attributes (->Private) tokens start)]
-                                                                                                                                  (p/with-use [[_use0] (result/try* result)]
-                                                                                                                                    (let [[module tokens] _use0]
-                                                                                                                                      (slurp module
-                                                                                                                                             (list)
-                                                                                                                                             tokens))))
-    (and (<= 3 (count tokens)) (instance? glexer.token.Pub (nth (first tokens) 0)) (instance? glexer.token.Fn (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0))) (let [start (nth (first tokens) 1) name (:value (nth (nth tokens 2) 0)) tokens (nthrest tokens 3) {start :byte-offset} start result (function-definition module attributes (->Public) name start tokens)]
-                                                                                                                                                                                              (p/with-use [[_use0] (result/try* result)]
-                                                                                                                                                                                                (let [[module tokens] _use0]
-                                                                                                                                                                                                  (slurp module
-                                                                                                                                                                                                         (list)
-                                                                                                                                                                                                         tokens))))
-    (and (<= 2 (count tokens)) (instance? glexer.token.Fn (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0))) (let [start (nth (first tokens) 1) name (:value (nth (nth tokens 1) 0)) tokens (nthrest tokens 2) {start :byte-offset} start result (function-definition module attributes (->Private) name start tokens)]
-                                                                                                                                          (p/with-use [[_use0] (result/try* result)]
-                                                                                                                                            (let [[module tokens] _use0]
-                                                                                                                                              (slurp module
-                                                                                                                                                     (list)
-                                                                                                                                                     tokens))))
-    (empty? tokens) (p/->Ok module)
-    :else (let [tokens tokens]
-            (unexpected-error tokens))))
+    (and (seq tokens) (instance? glexer.token.At (nth (first tokens) 0)))
+    (let [tokens (rest tokens)]
+      (p/with-use [[_use0] (result/try* (attribute tokens))]
+        (let [[attribute tokens] _use0]
+          (slurp module (list* attribute attributes) tokens))))
+
+    (and (seq tokens) (instance? glexer.token.Import (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (import-statement module attributes tokens start)]
+      (p/with-use [[_use0] (result/try* result)]
+        (let [[module tokens] _use0]
+          (slurp module (list) tokens))))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.Pub (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Type (nth (nth tokens 1) 0)))
+    (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2) result (type-definition module attributes (->Public) false tokens start)]
+      (p/with-use [[_use0] (result/try* result)]
+        (let [[module tokens] _use0]
+          (slurp module (list) tokens))))
+
+    (and (<= 3 (count tokens)) (instance? glexer.token.Pub (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Opaque (nth (nth tokens 1) 0)) (instance? glexer.token.Type (nth (nth tokens 2) 0)))
+    (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 3) result (type-definition module attributes (->Public) true tokens start)]
+      (p/with-use [[_use0] (result/try* result)]
+        (let [[module tokens] _use0]
+          (slurp module (list) tokens))))
+
+    (and (seq tokens) (instance? glexer.token.Type (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (type-definition module attributes (->Private) false tokens start)]
+      (p/with-use [[_use0] (result/try* result)]
+        (let [[module tokens] _use0]
+          (slurp module (list) tokens))))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.Pub (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Const (nth (nth tokens 1) 0)))
+    (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2) result (const-definition module attributes (->Public) tokens start)]
+      (p/with-use [[_use0] (result/try* result)]
+        (let [[module tokens] _use0]
+          (slurp module (list) tokens))))
+
+    (and (seq tokens) (instance? glexer.token.Const (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
+    (let [start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens) result (const-definition module attributes (->Private) tokens start)]
+      (p/with-use [[_use0] (result/try* result)]
+        (let [[module tokens] _use0]
+          (slurp module (list) tokens))))
+
+    (and (<= 3 (count tokens)) (instance? glexer.token.Pub (nth (first tokens) 0)) (instance? glexer.token.Fn (nth (nth tokens 1) 0)) (instance? glexer.token.Name (nth (nth tokens 2) 0)))
+    (let [start (nth (first tokens) 1) name (:value (nth (nth tokens 2) 0)) tokens (nthrest tokens 3) {start :byte-offset} start result (function-definition module attributes (->Public) name start tokens)]
+      (p/with-use [[_use0] (result/try* result)]
+        (let [[module tokens] _use0]
+          (slurp module (list) tokens))))
+
+    (and (<= 2 (count tokens)) (instance? glexer.token.Fn (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)))
+    (let [start (nth (first tokens) 1) name (:value (nth (nth tokens 1) 0)) tokens (nthrest tokens 2) {start :byte-offset} start result (function-definition module attributes (->Private) name start tokens)]
+      (p/with-use [[_use0] (result/try* result)]
+        (let [[module tokens] _use0]
+          (slurp module (list) tokens))))
+
+    (empty? tokens)
+    (p/->Ok module)
+
+    :else
+    (let [tokens tokens]
+      (unexpected-error tokens))))
 
 (defn module
   {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}

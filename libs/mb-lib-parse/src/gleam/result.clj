@@ -283,11 +283,16 @@
 
 (defn- partition-loop [results oks errors]
   (cond
-    (empty? results) [oks errors]
-    (and (seq results) (instance? Ok (first results))) (let [a (:value (first results)) rest' (rest results)]
-                                                         (recur rest' (list* a oks) errors))
-    (and (seq results) (instance? gleam.prelude.Error (first results))) (let [e (:value (first results)) rest' (rest results)]
-                                                                          (recur rest' oks (list* e errors)))))
+    (empty? results)
+    [oks errors]
+
+    (and (seq results) (instance? Ok (first results)))
+    (let [a (:value (first results)) rest' (rest results)]
+      (recur rest' (list* a oks) errors))
+
+    (and (seq results) (instance? gleam.prelude.Error (first results)))
+    (let [e (:value (first results)) rest' (rest results)]
+      (recur rest' oks (list* e errors)))))
 
 (defn partition
   "Given a list of results, returns a pair where the first element is a list

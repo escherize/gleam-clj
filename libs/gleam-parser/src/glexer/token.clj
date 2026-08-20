@@ -164,92 +164,245 @@
                       :string]}
   [tok]
   (cond
-    (instance? Name tok) (let [str' (:value tok)]
-                           str')
-    (instance? UpperName tok) (let [str' (:value tok)]
-                                str')
-    (instance? Int tok) (let [str' (:value tok)]
-                          str')
-    (instance? Float tok) (let [str' (:value tok)]
-                            str')
-    (instance? DiscardName tok) (let [str' (:value tok)]
-                                  (str "_" str'))
-    (instance? String tok) (let [str' (:value tok)]
-                             (str (str "\"" str') "\""))
-    (instance? CommentDoc tok) (let [str' (:value tok)]
-                                 (str "///" str'))
-    (instance? CommentNormal tok) (let [str' (:value tok)]
-                                    (str "//" str'))
-    (instance? CommentModule tok) (let [str' (:value tok)]
-                                    (str "////" str'))
-    (instance? As tok) "as"
-    (instance? Assert tok) "assert"
-    (instance? Auto tok) "auto"
-    (instance? Case tok) "case"
-    (instance? Const tok) "const"
-    (instance? Delegate tok) "delegate"
-    (instance? Derive tok) "derive"
-    (instance? Echo tok) "echo"
-    (instance? Else tok) "else"
-    (instance? Fn tok) "fn"
-    (instance? If tok) "if"
-    (instance? Implement tok) "implement"
-    (instance? Import tok) "import"
-    (instance? Let tok) "let"
-    (instance? Macro tok) "macro"
-    (instance? Opaque tok) "opaque"
-    (instance? Panic tok) "panic"
-    (instance? Pub tok) "pub"
-    (instance? Test tok) "test"
-    (instance? Todo tok) "todo"
-    (instance? Type tok) "type"
-    (instance? Use tok) "use"
-    (instance? LeftParen tok) "("
-    (instance? RightParen tok) ")"
-    (instance? LeftBrace tok) "{"
-    (instance? RightBrace tok) "}"
-    (instance? LeftSquare tok) "["
-    (instance? RightSquare tok) "]"
-    (instance? Plus tok) "+"
-    (instance? Minus tok) "-"
-    (instance? Star tok) "*"
-    (instance? Slash tok) "/"
-    (instance? Less tok) "<"
-    (instance? Greater tok) ">"
-    (instance? LessEqual tok) "<="
-    (instance? GreaterEqual tok) ">="
-    (instance? Percent tok) "%"
-    (instance? PlusDot tok) "+."
-    (instance? MinusDot tok) "-."
-    (instance? StarDot tok) "*."
-    (instance? SlashDot tok) "/."
-    (instance? LessDot tok) "<."
-    (instance? GreaterDot tok) ">."
-    (instance? LessEqualDot tok) "<=."
-    (instance? GreaterEqualDot tok) ">=."
-    (instance? LessGreater tok) "<>"
-    (instance? At tok) "@"
-    (instance? Colon tok) ":"
-    (instance? Comma tok) ","
-    (instance? Hash tok) "#"
-    (instance? Bang tok) "!"
-    (instance? Equal tok) "="
-    (instance? EqualEqual tok) "=="
-    (instance? NotEqual tok) "!="
-    (instance? VBar tok) "|"
-    (instance? VBarVBar tok) "||"
-    (instance? AmperAmper tok) "&&"
-    (instance? LessLess tok) "<<"
-    (instance? GreaterGreater tok) ">>"
-    (instance? Pipe tok) "|>"
-    (instance? Dot tok) "."
-    (instance? DotDot tok) ".."
-    (instance? LeftArrow tok) "<-"
-    (instance? RightArrow tok) "->"
-    (instance? EndOfFile tok) ""
-    (instance? Space tok) (let [str' (:value tok)]
-                            str')
-    (instance? UnterminatedString tok) (let [str' (:value tok)]
-                                         (str "\"" str'))
-    (instance? UnexpectedGrapheme tok) (let [str' (:value tok)]
-                                         str')))
+    (instance? Name tok)
+    (let [str' (:value tok)]
+      str')
+
+    (instance? UpperName tok)
+    (let [str' (:value tok)]
+      str')
+
+    (instance? Int tok)
+    (let [str' (:value tok)]
+      str')
+
+    (instance? Float tok)
+    (let [str' (:value tok)]
+      str')
+
+    (instance? DiscardName tok)
+    (let [str' (:value tok)]
+      (str "_" str'))
+
+    (instance? String tok)
+    (let [str' (:value tok)]
+      (str (str "\"" str') "\""))
+
+    (instance? CommentDoc tok)
+    (let [str' (:value tok)]
+      (str "///" str'))
+
+    (instance? CommentNormal tok)
+    (let [str' (:value tok)]
+      (str "//" str'))
+
+    (instance? CommentModule tok)
+    (let [str' (:value tok)]
+      (str "////" str'))
+
+    (instance? As tok)
+    "as"
+
+    (instance? Assert tok)
+    "assert"
+
+    (instance? Auto tok)
+    "auto"
+
+    (instance? Case tok)
+    "case"
+
+    (instance? Const tok)
+    "const"
+
+    (instance? Delegate tok)
+    "delegate"
+
+    (instance? Derive tok)
+    "derive"
+
+    (instance? Echo tok)
+    "echo"
+
+    (instance? Else tok)
+    "else"
+
+    (instance? Fn tok)
+    "fn"
+
+    (instance? If tok)
+    "if"
+
+    (instance? Implement tok)
+    "implement"
+
+    (instance? Import tok)
+    "import"
+
+    (instance? Let tok)
+    "let"
+
+    (instance? Macro tok)
+    "macro"
+
+    (instance? Opaque tok)
+    "opaque"
+
+    (instance? Panic tok)
+    "panic"
+
+    (instance? Pub tok)
+    "pub"
+
+    (instance? Test tok)
+    "test"
+
+    (instance? Todo tok)
+    "todo"
+
+    (instance? Type tok)
+    "type"
+
+    (instance? Use tok)
+    "use"
+
+    (instance? LeftParen tok)
+    "("
+
+    (instance? RightParen tok)
+    ")"
+
+    (instance? LeftBrace tok)
+    "{"
+
+    (instance? RightBrace tok)
+    "}"
+
+    (instance? LeftSquare tok)
+    "["
+
+    (instance? RightSquare tok)
+    "]"
+
+    (instance? Plus tok)
+    "+"
+
+    (instance? Minus tok)
+    "-"
+
+    (instance? Star tok)
+    "*"
+
+    (instance? Slash tok)
+    "/"
+
+    (instance? Less tok)
+    "<"
+
+    (instance? Greater tok)
+    ">"
+
+    (instance? LessEqual tok)
+    "<="
+
+    (instance? GreaterEqual tok)
+    ">="
+
+    (instance? Percent tok)
+    "%"
+
+    (instance? PlusDot tok)
+    "+."
+
+    (instance? MinusDot tok)
+    "-."
+
+    (instance? StarDot tok)
+    "*."
+
+    (instance? SlashDot tok)
+    "/."
+
+    (instance? LessDot tok)
+    "<."
+
+    (instance? GreaterDot tok)
+    ">."
+
+    (instance? LessEqualDot tok)
+    "<=."
+
+    (instance? GreaterEqualDot tok)
+    ">=."
+
+    (instance? LessGreater tok)
+    "<>"
+
+    (instance? At tok)
+    "@"
+
+    (instance? Colon tok)
+    ":"
+
+    (instance? Comma tok)
+    ","
+
+    (instance? Hash tok)
+    "#"
+
+    (instance? Bang tok)
+    "!"
+
+    (instance? Equal tok)
+    "="
+
+    (instance? EqualEqual tok)
+    "=="
+
+    (instance? NotEqual tok)
+    "!="
+
+    (instance? VBar tok)
+    "|"
+
+    (instance? VBarVBar tok)
+    "||"
+
+    (instance? AmperAmper tok)
+    "&&"
+
+    (instance? LessLess tok)
+    "<<"
+
+    (instance? GreaterGreater tok)
+    ">>"
+
+    (instance? Pipe tok)
+    "|>"
+
+    (instance? Dot tok)
+    "."
+
+    (instance? DotDot tok)
+    ".."
+
+    (instance? LeftArrow tok)
+    "<-"
+
+    (instance? RightArrow tok)
+    "->"
+
+    (instance? EndOfFile tok)
+    ""
+
+    (instance? Space tok)
+    (let [str' (:value tok)]
+      str')
+
+    (instance? UnterminatedString tok)
+    (let [str' (:value tok)]
+      (str "\"" str'))
+
+    (instance? UnexpectedGrapheme tok)
+    (let [str' (:value tok)]
+      str')))

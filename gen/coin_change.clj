@@ -22,13 +22,18 @@
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [coins amount]
   (cond
-    (= amount 0) (p/->Ok 0)
-    (< amount 0) (p/->Error nil)
-    :else (-> (int/range 1
-                         (+' amount 1)
-                         (dict/from-list (list [0 0]))
-                         (fn [table a] (step coins table a)))
-              (dict/get amount))))
+    (= amount 0)
+    (p/->Ok 0)
+
+    (< amount 0)
+    (p/->Error nil)
+
+    :else
+    (-> (int/range 1
+                   (+' amount 1)
+                   (dict/from-list (list [0 0]))
+                   (fn [table a] (step coins table a)))
+        (dict/get amount))))
 
 (defn main
   {:malli/schema [:=> [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]}

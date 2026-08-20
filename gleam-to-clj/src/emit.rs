@@ -1498,14 +1498,38 @@ fn emit_case(
             format!("(if {t}\n{i2}{b1}\n{i2}{b2})", i2 = sp(ind + 2))
         }
     } else {
-        let mut out = String::from("(cond\n");
         let n = branches.len();
-        for (i, (test, used, then)) in branches.iter().enumerate() {
-            let last = i + 1 == n;
-            let test = if last && test == "true" { ":else".to_string() } else { test.clone() };
-            let body = emit_branch_body(used, then, ind + 2 + test.len() + 1);
-            let _ = write!(out, "{}{test} {}", sp(ind + 2), body);
-            out.push_str(if last { ")" } else { "\n" });
+        let tests: Vec<String> = branches
+            .iter()
+            .enumerate()
+            .map(|(i, (test, _, _))| {
+                if i + 1 == n && test == "true" { ":else".to_string() } else { test.clone() }
+            })
+            .collect();
+        // Compact when every `test body` pair fits on one line; otherwise
+        // stack: test on its own line, body at a fixed indent, blank line
+        // between branches.
+        let compact_bodies: Vec<String> = branches
+            .iter()
+            .zip(&tests)
+            .map(|((_, used, then), test)| emit_branch_body(used, then, ind + 2 + test.len() + 1))
+            .collect();
+        let compact_ok = compact_bodies
+            .iter()
+            .zip(&tests)
+            .all(|(body, test)| !body.contains('\n') && fits(&format!("{test} {body}"), ind + 2));
+        let mut out = String::from("(cond\n");
+        if compact_ok {
+            for (i, (test, body)) in tests.iter().zip(&compact_bodies).enumerate() {
+                let _ = write!(out, "{}{test} {}", sp(ind + 2), body);
+                out.push_str(if i + 1 == n { ")" } else { "\n" });
+            }
+        } else {
+            for (i, ((_, used, then), test)) in branches.iter().zip(&tests).enumerate() {
+                let body = emit_branch_body(used, then, ind + 2);
+                let _ = write!(out, "{}{test}\n{}{body}", sp(ind + 2), sp(ind + 2));
+                out.push_str(if i + 1 == n { ")" } else { "\n\n" });
+            }
         }
         out
     };

@@ -131,15 +131,24 @@
 
 (defn- to-list [stack acc]
   (cond
-    (empty? stack) acc
-    (and (seq stack) (empty? (first stack))) (let [remaining-stack (rest stack)]
-                                               (recur remaining-stack acc))
-    (and (seq stack) (seq (first stack)) (instance? Bytes (first (first stack)))) (let [bits (:value (first (first stack))) rest' (rest (first stack)) remaining-stack (rest stack)]
-                                                                                    (recur (list* rest' remaining-stack) (list* bits acc)))
-    (and (seq stack) (seq (first stack)) (instance? Text (first (first stack)))) (let [tree (:value (first (first stack))) rest' (rest (first stack)) remaining-stack (rest stack) bits (bit_array/from-string (string_tree/to-string tree))]
-                                                                                   (recur (list* rest' remaining-stack) (list* bits acc)))
-    (and (seq stack) (seq (first stack)) (instance? Many (first (first stack)))) (let [trees (:value (first (first stack))) rest' (rest (first stack)) remaining-stack (rest stack)]
-                                                                                   (recur (list* trees rest' remaining-stack) acc))))
+    (empty? stack)
+    acc
+
+    (and (seq stack) (empty? (first stack)))
+    (let [remaining-stack (rest stack)]
+      (recur remaining-stack acc))
+
+    (and (seq stack) (seq (first stack)) (instance? Bytes (first (first stack))))
+    (let [bits (:value (first (first stack))) rest' (rest (first stack)) remaining-stack (rest stack)]
+      (recur (list* rest' remaining-stack) (list* bits acc)))
+
+    (and (seq stack) (seq (first stack)) (instance? Text (first (first stack))))
+    (let [tree (:value (first (first stack))) rest' (rest (first stack)) remaining-stack (rest stack) bits (bit_array/from-string (string_tree/to-string tree))]
+      (recur (list* rest' remaining-stack) (list* bits acc)))
+
+    (and (seq stack) (seq (first stack)) (instance? Many (first (first stack))))
+    (let [trees (:value (first (first stack))) rest' (rest (first stack)) remaining-stack (rest stack)]
+      (recur (list* trees rest' remaining-stack) acc))))
 
 (defn to-bit-array
   "Turns a bytes tree into a bit array.

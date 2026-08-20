@@ -452,11 +452,18 @@
   {:malli/schema [:=> [:cat :int] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [value]
   (cond
-    (> value 1114111) (p/->Error nil)
-    (and (>= value 55296) (<= value 57343)) (p/->Error nil)
-    (< value 0) (p/->Error nil)
-    :else (let [i value]
-            (p/->Ok (unsafe-int-to-utf-codepoint i)))))
+    (> value 1114111)
+    (p/->Error nil)
+
+    (and (>= value 55296) (<= value 57343))
+    (p/->Error nil)
+
+    (< value 0)
+    (p/->Error nil)
+
+    :else
+    (let [i value]
+      (p/->Ok (unsafe-int-to-utf-codepoint i)))))
 
 (def ^{:malli/schema [:=> [:cat :int] :int]} utf-codepoint-to-int gleam-ffi/identity1)
 
@@ -522,12 +529,17 @@
   [string]
   (let [subject (pop-grapheme string)]
     (cond
-      (and (instance? Ok subject) (= (nth (:value subject) 1) "")) (let [first' (nth (:value subject) 0)]
-                                                                     (p/->Ok first'))
-      (instance? Ok subject) (let [rest' (nth (:value subject) 1)]
-                               (p/->Ok (slice rest' -1 1)))
-      (instance? gleam.prelude.Error subject) (let [e (:value subject)]
-                                                (p/->Error e)))))
+      (and (instance? Ok subject) (= (nth (:value subject) 1) ""))
+      (let [first' (nth (:value subject) 0)]
+        (p/->Ok first'))
+
+      (instance? Ok subject)
+      (let [rest' (nth (:value subject) 1)]
+        (p/->Ok (slice rest' -1 1)))
+
+      (instance? gleam.prelude.Error subject)
+      (let [e (:value subject)]
+        (p/->Error e)))))
 
 (defn capitalise
   "Creates a new `String` with the first grapheme in the input `String`

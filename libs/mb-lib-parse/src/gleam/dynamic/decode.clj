@@ -191,15 +191,17 @@
     (-> data inner (push-path (list/reverse position)))
     (let [key (first path) path (rest path) subject (bare-index data key)]
       (cond
-        (and (instance? Ok subject) (instance? gleam.option.Some (:value subject))) (let [data (:value (:value subject))]
-                                                                                      (recur path (list* key position) inner data handle-miss))
-        (and (instance? Ok subject) (instance? gleam.option.None (:value subject))) (handle-miss data
-                                                                                                 (list* key position))
-        (instance? gleam.prelude.Error subject) (let [kind (:value subject) [default _] (inner data)]
-                                                  (-> [default (list (->DecodeError kind
-                                                                            (dynamic/classify data)
-                                                                            (list)))]
-                                                      (push-path (list/reverse position))))))))
+        (and (instance? Ok subject) (instance? gleam.option.Some (:value subject)))
+        (let [data (:value (:value subject))]
+          (recur path (list* key position) inner data handle-miss))
+
+        (and (instance? Ok subject) (instance? gleam.option.None (:value subject)))
+        (handle-miss data (list* key position))
+
+        (instance? gleam.prelude.Error subject)
+        (let [kind (:value subject) [default _] (inner data)]
+          (-> [default (list (->DecodeError kind (dynamic/classify data) (list)))]
+              (push-path (list/reverse position))))))))
 
 (defn subfield
   "The same as [`field`](#field), except taking a path to the value rather
@@ -393,13 +395,18 @@
   (->Decoder (fn [data]
                (let [[out errors1] (-> (let [subject (bare-index data key)]
                                          (cond
-                                           (and (instance? Ok subject) (instance? gleam.option.Some (:value subject))) (let [data (:value (:value subject))]
-                                                                                                                         ((:function field-decoder) data))
-                                           (and (instance? Ok subject) (instance? gleam.option.None (:value subject))) [default (list)]
-                                           (instance? gleam.prelude.Error subject) (let [kind (:value subject)]
-                                                                                     [default (list (->DecodeError kind
-                                                                                                           (dynamic/classify data)
-                                                                                                           (list)))])))
+                                           (and (instance? Ok subject) (instance? gleam.option.Some (:value subject)))
+                                           (let [data (:value (:value subject))]
+                                             ((:function field-decoder) data))
+
+                                           (and (instance? Ok subject) (instance? gleam.option.None (:value subject)))
+                                           [default (list)]
+
+                                           (instance? gleam.prelude.Error subject)
+                                           (let [kind (:value subject)]
+                                             [default (list (->DecodeError kind
+                                                                   (dynamic/classify data)
+                                                                   (list)))])))
                                        (push-path (list key)))
                      [out errors2] ((:function (next out)) data)]
                  [out (list/append errors1 errors2)]))))
