@@ -21,6 +21,19 @@
      (throw (ex-info message {:expected expected :actual actual})))
    actual))
 
+(defn ba-int
+  "Big-endian bytes of an int segment of `bits` width."
+  [v bits]
+  (mapv #(bit-and 255 (bit-shift-right v %)) (range (- bits 8) -1 -8)))
+
+(defn ba-utf8 [s]
+  (mapv #(bit-and 255 %) (.getBytes ^String s "UTF-8")))
+
+(defn bit-array
+  "A Gleam bit array as a vector of bytes (byte-aligned segments only)."
+  [& segments]
+  (vec (apply concat segments)))
+
 (defmacro with-use
   "Gleam `use` sugar, flattened. Binding pairs are params-vector + call;
   everything after a pair runs as a callback appended to that call:

@@ -1,0 +1,1 @@
+-record(person, {name :: binary(), pet :: gleam@option:option(binary())}).

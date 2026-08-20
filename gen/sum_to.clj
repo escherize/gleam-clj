@@ -3,8 +3,6 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare sum-to main)
-
 (defn- sum-to
   "Sum 1..n with a tail-recursive accumulator."
   [n acc]

@@ -5,8 +5,6 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare conditional-example main)
-
 (defn conditional-example [x]
   (cond
     (< x 0) (let [x x]

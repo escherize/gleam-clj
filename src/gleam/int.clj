@@ -20,6 +20,14 @@
 (defn bitwise-shift-right [n b] (bit-shift-right n b))
 (defn random [n] (rand-int n))
 
+(defn clamp [n lo hi]
+  (-> n (clojure.core/max lo) (clojure.core/min hi)))
+
+(defn remainder
+  "Remainder; Error(Nil) on zero divisor."
+  [a b]
+  (if (zero? b) (p/->Error nil) (p/->Ok (rem a b))))
+
 (defn divide
   "Truncated division; Error(Nil) on zero divisor."
   [a b]

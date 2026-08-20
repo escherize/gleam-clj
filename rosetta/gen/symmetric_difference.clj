@@ -10,7 +10,7 @@
         _ (set/union seta setb)
         _ (set/intersection seta setb)
         symmetric-difference (set/symmetric-difference seta setb)]
-    (-> (set/to-list symmetric-difference) p/echo)
+    (-> (set/to-list symmetric-difference) (p/echo))
     nil))
 
 (defn -main [& _]

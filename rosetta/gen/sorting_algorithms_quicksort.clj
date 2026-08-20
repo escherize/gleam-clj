@@ -6,8 +6,6 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare quick-sort main)
-
 (defn quick-sort [xs compare]
   (if (empty? xs)
     (list)
@@ -20,7 +18,7 @@
         (list/append (list/append ql (list x)) qr)))))
 
 (defn main []
-  (-> (list 31 4 1 5 9 2 6 5 3 5 8) (quick-sort int/cmp) p/echo))
+  (-> (list 31 4 1 5 9 2 6 5 3 5 8) (quick-sort int/cmp) (p/echo)))
 
 (defn -main [& _]
   (main))

@@ -1,0 +1,1 @@
+-record(ice_cream, {flavour :: binary()}).

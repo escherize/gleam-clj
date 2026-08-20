@@ -3,14 +3,6 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare sum-digits sum-digits-base sum-digits-helper main)
-
-(defn sum-digits [n]
-  (sum-digits-base n 10))
-
-(defn sum-digits-base [n base]
-  (sum-digits-helper n base 0))
-
 (defn- sum-digits-helper [n base acc]
   (cond
     (= n 0) (let [acc acc]
@@ -19,6 +11,12 @@
                  (+' acc n))
     :else (let [n n base base acc acc]
             (recur (quot n base) base (+' acc (rem n base))))))
+
+(defn sum-digits-base [n base]
+  (sum-digits-helper n base 0))
+
+(defn sum-digits [n]
+  (sum-digits-base n 10))
 
 (defn main []
   (p/echo (sum-digits 1) "sum_digits_of_an_integer.gleam:18")

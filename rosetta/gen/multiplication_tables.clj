@@ -6,7 +6,8 @@
    [gleam.string :as string])
   (:import (gleam.prelude Ok)))
 
-(declare main show)
+(defn- show [n padding]
+  (-> n int/to-string (string/pad-start padding " ") io/write))
 
 (defn main []
   (io/write " x |")
@@ -17,9 +18,6 @@
     (io/write (str " |" (string/repeat-str " " (*' (-' x 1) 4))))
     (int/fold-range x 13 nil (fn [_ y] (show (*' x y) 4)))
     (io/print-line "")))
-
-(defn- show [n padding]
-  (-> n int/to-string (string/pad-start padding " ") io/write))
 
 (defn -main [& _]
   (main))

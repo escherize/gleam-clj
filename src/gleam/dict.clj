@@ -21,5 +21,15 @@
 
 (defn new [] {})
 
+(defn delete [d k]
+  (dissoc d k))
+
 (defn has-key [d k]
   (contains? d k))
+
+(defn to-list
+  "Entries as 2-tuples; sorted by key when comparable, for determinism."
+  [d]
+  (let [entries (map vec d)]
+    (try (sort-by clojure.core/first entries)
+         (catch ClassCastException _ (doall entries)))))

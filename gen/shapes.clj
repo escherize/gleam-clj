@@ -9,8 +9,6 @@
 (defrecord Rect [width height])
 (defrecord Point [])
 
-(declare area sum total-area main)
-
 (defn area
   "Area with pi = 3.0, engineering approximation."
   [shape]

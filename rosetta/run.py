@@ -19,8 +19,10 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-ROOT = Path(__file__).parent
-REPO = ROOT.parent
+REPO = Path(__file__).parent.parent
+_args = sys.argv[1:]
+SUITE = _args.pop(0) if _args and (REPO / _args[0] / "tasks").is_dir() else "rosetta"
+ROOT = REPO / SUITE
 TASKS = sorted((ROOT / "tasks").glob("*.gleam"))
 EMITTER = REPO / "gleam-to-clj" / "target" / "debug" / "gleam-to-clj"
 REF = ROOT / "work" / "ref"
@@ -37,13 +39,18 @@ def sh(cmd, timeout, cwd=None):
 
 
 def ref_run(src):
+    """Returns (stdout, error_detail, crashed). Intentional runtime crashes
+    (todo/panic/assert demos) are still comparable: stdout + nonzero exit."""
     (REF / "src" / "ref.gleam").write_text(src)
     r = sh(["gleam", "run"], 30, cwd=REF)
-    if r is None or r.returncode != 0:
-        detail = "" if r is None else (r.stderr.strip().splitlines() or [""])[-0:1]
-        return None, "timeout" if r is None else "; ".join(
-            line for line in r.stderr.splitlines() if "error" in line.lower())[:120]
-    return r.stdout, None
+    if r is None:
+        return None, "timeout", False
+    if r.returncode != 0:
+        if "runtime error" in r.stderr:
+            return r.stdout, None, True
+        return None, "; ".join(
+            line for line in r.stderr.splitlines() if "error" in line.lower())[:120], False
+    return r.stdout, None, False
 
 
 def panic_msg(stderr):
@@ -68,7 +75,7 @@ def clj_fail_detail(stderr):
 
 
 def main():
-    only = sys.argv[1:]  # optional slugs to (re)run
+    only = _args  # optional slugs to (re)run
     (ROOT / "expected").mkdir(exist_ok=True)
     (ROOT / "gen").mkdir(exist_ok=True)
     if not REF.exists():
@@ -89,7 +96,7 @@ def main():
             continue
         nondet = re.search(r"\b(int|float)\.random\b", src) is not None
 
-        expected, err = ref_run(src)
+        expected, err, crashed = ref_run(src)
         if expected is None:
             status[slug] = {"status": "ref_fail", "detail": err or ""}
             continue
@@ -103,9 +110,15 @@ def main():
             continue
 
         ns = slug.replace("_", "-")
-        r = sh(["clojure", "-J-Xss512m", "-A:rosetta", "-M", "-m", ns], 60, cwd=REPO)
+        r = sh(["clojure", "-J-Xss512m", f"-A:{SUITE}", "-M", "-m", ns], 60, cwd=REPO)
         if r is None:
             status[slug] = {"status": "clj_fail", "detail": "timeout"}
+        elif crashed:
+            # Reference crashed on purpose: require nonzero exit + same stdout.
+            if r.returncode != 0 and r.stdout.rstrip("\n") == expected.rstrip("\n"):
+                status[slug] = {"status": "pass", "detail": "crash parity"}
+            else:
+                status[slug] = {"status": "diff", "detail": "crash parity failed"}
         elif r.returncode != 0:
             status[slug] = {"status": "clj_fail",
                             "detail": clj_fail_detail(r.stderr)}

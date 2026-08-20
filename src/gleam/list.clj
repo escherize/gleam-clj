@@ -21,6 +21,18 @@
   [lst fun]
   (doall (map fun lst)))
 
+(defn repeated
+  "Shim for gleam/list.repeat."
+  [x times]
+  (doall (repeat times x)))
+
+(defn find-first
+  "Shim for gleam/list.find: first element satisfying the predicate, as a Result."
+  [lst pred]
+  (if-let [x (clojure.core/first (filter pred lst))]
+    (p/->Ok x)
+    (p/->Error nil)))
+
 (defn map2
   "Pairwise map over two lists, stopping at the shorter."
   [a b fun]

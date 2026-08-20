@@ -5,7 +5,7 @@
   (:import (gleam.prelude Ok)))
 
 (defn main []
-  (-> (list 1 14 99 23) (list/map-over (fn [x] (*' x 2))) p/echo))
+  (-> (list 1 14 99 23) (list/map-over (fn [x] (*' x 2))) (p/echo)))
 
 (defn -main [& _]
   (main))

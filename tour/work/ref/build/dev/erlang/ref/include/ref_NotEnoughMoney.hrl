@@ -1,0 +1,1 @@
+-record(not_enough_money, {required :: integer()}).

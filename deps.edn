@@ -2,4 +2,5 @@
  :aliases
  {:golden {:extra-paths ["golden"]}
   :gen {:extra-paths ["gen"]}
-  :rosetta {:extra-paths ["rosetta/gen"]}}}
+  :rosetta {:extra-paths ["rosetta/gen"]}
+  :tour {:extra-paths ["tour/gen"]}}}

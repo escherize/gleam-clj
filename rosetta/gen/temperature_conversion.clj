@@ -6,10 +6,12 @@
    [gleam.string :as string])
   (:import (gleam.prelude Ok)))
 
-(declare main convert show-temp)
-
-(defn main []
-  (convert 21.0))
+(defn- show-temp [temperature unit]
+  (-> temperature
+      (float/to-precision 2)
+      float/to-string
+      (string/append (str " °" unit))
+      io/print-line))
 
 (defn convert [kelvin]
   (let [rankine (/ (* kelvin 9.0) 5.0)]
@@ -18,12 +20,8 @@
     (show-temp (- rankine 459.67) "F")
     (show-temp rankine "R")))
 
-(defn- show-temp [temperature unit]
-  (-> temperature
-      (float/to-precision 2)
-      float/to-string
-      (string/append (str " °" unit))
-      io/print-line))
+(defn main []
+  (convert 21.0))
 
 (defn -main [& _]
   (main))

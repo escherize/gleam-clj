@@ -1,0 +1,1 @@
+-record(student, {name :: binary()}).

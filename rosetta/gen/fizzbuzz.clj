@@ -6,13 +6,6 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare main fizz-buzz)
-
-(defn main []
-  (-> (int/fold-range 100 0 (list) list/prepend)
-      (list/map-over fizz-buzz)
-      (list/each io/print-line)))
-
 (defn fizz-buzz [i]
   (let [s0 (rem i 3)
         s1 (rem i 5)]
@@ -21,6 +14,11 @@
       (= s0 0) "Fizz"
       (= s1 0) "Buzz"
       :else (int/to-string i))))
+
+(defn main []
+  (-> (int/fold-range 100 0 (list) list/prepend)
+      (list/map-over fizz-buzz)
+      (list/each io/print-line)))
 
 (defn -main [& _]
   (main))

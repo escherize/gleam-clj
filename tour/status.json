@@ -1,0 +1,254 @@
+{
+ "c0l01_hello_world": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l02_modules": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l03_unqualified_imports": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l04_type_checking": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l05_ints": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l06_floats": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l07_number_formats": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l08_equality": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l09_strings": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l10_bools": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l11_assignments": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l12_discard_patterns": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l13_type_annotations": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l14_type_imports": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l15_type_aliases": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l16_blocks": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l17_lists": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c0l18_constants": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c1l01_functions": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c1l02_higher_order_functions": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c1l03_anonymous_functions": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c1l04_function_captures": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c1l05_generic_functions": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c1l06_pipelines": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c1l07_labelled_arguments": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c1l08_label_shorthand_syntax": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c1l09_documentation_comments": {
+  "detail": "error: Module does not have a main function",
+  "status": "ref_fail"
+ },
+ "c1l10_deprecations": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c2l01_case_expressions": {
+  "detail": "nondet: exit-0 only",
+  "status": "pass"
+ },
+ "c2l02_variable_patterns": {
+  "detail": "nondet: exit-0 only",
+  "status": "pass"
+ },
+ "c2l03_string_patterns": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c2l04_list_patterns": {
+  "detail": "nondet: exit-0 only",
+  "status": "pass"
+ },
+ "c2l05_recursion": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c2l06_tail_calls": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c2l07_list_recursion": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c2l08_multiple_subjects": {
+  "detail": "nondet: exit-0 only",
+  "status": "pass"
+ },
+ "c2l09_alternative_patterns": {
+  "detail": "nondet: exit-0 only",
+  "status": "pass"
+ },
+ "c2l10_pattern_aliases": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c2l11_guards": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c3l00_tuples": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c3l01_custom_types": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c3l02_records": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c3l03_record_accessors": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c3l04_record_pattern_matching": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c3l05_record_updates": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c3l06_generic_custom_types": {
+  "detail": "error: Module does not have a main function",
+  "status": "ref_fail"
+ },
+ "c3l07_nil": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c3l08_results": {
+  "detail": "nondet: exit-0 only",
+  "status": "pass"
+ },
+ "c3l09_bit_arrays": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c4l00_standard_library_package": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c4l01_list_module": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c4l02_result_module": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c4l03_dict_module": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c4l04_option_module": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c5l00_opaque_types": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c5l01_use": {
+  "detail": "",
+  "status": "pass"
+ },
+ "c5l02_todo": {
+  "detail": "crash parity",
+  "status": "pass"
+ },
+ "c5l03_panic": {
+  "detail": "crash parity",
+  "status": "pass"
+ },
+ "c5l04_let_assert": {
+  "detail": "crash parity",
+  "status": "pass"
+ },
+ "c5l05_bool_assert": {
+  "detail": "crash parity",
+  "status": "pass"
+ },
+ "c5l06_externals": {
+  "detail": "",
+  "status": "excluded"
+ },
+ "c5l07_multi_target_externals": {
+  "detail": "",
+  "status": "excluded"
+ },
+ "c5l08_external_gleam_fallbacks": {
+  "detail": "",
+  "status": "excluded"
+ }
+}

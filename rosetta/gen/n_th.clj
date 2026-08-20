@@ -5,13 +5,6 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare main nth' show-nths)
-
-(defn main []
-  (show-nths 0 25)
-  (show-nths 250 265)
-  (show-nths 1000 1025))
-
 (defn nth' [n]
   (str (int/to-string n) (let [s0 (rem n 100)
         s1 (rem n 10)]
@@ -25,6 +18,11 @@
 (defn- show-nths [x y]
   (int/fold-range x y nil (fn [_ x] (io/write (str (nth' x) " "))))
   (io/print-line ""))
+
+(defn main []
+  (show-nths 0 25)
+  (show-nths 250 265)
+  (show-nths 1000 1025))
 
 (defn -main [& _]
   (main))

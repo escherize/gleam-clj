@@ -134,6 +134,11 @@ impl Ctx {
             ("gleam/list", "count") => format!("{alias}/count-if"),
             ("gleam/list", "partition") => format!("{alias}/separate"),
             ("gleam/list", "reverse") => format!("{alias}/reversed"),
+            ("gleam/list", "repeat") => format!("{alias}/repeated"),
+            ("gleam/list", "find") => format!("{alias}/find-first"),
+            ("gleam/string", "reverse") => format!("{alias}/reversed"),
+            ("gleam/float", "min") => "min".into(),
+            ("gleam/float", "max") => "max".into(),
             ("gleam/dict", "get") => format!("{alias}/lookup"),
             ("gleam/string", "repeat") => format!("{alias}/repeat-str"),
             ("gleam/result", "map") => format!("{alias}/map-ok"),
@@ -275,30 +280,61 @@ fn emit_module(module: &UntypedModule, stem: &str, file_name: &str, src: &str) -
         }
     }
 
-    // Gleam allows definitions in any order; Clojure needs forward declarations.
-    let fn_names: Vec<String> = module
+    // Emit definitions in call-dependency order (gleam-core's call graph),
+    // so forward declarations are only needed for mutual-recursion groups.
+    let functions: Vec<_> = module
         .definitions
         .iter()
         .filter_map(|def| match &def.definition {
-            Definition::Function(f) => {
-                f.name.as_ref().map(|(_, n)| local_fn_name(&kebab(n.as_str())))
-            }
+            Definition::Function(f) => Some(f.clone()),
             _ => None,
         })
         .collect();
-    if fn_names.len() > 1 {
-        let _ = writeln!(out, "\n(declare {})", fn_names.join(" "));
-    }
+    let constants: Vec<_> = module
+        .definitions
+        .iter()
+        .filter_map(|def| match &def.definition {
+            Definition::ModuleConstant(c) => Some(c.clone()),
+            _ => None,
+        })
+        .collect();
+    let has_pub_main = functions.iter().any(|f| {
+        f.publicity == Publicity::Public
+            && f.name.as_ref().is_some_and(|(_, n)| n.as_str() == "main")
+    });
 
-    let mut has_pub_main = false;
-    for def in &module.definitions {
-        if let Definition::Function(f) = &def.definition {
-            out.push('\n');
-            out.push_str(&emit_function(&ctx, f));
-            if f.publicity == Publicity::Public
-                && f.name.as_ref().is_some_and(|(_, n)| n.as_str() == "main")
-            {
-                has_pub_main = true;
+    let groups = gleam_core::call_graph::into_dependency_order(functions, constants)
+        .unwrap_or_else(|e| panic!("call graph error: {e:?}"));
+    use gleam_core::call_graph::CallGraphNode;
+    for group in groups {
+        if group.len() > 1 {
+            let names: Vec<String> = group
+                .iter()
+                .map(|node| match node {
+                    CallGraphNode::Function(f) => local_fn_name(&kebab(
+                        f.name.as_ref().expect("function name").1.as_str(),
+                    )),
+                    CallGraphNode::ModuleConstant(c) => user_var(&kebab(c.name.as_str())),
+                })
+                .collect();
+            let _ = writeln!(out, "\n(declare {})", names.join(" "));
+        }
+        for node in group {
+            match node {
+                CallGraphNode::Function(f) => {
+                    out.push('\n');
+                    out.push_str(&emit_function(&ctx, &f));
+                }
+                CallGraphNode::ModuleConstant(c) => {
+                    let private =
+                        if c.publicity == Publicity::Public { "" } else { "^:private " };
+                    let _ = write!(
+                        out,
+                        "\n(def {private}{} {})\n",
+                        user_var(&kebab(c.name.as_str())),
+                        emit_constant(&c.value)
+                    );
+                }
             }
         }
     }
@@ -567,7 +603,7 @@ fn pattern_literal(ctx: &Ctx, pattern: &UntypedPattern) -> Option<String> {
     match pattern {
         Pattern::Int { value, .. } => Some(int_lit(value)),
         Pattern::Float { value, .. } => Some(int_lit(value)),
-        Pattern::String { value, .. } => Some(format!("\"{}\"", value.replace("\"", "\\\""))),
+        Pattern::String { value, .. } => Some(format!("\"{}\"", clj_string(value))),
         Pattern::Constructor { name, arguments, spread, .. } => match name.as_str() {
             "Nil" => Some("nil".into()),
             "True" => Some("true".into()),
@@ -644,7 +680,9 @@ fn pattern_cond_inner(
     match pattern {
         Pattern::Int { value, .. } => tests.push(format!("(= {subj} {})", int_lit(value))),
         Pattern::Float { value, .. } => tests.push(format!("(= {subj} {})", int_lit(value))),
-        Pattern::String { value, .. } => tests.push(format!("(= {subj} \"{value}\")")),
+        Pattern::String { value, .. } => {
+            tests.push(format!("(= {subj} \"{}\")", clj_string(value)))
+        }
         Pattern::Variable { name, .. } => {
             binds.push((user_var(&kebab(name.as_str())), subj.to_string()))
         }
@@ -713,12 +751,118 @@ fn pattern_cond_inner(
                 pattern_cond_inner(ctx, &t.pattern, &access, tests, binds);
             }
         }
+        Pattern::Assign { name, pattern, .. } => {
+            binds.push((user_var(&kebab(name.as_str())), subj.to_string()));
+            pattern_cond_inner(ctx, pattern, subj, tests, binds);
+        }
+        Pattern::StringPrefix {
+            left_side_string,
+            left_side_assignment,
+            right_side_assignment,
+            ..
+        } => {
+            let prefix = clj_string(left_side_string);
+            tests.push(format!("(.startsWith ^String {subj} \"{prefix}\")"));
+            if let Some((name, _)) = left_side_assignment {
+                binds.push((user_var(&kebab(name.as_str())), format!("\"{prefix}\"")));
+            }
+            if let gleam_core::ast::AssignName::Variable(name) = right_side_assignment {
+                binds.push((
+                    user_var(&kebab(name.as_str())),
+                    format!("(subs {subj} {})", gleam_str_len(left_side_string)),
+                ));
+            }
+        }
         other => panic!("unsupported pattern (v0): {other:?}"),
     }
 }
 
 fn int_lit(value: &str) -> String {
-    value.replace('_', "")
+    let v = value.replace('_', "");
+    // Gleam radix prefixes -> Clojure reader syntax (0x works as-is).
+    if let Some(rest) = v.strip_prefix("0b") {
+        format!("2r{rest}")
+    } else if let Some(rest) = v.strip_prefix("-0b") {
+        format!("-2r{rest}")
+    } else if let Some(rest) = v.strip_prefix("0o") {
+        format!("8r{rest}")
+    } else if let Some(rest) = v.strip_prefix("-0o") {
+        format!("-8r{rest}")
+    } else {
+        v
+    }
+}
+
+/// Translate a Gleam string literal body (raw source text, escapes included)
+/// into a Clojure string literal body. Gleam and Clojure share \\n \\r \\t
+/// \\\\ \\\"; Gleam adds \\e, \\f and \\u{...} which Clojure spells differently.
+fn clj_string(value: &str) -> String {
+    // Unescape Gleam syntax to real chars.
+    let mut chars = value.chars().peekable();
+    let mut real = String::new();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            real.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('n') => real.push('\n'),
+            Some('r') => real.push('\r'),
+            Some('t') => real.push('\t'),
+            Some('f') => real.push('\u{000C}'),
+            Some('e') => real.push('\u{001B}'),
+            Some('\\') => real.push('\\'),
+            Some('"') => real.push('"'),
+            Some('u') => {
+                // \u{HEX}
+                let hex: String = chars
+                    .by_ref()
+                    .skip_while(|&c| c == '{')
+                    .take_while(|&c| c != '}')
+                    .collect();
+                let cp = u32::from_str_radix(&hex, 16).expect("unicode escape");
+                real.push(char::from_u32(cp).expect("valid codepoint"));
+            }
+            other => panic!("unknown string escape: \\{other:?}"),
+        }
+    }
+    // Re-escape for Clojure.
+    let mut out = String::new();
+    for c in real.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\u{000C}' => out.push_str("\\f"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Character count of a Gleam string literal after unescaping (for StringPrefix).
+fn gleam_str_len(value: &str) -> usize {
+    let translated = clj_string(value);
+    // Count chars of the *unescaped* value: redo minimal unescape on the
+    // Clojure body (every backslash pair is one char).
+    let mut n = 0;
+    let mut chars = translated.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            if let Some(e) = chars.next() {
+                if e == 'u' {
+                    for _ in 0..4 {
+                        chars.next();
+                    }
+                }
+            }
+        }
+        n += 1;
+    }
+    n
 }
 
 fn binop(op: &BinOp) -> &'static str {
@@ -752,7 +896,7 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
     match e {
         UntypedExpr::Int { value, .. } => int_lit(value),
         UntypedExpr::Float { value, .. } => int_lit(value),
-        UntypedExpr::String { value, .. } => format!("\"{}\"", value.replace("\"", "\\\"")),
+        UntypedExpr::String { value, .. } => format!("\"{}\"", clj_string(value)),
         UntypedExpr::Var { name, .. } => match name.as_str() {
             "Nil" => "nil".into(),
             "True" => "true".into(),
@@ -815,7 +959,7 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
                 .iter()
                 .map(|a| match &a.names {
                     ArgNames::Named { name, .. } | ArgNames::NamedLabelled { name, .. } => {
-                        kebab(name.as_str())
+                        user_var(&kebab(name.as_str()))
                     }
                     _ => "_".into(),
                 })
@@ -841,7 +985,12 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
                     UntypedExpr::Call { fun, arguments, .. } => {
                         emit_call(ctx, fun, arguments, ind + 4)
                     }
-                    other => emit_expr(ctx, other, ind + 4),
+                    v @ (UntypedExpr::Var { .. } | UntypedExpr::FieldAccess { .. }) => {
+                        emit_expr(ctx, v, ind + 4)
+                    }
+                    // Anything else (fn captures etc.) must be wrapped so ->
+                    // threads into a call of it, not into its form.
+                    other => format!("({})", emit_expr(ctx, other, ind + 5)),
                 })
                 .collect();
             let inline = format!("(-> {first} {})", steps.join(" "));
@@ -875,6 +1024,46 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
             let inner = emit_expr(ctx, expr, ind + 8);
             format!("(p/echo {inner} {prefix})")
         }
+        UntypedExpr::BitArray { segments, .. } => {
+            use gleam_core::ast::BitArrayOption as Opt;
+            let parts: Vec<String> = segments
+                .iter()
+                .map(|seg| {
+                    let val = emit_expr(ctx, &seg.value, ind + 2);
+                    let utf8 = seg.options.iter().any(|o| matches!(o, Opt::Utf8 { .. }));
+                    let raw = seg
+                        .options
+                        .iter()
+                        .any(|o| matches!(o, Opt::Bits { .. } | Opt::Bytes { .. }));
+                    let size = seg.options.iter().find_map(|o| match o {
+                        Opt::Size { value, .. } => Some(emit_expr(ctx, value, ind + 2)),
+                        _ => None,
+                    });
+                    if utf8 {
+                        format!("(p/ba-utf8 {val})")
+                    } else if raw {
+                        val
+                    } else {
+                        format!("(p/ba-int {val} {})", size.unwrap_or_else(|| "8".into()))
+                    }
+                })
+                .collect();
+            format!("(p/bit-array {})", parts.join(" "))
+        }
+        UntypedExpr::RecordUpdate { record, arguments, .. } => {
+            let base = emit_expr(ctx, &record.base, ind);
+            let fields: Vec<String> = arguments
+                .iter()
+                .map(|a| {
+                    format!(
+                        ":{} {}",
+                        kebab(a.label.as_str()),
+                        emit_expr(ctx, &a.value, ind + 2)
+                    )
+                })
+                .collect();
+            format!("(assoc {base} {})", fields.join(" "))
+        }
         UntypedExpr::Todo { message, .. } => {
             let msg = message
                 .as_ref()
@@ -889,7 +1078,6 @@ fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> S
                 .unwrap_or_else(|| "\"panic\"".into());
             format!("(throw (ex-info {msg} {{:gleam/panic true}}))")
         }
-        other => panic!("unsupported expression (v0): {other:?}"),
     }
 }
 
@@ -1080,8 +1268,20 @@ fn emit_constant(c: &gleam_core::ast::Constant<()>) -> String {
     match c {
         C::Int { value, .. } => int_lit(value),
         C::Float { value, .. } => int_lit(value),
-        C::String { value, .. } => format!("\"{value}\""),
-        other => panic!("unsupported constant in guard (v0): {other:?}"),
+        C::String { value, .. } => format!("\"{}\"", clj_string(value)),
+        C::Tuple { elements, .. } => {
+            let parts: Vec<String> = elements.iter().map(emit_constant).collect();
+            format!("[{}]", parts.join(" "))
+        }
+        C::List { elements, .. } => {
+            let parts: Vec<String> = elements.iter().map(emit_constant).collect();
+            if parts.is_empty() {
+                "(list)".into()
+            } else {
+                format!("(list {})", parts.join(" "))
+            }
+        }
+        other => panic!("unsupported constant (v0): {other:?}"),
     }
 }
 

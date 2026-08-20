@@ -6,13 +6,11 @@
    [gleam.string :as string])
   (:import (gleam.prelude Ok)))
 
-(declare digit-sum digit-sum-loop task-loop main)
+(defn- digit-sum-loop [n sum]
+  (if (= n 0) sum (recur (quot n 10) (+' sum (rem n 10)))))
 
 (defn- digit-sum [n]
   (digit-sum-loop n 0))
-
-(defn- digit-sum-loop [n sum]
-  (if (= n 0) sum (recur (quot n 10) (+' sum (rem n 10)))))
 
 (defn- task-loop [m n]
   (let [s1 (= (digit-sum (*' m n)) n)]

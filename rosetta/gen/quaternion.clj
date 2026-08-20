@@ -8,7 +8,46 @@
 ;; type Quaternion
 (defrecord Quaternion [f0 f1 f2 f3])
 
-(declare main to-string norm negate conjugate add-scalar add multiply-scalar multiply)
+(defn to-string [q]
+  (let [{a :f0 b :f1 c :f2 d :f3} q]
+    (str (str (str (str (str (str (str (str "(" (float/to-string a)) ", ") (float/to-string b)) ", ") (float/to-string c)) ", ") (float/to-string d)) ")")))
+
+(defn multiply [q1 q2]
+  (let [{a :f0 b :f1 c :f2 d :f3} q1
+        {w :f0 x :f1 y :f2 z :f3} q2]
+    (->Quaternion (- (- (- (* a w) (* b x)) (* c y)) (* d z))
+                  (- (+ (+ (* a x) (* w b)) (* c z)) (* d y))
+                  (+ (+ (- (* a y) (* b z)) (* c w)) (* d x))
+                  (+ (- (+ (* a z) (* b y)) (* c x)) (* d w)))))
+
+(defn multiply-scalar [q real]
+  (let [{a :f0 b :f1 c :f2 d :f3} q]
+    (->Quaternion (* a real) (* b real) (* c real) (* d real))))
+
+(defn add [q1 q2]
+  (let [{a :f0 b :f1 c :f2 d :f3} q1
+        {w :f0 x :f1 y :f2 z :f3} q2]
+    (->Quaternion (+ a w) (+ b x) (+ c y) (+ d z))))
+
+(defn add-scalar [q real]
+  (let [{a :f0 b :f1 c :f2 d :f3} q]
+    (->Quaternion (+ real a) b c d)))
+
+(defn conjugate [q]
+  (let [{a :f0 b :f1 c :f2 d :f3} q]
+    (->Quaternion a (* -1.0 b) (* -1.0 c) (* -1.0 d))))
+
+(defn negate [q]
+  (let [{a :f0 b :f1 c :f2 d :f3} q]
+    (->Quaternion (* -1.0 a) (* -1.0 b) (* -1.0 c) (* -1.0 d))))
+
+(defn norm [q]
+  (let [{a :f0 b :f1 c :f2 d :f3} q]
+    (let [v (float/square-root (+ (+ (+ (* a a) (* b b)) (* c c)) (* d d)))]
+      (when-not (instance? Ok v)
+        (throw (ex-info "let assert failed" {:value v})))
+      (let [result (:value v)]
+        result))))
 
 (defn main []
   (let [q (->Quaternion 1.0 2.0 3.0 4.0)
@@ -27,47 +66,6 @@
     (io/print-line (str "multiply_scalar(q, r) = " (-> (multiply-scalar q r) (to-string))))
     (io/print-line (str "multiply(q1, q2) = " (-> (multiply q1 q2) (to-string))))
     (io/print-line (str "multiply(q2, q1) = " (-> (multiply q2 q1) (to-string))))))
-
-(defn to-string [q]
-  (let [{a :f0 b :f1 c :f2 d :f3} q]
-    (str (str (str (str (str (str (str (str "(" (float/to-string a)) ", ") (float/to-string b)) ", ") (float/to-string c)) ", ") (float/to-string d)) ")")))
-
-(defn norm [q]
-  (let [{a :f0 b :f1 c :f2 d :f3} q]
-    (let [v (float/square-root (+ (+ (+ (* a a) (* b b)) (* c c)) (* d d)))]
-      (when-not (instance? Ok v)
-        (throw (ex-info "let assert failed" {:value v})))
-      (let [result (:value v)]
-        result))))
-
-(defn negate [q]
-  (let [{a :f0 b :f1 c :f2 d :f3} q]
-    (->Quaternion (* -1.0 a) (* -1.0 b) (* -1.0 c) (* -1.0 d))))
-
-(defn conjugate [q]
-  (let [{a :f0 b :f1 c :f2 d :f3} q]
-    (->Quaternion a (* -1.0 b) (* -1.0 c) (* -1.0 d))))
-
-(defn add-scalar [q real]
-  (let [{a :f0 b :f1 c :f2 d :f3} q]
-    (->Quaternion (+ real a) b c d)))
-
-(defn add [q1 q2]
-  (let [{a :f0 b :f1 c :f2 d :f3} q1
-        {w :f0 x :f1 y :f2 z :f3} q2]
-    (->Quaternion (+ a w) (+ b x) (+ c y) (+ d z))))
-
-(defn multiply-scalar [q real]
-  (let [{a :f0 b :f1 c :f2 d :f3} q]
-    (->Quaternion (* a real) (* b real) (* c real) (* d real))))
-
-(defn multiply [q1 q2]
-  (let [{a :f0 b :f1 c :f2 d :f3} q1
-        {w :f0 x :f1 y :f2 z :f3} q2]
-    (->Quaternion (- (- (- (* a w) (* b x)) (* c y)) (* d z))
-                  (- (+ (+ (* a x) (* w b)) (* c z)) (* d y))
-                  (+ (+ (- (* a y) (* b z)) (* c w)) (* d x))
-                  (+ (- (+ (* a z) (* b y)) (* c x)) (* d w)))))
 
 (defn -main [& _]
   (main))

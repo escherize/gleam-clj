@@ -9,8 +9,6 @@
 ;; type Point
 (defrecord Point [x y])
 
-(declare point-to-string main)
-
 (defn point-to-string [p to-string]
   (let [{x :x y :y} p]
     (str (str (str (str "Point{x = " (-> x to-string)) ", y = ") (-> y to-string)) "}")))

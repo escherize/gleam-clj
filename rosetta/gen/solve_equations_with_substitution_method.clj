@@ -3,8 +3,6 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare solve main)
-
 (defn solve
   "Solves a system of two linear equations."
   [eq1 eq2]

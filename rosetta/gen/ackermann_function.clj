@@ -3,8 +3,6 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare ackermann main)
-
 (defn ackermann [m n]
   (cond
     (= m 0) (let [n n]

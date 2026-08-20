@@ -8,8 +8,6 @@
 (defrecord Empty [])
 (defrecord Node [f0 f1 f2])
 
-(declare preorder inorder postorder levelorder levelorder-helper main)
-
 (defn preorder [t]
   (if (instance? Empty t)
     (list)
@@ -28,9 +26,6 @@
     (let [v (:f0 t) l (:f1 t) r (:f2 t)]
       (list/append (list/append (postorder l) (postorder r)) (list v)))))
 
-(defn levelorder [t]
-  (levelorder-helper (list t)))
-
 (defn- levelorder-helper [trees]
   (cond
     (empty? trees) (list)
@@ -39,6 +34,9 @@
     (and (seq trees) (instance? Node (first trees))) (let [v (:f0 (first trees)) l (:f1 (first trees)) r (:f2 (first trees)) rest' (rest trees)]
                                                        (list* v (levelorder-helper (list/append rest'
                                                                                        (list l r)))))))
+
+(defn levelorder [t]
+  (levelorder-helper (list t)))
 
 (defn main []
   (let [example (->Node 1

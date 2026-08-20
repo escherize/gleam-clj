@@ -5,8 +5,6 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare safe-div main)
-
 (defn safe-div [a b]
   (if (= b 0) (p/->Error nil) (p/->Ok (quot a b))))
 

@@ -7,7 +7,13 @@
    [gleam.result :as result])
   (:import (gleam.prelude Ok)))
 
-(declare main gospers-hack)
+(defn gospers-hack [n]
+  (let [c (int/bitwise-and n (- n))
+        r (+' n c)]
+    (-> (int/bitwise-exclusive-or r n)
+        (int/bitwise-shift-right 2)
+        (int/divide c)
+        (result/map-ok (fn [-capture] (int/bitwise-or -capture r))))))
 
 (defn main []
   (p/with-use [[x] (list/each (list 1 3 7 15))]
@@ -23,14 +29,6 @@
                           (io/write (str (int/to-string y) " "))
                           y))))
     (io/print-line "")))
-
-(defn gospers-hack [n]
-  (let [c (int/bitwise-and n (- n))
-        r (+' n c)]
-    (-> (int/bitwise-exclusive-or r n)
-        (int/bitwise-shift-right 2)
-        (int/divide c)
-        (result/map-ok (fn [-capture] (int/bitwise-or -capture r))))))
 
 (defn -main [& _]
   (main))

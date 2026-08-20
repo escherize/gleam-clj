@@ -6,11 +6,6 @@
    [gleam.string :as string])
   (:import (gleam.prelude Ok)))
 
-(declare main count-jewels)
-
-(defn main []
-  (p/echo (count-jewels "aAAbbbb" "aA") "jewels_and_stones.gleam:6"))
-
 (defn count-jewels
   "Counts how many letters in stones are in jewels."
   [stones jewels]
@@ -18,6 +13,9 @@
     (-> stones
         string/to-graphemes
         (list/count-if (fn [-capture] (set/contains jewels -capture))))))
+
+(defn main []
+  (p/echo (count-jewels "aAAbbbb" "aA") "jewels_and_stones.gleam:6"))
 
 (defn -main [& _]
   (main))

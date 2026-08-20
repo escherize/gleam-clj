@@ -3,8 +3,6 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare compose main)
-
 (defn compose [f g]
   (fn [x] (f (g x))))
 

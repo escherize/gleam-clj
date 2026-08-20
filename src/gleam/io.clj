@@ -10,6 +10,12 @@
   (print s)
   (flush))
 
+(defn debug
+  "Print a value to stderr, return it."
+  [v]
+  (binding [*out* *err*] (prn v))
+  v)
+
 (defn print-line-error [s]
   (binding [*out* *err*] (println s)))
 

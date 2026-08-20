@@ -6,7 +6,15 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare min-coins step main)
+(defn- step [coins table a]
+  (p/echo ["step" "a: " a ", table: " table] "coin_change.gleam:20")
+  (let [best (-> coins
+                 (list/filter-map (fn [c] (dict/lookup table (-' a c))))
+                 (list/reduce1 min))]
+    (if (instance? Ok best)
+      (let [b (:value best)]
+        (dict/insert table a (+' b 1)))
+      table)))
 
 (defn min-coins
   "Fewest coins summing to `amount`. Error(Nil) if unreachable."
@@ -19,16 +27,6 @@
                               (dict/from-list (list [0 0]))
                               (fn [table a] (step coins table a)))
               (dict/lookup amount))))
-
-(defn- step [coins table a]
-  (p/echo ["step" "a: " a ", table: " table] "coin_change.gleam:20")
-  (let [best (-> coins
-                 (list/filter-map (fn [c] (dict/lookup table (-' a c))))
-                 (list/reduce1 min))]
-    (if (instance? Ok best)
-      (let [b (:value best)]
-        (dict/insert table a (+' b 1)))
-      table)))
 
 (defn main []
   (p/let-assert (p/->Ok 0) (min-coins (list 1 5 10) 0))

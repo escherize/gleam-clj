@@ -1,0 +1,1 @@
+-record(starfish, {name :: binary(), favourite_colour :: binary()}).

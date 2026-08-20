@@ -23,3 +23,14 @@
 
 (defn to-graphemes [s]
   (mapv str s))
+
+(defn reversed
+  "Shim for gleam/string.reverse."
+  [s]
+  (str/reverse s))
+
+(defn drop-start [s n]
+  (subs s (min n (count s))))
+
+(defn drop-end [s n]
+  (subs s 0 (max 0 (- (count s) n))))
