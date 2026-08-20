@@ -17,7 +17,7 @@
 (def pop-codeunit gleam-ffi/pop-codeunit)
 
 (defn- parse-fragment [rest' pieces]
-  (p/->Ok (assoc pieces :fragment (option/->Some rest'))))
+  (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (option/->Some rest'))))
 
 (def codeunit-slice gleam-ffi/codeunit-slice)
 
@@ -30,9 +30,9 @@
                                            (let [query (codeunit-slice original
                                                                        0
                                                                        size)
-                                                 pieces (assoc pieces :query (option/->Some query))]
+                                                 pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (option/->Some query) (:fragment pieces))]
                                              (parse-fragment rest' pieces)))
-    (= uri-string "") (p/->Ok (assoc pieces :query (option/->Some original)))
+    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (option/->Some original) (:fragment pieces)))
     :else (let [[_ rest'] (pop-codeunit uri-string)]
             (recur original rest' pieces (+' size 1)))))
 
@@ -45,16 +45,16 @@
                                            (let [path (codeunit-slice original
                                                                       0
                                                                       size)
-                                                 pieces (assoc pieces :path path)]
+                                                 pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) path (:query pieces) (:fragment pieces))]
                                              (parse-query-with-question-mark rest'
                                                                              pieces)))
     (.startsWith ^String uri-string "#") (let [rest' (subs uri-string 1)]
                                            (let [path (codeunit-slice original
                                                                       0
                                                                       size)
-                                                 pieces (assoc pieces :path path)]
+                                                 pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) path (:query pieces) (:fragment pieces))]
                                              (parse-fragment rest' pieces)))
-    (= uri-string "") (p/->Ok (assoc pieces :path original))
+    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) original (:query pieces) (:fragment pieces)))
     :else (let [[_ rest'] (pop-codeunit uri-string)]
             (recur original rest' pieces (+' size 1)))))
 
@@ -84,15 +84,15 @@
     (.startsWith ^String uri-string "9") (let [rest' (subs uri-string 1)]
                                            (recur rest' pieces (+' (*' port 10) 9)))
     (.startsWith ^String uri-string "?") (let [rest' (subs uri-string 1)]
-                                           (let [pieces (assoc pieces :port (option/->Some port))]
+                                           (let [pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces))]
                                              (parse-query-with-question-mark rest'
                                                                              pieces)))
     (.startsWith ^String uri-string "#") (let [rest' (subs uri-string 1)]
-                                           (let [pieces (assoc pieces :port (option/->Some port))]
+                                           (let [pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces))]
                                              (parse-fragment rest' pieces)))
-    (.startsWith ^String uri-string "/") (let [pieces (assoc pieces :port (option/->Some port))]
+    (.startsWith ^String uri-string "/") (let [pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces))]
                                            (parse-path uri-string pieces))
-    (= uri-string "") (p/->Ok (assoc pieces :port (option/->Some port)))
+    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces)))
     :else (p/->Error nil)))
 
 (defn- parse-port [uri-string pieces]
@@ -137,29 +137,29 @@
 
 (defn- parse-host-outside-of-brackets-loop [original uri-string pieces size]
   (cond
-    (= uri-string "") (p/->Ok (assoc pieces :host (option/->Some original)))
+    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some original) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
     (.startsWith ^String uri-string ":") (let [host (codeunit-slice original
                                                                     0
                                                                     size)
-                                               pieces (assoc pieces :host (option/->Some host))]
+                                               pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                            (parse-port uri-string pieces))
     (.startsWith ^String uri-string "/") (let [host (codeunit-slice original
                                                                     0
                                                                     size)
-                                               pieces (assoc pieces :host (option/->Some host))]
+                                               pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                            (parse-path uri-string pieces))
     (.startsWith ^String uri-string "?") (let [rest' (subs uri-string 1)]
                                            (let [host (codeunit-slice original
                                                                       0
                                                                       size)
-                                                 pieces (assoc pieces :host (option/->Some host))]
+                                                 pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                              (parse-query-with-question-mark rest'
                                                                              pieces)))
     (.startsWith ^String uri-string "#") (let [rest' (subs uri-string 1)]
                                            (let [host (codeunit-slice original
                                                                       0
                                                                       size)
-                                                 pieces (assoc pieces :host (option/->Some host))]
+                                                 pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                              (parse-fragment rest' pieces)))
     :else (let [[_ rest'] (pop-codeunit uri-string)]
             (recur original rest' pieces (+' size 1)))))
@@ -172,7 +172,7 @@
 
 (defn- parse-host-within-brackets-loop [original uri-string pieces size]
   (cond
-    (= uri-string "") (p/->Ok (assoc pieces :host (option/->Some uri-string)))
+    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some uri-string) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
     (and (.startsWith ^String uri-string "]") (= size 0)) (let [rest' (subs uri-string 1)]
                                                             (parse-port rest'
                                                                         pieces))
@@ -180,14 +180,14 @@
                                            (let [host (codeunit-slice original
                                                                       0
                                                                       (+' size 1))
-                                                 pieces (assoc pieces :host (option/->Some host))]
+                                                 pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                              (parse-port rest' pieces)))
     (and (.startsWith ^String uri-string "/") (= size 0)) (parse-path uri-string
                                                                       pieces)
     (.startsWith ^String uri-string "/") (let [host (codeunit-slice original
                                                                     0
                                                                     size)
-                                               pieces (assoc pieces :host (option/->Some host))]
+                                               pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                            (parse-path uri-string pieces))
     (and (.startsWith ^String uri-string "?") (= size 0)) (let [rest' (subs uri-string 1)]
                                                             (parse-query-with-question-mark rest'
@@ -196,7 +196,7 @@
                                            (let [host (codeunit-slice original
                                                                       0
                                                                       size)
-                                                 pieces (assoc pieces :host (option/->Some host))]
+                                                 pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                              (parse-query-with-question-mark rest'
                                                                              pieces)))
     (and (.startsWith ^String uri-string "#") (= size 0)) (let [rest' (subs uri-string 1)]
@@ -206,7 +206,7 @@
                                            (let [host (codeunit-slice original
                                                                       0
                                                                       size)
-                                                 pieces (assoc pieces :host (option/->Some host))]
+                                                 pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                              (parse-fragment rest' pieces)))
     :else (let [[char rest'] (pop-codeunit uri-string)]
             (let [subject (is-valid-host-within-brackets-char char)]
@@ -224,9 +224,9 @@
   (cond
     (.startsWith ^String uri-string "[") (parse-host-within-brackets uri-string
                                                                      pieces)
-    (.startsWith ^String uri-string ":") (let [pieces (assoc pieces :host (option/->Some ""))]
+    (.startsWith ^String uri-string ":") (let [pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some "") (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                            (parse-port uri-string pieces))
-    (= uri-string "") (p/->Ok (assoc pieces :host (option/->Some "")))
+    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some "") (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
     :else (parse-host-outside-of-brackets uri-string pieces)))
 
 (defn- parse-userinfo-loop [original uri-string pieces size]
@@ -238,7 +238,7 @@
                                            (let [userinfo (codeunit-slice original
                                                                           0
                                                                           size)
-                                                 pieces (assoc pieces :userinfo (option/->Some userinfo))]
+                                                 pieces (->Uri (:scheme pieces) (option/->Some userinfo) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                              (parse-host rest' pieces)))
     (or (= uri-string "") (.startsWith ^String uri-string "/") (.startsWith ^String uri-string "?") (.startsWith ^String uri-string "#")) (parse-host original
                                                                                                                                                       pieces)
@@ -250,7 +250,7 @@
 
 (defn- parse-authority-with-slashes [uri-string pieces]
   (cond
-    (= uri-string "//") (p/->Ok (assoc pieces :host (option/->Some "")))
+    (= uri-string "//") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some "") (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
     (.startsWith ^String uri-string "//") (let [rest' (subs uri-string 2)]
                                             (parse-authority-pieces rest'
                                                                     pieces))
@@ -263,7 +263,7 @@
     (.startsWith ^String uri-string "/") (let [scheme (codeunit-slice original
                                                                       0
                                                                       size)
-                                               pieces (assoc pieces :scheme (option/->Some (string/lowercase scheme)))]
+                                               pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                            (parse-authority-with-slashes uri-string
                                                                          pieces))
     (and (.startsWith ^String uri-string "?") (= size 0)) (let [rest' (subs uri-string 1)]
@@ -273,7 +273,7 @@
                                            (let [scheme (codeunit-slice original
                                                                         0
                                                                         size)
-                                                 pieces (assoc pieces :scheme (option/->Some (string/lowercase scheme)))]
+                                                 pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                              (parse-query-with-question-mark rest'
                                                                              pieces)))
     (and (.startsWith ^String uri-string "#") (= size 0)) (let [rest' (subs uri-string 1)]
@@ -283,17 +283,17 @@
                                            (let [scheme (codeunit-slice original
                                                                         0
                                                                         size)
-                                                 pieces (assoc pieces :scheme (option/->Some (string/lowercase scheme)))]
+                                                 pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                              (parse-fragment rest' pieces)))
     (and (.startsWith ^String uri-string ":") (= size 0)) (p/->Error nil)
     (.startsWith ^String uri-string ":") (let [rest' (subs uri-string 1)]
                                            (let [scheme (codeunit-slice original
                                                                         0
                                                                         size)
-                                                 pieces (assoc pieces :scheme (option/->Some (string/lowercase scheme)))]
+                                                 pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
                                              (parse-authority-with-slashes rest'
                                                                            pieces)))
-    (= uri-string "") (p/->Ok (assoc pieces :path original))
+    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) original (:query pieces) (:fragment pieces)))
     :else (let [[_ rest'] (pop-codeunit uri-string)]
             (recur original rest' pieces (+' size 1)))))
 
@@ -475,8 +475,8 @@
     (if (and (instance? Uri relative) (instance? gleam.option.Some (:host relative)))
       (let [path (-> (:path relative)
                      (string/split "/")
-                     (remove-dot-segments)
-                     (join-segments))
+                     remove-dot-segments
+                     join-segments)
             resolved (->Uri (option/or (:scheme relative) (:scheme base))
                             (option/->None)
                             (:host relative)
@@ -496,12 +496,12 @@
                                                                            "/")
                                                              (-> (:path base)
                                                                  (string/split "/")
-                                                                 (drop-last)
+                                                                 drop-last
                                                                  (list/append (string/split (:path relative)
                                                                                             "/")))))
                                            path (-> path-segments
-                                                    (remove-dot-segments)
-                                                    (join-segments))]
+                                                    remove-dot-segments
+                                                    join-segments)]
                                        [path (:query relative)])))
             resolved (->Uri (:scheme base)
                             (option/->None)

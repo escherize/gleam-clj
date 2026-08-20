@@ -8,13 +8,8 @@
 //! - line comments are dropped (doc comments become docstrings)
 
 use std::collections::HashMap;
-use std::fmt::Write as _;
 
-use gleam_core::ast::{
-    ArgNames, AssignmentKind, BinOp, CallArg, Clause, Definition, Function, Pattern, Publicity,
-    Statement, UntypedClauseGuard, UntypedExpr, UntypedModule, UntypedPattern,
-    UntypedStatement,
-};
+use gleam_core::ast::{Definition, UntypedModule};
 use gleam_core::parse;
 use gleam_core::warning::WarningEmitter;
 
@@ -28,84 +23,58 @@ const JAVA_LANG: &[&str] = &[
 ];
 
 mod analysis;
+mod emit;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() >= 2 && args[1] == "typecheck" {
-        if args.len() < 3 {
-            eprintln!("usage: gleam-to-clj typecheck <project-dir> [stdlib-src-dir]");
-            std::process::exit(2);
-        }
-        let stdlib = args.get(3).map(String::as_str).unwrap_or("stdlib-src");
-        typecheck(&args[2], stdlib);
-        return;
-    }
-    if args.len() >= 2 && args[1] == "build" {
-        if args.len() != 4 {
-            eprintln!("usage: gleam-to-clj build <project-dir> <out-dir>");
-            std::process::exit(2);
-        }
-        build_project(&args[2], &args[3]);
-        return;
-    }
+    let usage = "usage: gleam-to-clj <input.gleam> [output.clj]\n       gleam-to-clj build <project-dir> <out-dir> [stdlib-src-dir]\n       gleam-to-clj typecheck <project-dir> [stdlib-src-dir]";
     if args.len() < 2 {
-        eprintln!("usage: gleam-to-clj <input.gleam> [output.clj] | build <project-dir> <out-dir>");
+        eprintln!("{usage}");
         std::process::exit(2);
     }
-    let input = &args[1];
-    let src = std::fs::read_to_string(input).expect("read input");
-    let path = camino::Utf8PathBuf::from(input);
-    let parsed =
-        parse::parse_module(path.clone(), &src, &WarningEmitter::null()).unwrap_or_else(|e| {
-            eprintln!("parse error: {e:?}");
-            std::process::exit(1);
-        });
-    let stem = path.file_stem().expect("file stem").to_string();
-    let file_name = path.file_name().expect("file name").to_string();
-    let mut global = stdlib_registry();
-    register_module(&mut global, &stem, &parsed.module);
-    let out = emit_module(
-        &parsed.module,
-        &stem,
-        &file_name,
-        &src,
-        &global,
-        false,
-        &HashMap::new(),
-    );
-    match args.get(2) {
-        Some(out_path) => std::fs::write(out_path, out).expect("write output"),
-        None => print!("{out}"),
+    match args[1].as_str() {
+        "typecheck" => {
+            if args.len() < 3 {
+                eprintln!("{usage}");
+                std::process::exit(2);
+            }
+            let stdlib = args.get(3).map(String::as_str).unwrap_or("stdlib-src");
+            typecheck(&args[2], stdlib);
+        }
+        "build" | "buildt" => {
+            if args.len() < 4 {
+                eprintln!("{usage}");
+                std::process::exit(2);
+            }
+            let stdlib = args.get(4).map(String::as_str).unwrap_or("stdlib-src");
+            build_typed(&args[2], &args[3], stdlib);
+        }
+        "typed" => {
+            let stdlib = args.get(4).map(String::as_str).unwrap_or("stdlib-src");
+            typed_single(&args[2], args.get(3).map(String::as_str), stdlib);
+        }
+        _ => {
+            let stdlib = std::env::var("GLEAM_CLJ_STDLIB").unwrap_or_else(|_| "stdlib-src".into());
+            typed_single(&args[1], args.get(2).map(String::as_str), &stdlib);
+        }
     }
 }
 
-/// Public shape of a module: constructor fields + per-fn parameter labels.
-#[derive(Default)]
-struct ModuleInfo {
-    constructors: HashMap<String, Vec<String>>,
-    /// gleam fn name -> external label of each parameter, in order
-    fn_labels: HashMap<String, Vec<Option<String>>>,
+/// Analyze stdlib + project sources and report: the typecheck gate.
+fn typecheck(proj: &str, stdlib_dir: &str) {
+    let sources = gather_typed_sources(proj, stdlib_dir);
+    let n = sources.len();
+    let analyzed = analysis::analyze(sources);
+    for m in &analyzed {
+        if m.emit {
+            eprintln!("typed {} ({} functions)", m.path, m.module.definitions.functions.len());
+        }
+    }
+    println!("TYPECHECKED {n} modules");
 }
 
-mod stdlib_labels;
 
-fn stdlib_registry() -> HashMap<String, ModuleInfo> {
-    let mut g: HashMap<String, ModuleInfo> = HashMap::new();
-    for (module, name, labels) in stdlib_labels::STDLIB_LABELS {
-        g.entry(module.to_string()).or_default().fn_labels.insert(
-            name.to_string(),
-            labels.iter().map(|l| l.map(String::from)).collect(),
-        );
-    }
-    let order = g.entry("gleam/order".to_string()).or_default();
-    for c in ["Lt", "Eq", "Gt"] {
-        order.constructors.insert(c.into(), vec![]);
-    }
-    let option = g.entry("gleam/option".to_string()).or_default();
-    option.constructors.insert("Some".into(), vec!["value".into()]);
-    option.constructors.insert("None".into(), vec![]);
-    g
-}
+
 
 
 /// Definitions active on this backend: untargeted or erlang-targeted (BEAM
@@ -116,50 +85,7 @@ fn active_defs(module: &UntypedModule) -> impl Iterator<Item = &gleam_core::ast:
     })
 }
 
-fn register_module(global: &mut HashMap<String, ModuleInfo>, path: &str, module: &UntypedModule) {
-    let mut info = ModuleInfo::default();
-    for def in active_defs(module) {
-        match &def.definition {
-            Definition::CustomType(t) => {
-                for c in &t.constructors {
-                    info.constructors
-                        .insert(c.name.to_string(), constructor_fields(c));
-                }
-            }
-            Definition::Function(f) => {
-                if let Some((_, name)) = &f.name {
-                    let labels = f
-                        .arguments
-                        .iter()
-                        .map(|a| match &a.names {
-                            ArgNames::NamedLabelled { label, .. }
-                            | ArgNames::LabelledDiscard { label, .. } => {
-                                Some(label.to_string())
-                            }
-                            _ => None,
-                        })
-                        .collect();
-                    info.fn_labels.insert(name.to_string(), labels);
-                }
-            }
-            _ => {}
-        }
-    }
-    global.insert(path.to_string(), info);
-}
 
-fn constructor_fields(c: &gleam_core::ast::RecordConstructor<()>) -> Vec<String> {
-    let n = c.arguments.len();
-    c.arguments
-        .iter()
-        .enumerate()
-        .map(|(i, a)| match &a.label {
-            Some((_, l)) => kebab(l.as_str()),
-            None if n == 1 => "value".to_string(),
-            None => format!("f{i}"),
-        })
-        .collect()
-}
 
 fn collect_gleam_files(dir: &std::path::Path, base: &std::path::Path, out: &mut Vec<(String, std::path::PathBuf)>) {
     for entry in std::fs::read_dir(dir).expect("read src dir") {
@@ -174,122 +100,8 @@ fn collect_gleam_files(dir: &std::path::Path, base: &std::path::Path, out: &mut 
     }
 }
 
-/// Phase A of the typed pipeline: analyze stdlib + project sources with
-/// gleam-core's type checker and report, proving TypedModules flow end to end.
-fn typecheck(proj: &str, stdlib_dir: &str) {
-    let mut files: Vec<(String, std::path::PathBuf, bool)> = Vec::new();
-    let stdlib_src = std::path::Path::new(stdlib_dir).join("src");
-    if stdlib_src.exists() {
-        let mut v = Vec::new();
-        collect_gleam_files(&stdlib_src, &stdlib_src, &mut v);
-        files.extend(v.into_iter().map(|(m, f)| (m, f, true)));
-    }
-    for root in ["src", "test"] {
-        let dir = std::path::Path::new(proj).join(root);
-        if dir.exists() {
-            let mut v = Vec::new();
-            collect_gleam_files(&dir, &dir, &mut v);
-            files.extend(v.into_iter().map(|(m, f)| (m, f, false)));
-        }
-    }
-    let mut seen = std::collections::HashSet::new();
-    files.retain(|(m, _, _)| seen.insert(m.clone()));
 
-    let sources: Vec<analysis::SourceModule> = files
-        .into_iter()
-        .map(|(path, file, is_dep)| analysis::SourceModule {
-            file_name: file.to_string_lossy().to_string(),
-            src: std::fs::read_to_string(&file).expect("read module"),
-            path,
-            is_dep,
-        })
-        .collect();
-    let n = sources.len();
-    let analyzed = analysis::analyze(sources);
-    for m in &analyzed {
-        eprintln!(
-            "typed {} ({} definitions)",
-            m.path,
-            m.module.definitions.functions.len()
-        );
-    }
-    println!("TYPECHECKED {n} modules");
-}
-
-fn build_project(proj: &str, out_dir: &str) {
-    let mut files = Vec::new();
-    for root in ["src", "test"] {
-        let dir = std::path::Path::new(proj).join(root);
-        if dir.exists() {
-            collect_gleam_files(&dir, &dir, &mut files);
-        }
-    }
-    if files.is_empty() {
-        panic!("no .gleam files under {proj}/src");
-    }
-    files.sort();
-
-    // Package source roots vendored by `gleam build` — dependency modules are
-    // pulled in on demand by the import graph.
-    let packages_dir = std::path::Path::new(proj).join("build/packages");
-    let dep_roots: Vec<std::path::PathBuf> = if packages_dir.exists() {
-        std::fs::read_dir(&packages_dir)
-            .expect("read packages dir")
-            .filter_map(|e| {
-                let p = e.expect("dir entry").path().join("src");
-                p.exists().then_some(p)
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
-
-    // (module_path, file, is_dep)
-    let mut queue: Vec<(String, std::path::PathBuf, bool)> =
-        files.into_iter().map(|(m, f)| (m, f, false)).collect();
-    let mut seen: std::collections::HashSet<String> =
-        queue.iter().map(|(m, _, _)| m.clone()).collect();
-    let mut parsed_modules = Vec::new();
-    let mut global = stdlib_registry();
-    while let Some((module_path, file, is_dep)) = queue.pop() {
-        let src = std::fs::read_to_string(&file).expect("read module");
-        let path = camino::Utf8PathBuf::from(file.to_string_lossy().to_string());
-        let parsed = parse::parse_module(path, &src, &WarningEmitter::null())
-            .unwrap_or_else(|e| panic!("parse error in {module_path}: {e:?}"));
-        for def in active_defs(&parsed.module) {
-            if let Definition::Import(import) = &def.definition {
-                let m = import.module.to_string();
-                // gleam/* and gleeunit are shimmed; everything else must be
-                // found in a vendored package or the build fails loudly.
-                if m == "gleam"
-                    || m.starts_with("gleam/")
-                    || m == "gleeunit"
-                    || m.starts_with("gleeunit/")
-                {
-                    continue;
-                }
-                if !seen.insert(m.clone()) {
-                    continue;
-                }
-                let dep_file = dep_roots
-                    .iter()
-                    .map(|root| root.join(format!("{m}.gleam")))
-                    .find(|p| p.exists())
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "module {m} (imported by {module_path}) not found in \
-                             src/, test/, or any vendored package — run `gleam build` \
-                             first or add the package"
-                        )
-                    });
-                queue.push((m, dep_file, true));
-            }
-        }
-        register_module(&mut global, &module_path, &parsed.module);
-        parsed_modules.push((module_path, file, src, parsed, is_dep));
-    }
-
-    // Optional user externals map: lines of `module fn clojure.ns/var`.
+fn load_externals(proj: &str) -> HashMap<(String, String), String> {
     let mut externals: HashMap<(String, String), String> = HashMap::new();
     let map_path = std::path::Path::new(proj).join("clojure-externals.txt");
     if map_path.exists() {
@@ -302,37 +114,155 @@ fn build_project(proj: &str, out_dir: &str) {
             let [module, fun, target] = parts[..] else {
                 panic!("bad clojure-externals.txt line (want `module fn ns/var`): {line}");
             };
-            let known = global
-                .get(module)
-                .is_some_and(|m| m.fn_labels.contains_key(fun));
-            if !known {
-                panic!(
-                    "clojure-externals.txt maps {module}.{fun}, but no such fn \
-                     exists in this build"
-                );
+            let _ = externals.insert((module.to_string(), fun.to_string()), target.to_string());
+        }
+    }
+    externals
+}
+
+/// Gather sources for the typed pipeline: our stdlib (analyze-only), the
+/// project's src/ and test/, and vendored pure-Gleam deps discovered by the
+/// import graph. gleeunit is analyzed for its interface but never emitted
+/// (a Clojure shim provides the runtime).
+fn gather_typed_sources(proj: &str, stdlib_dir: &str) -> Vec<analysis::SourceModule> {
+    let stdlib_root = std::path::Path::new(stdlib_dir).join("src");
+    let emit_stdlib = std::fs::canonicalize(proj).ok()
+        == std::fs::canonicalize(stdlib_dir).ok();
+    let mut files: Vec<(String, std::path::PathBuf, bool, bool)> = Vec::new(); // (path, file, is_dep, emit)
+    if stdlib_root.exists() {
+        let mut v = Vec::new();
+        collect_gleam_files(&stdlib_root, &stdlib_root, &mut v);
+        files.extend(v.into_iter().map(|(m, f)| (m, f, true, emit_stdlib)));
+    }
+    if !emit_stdlib {
+        for root in ["src", "test"] {
+            let dir = std::path::Path::new(proj).join(root);
+            if dir.exists() {
+                let mut v = Vec::new();
+                collect_gleam_files(&dir, &dir, &mut v);
+                files.extend(v.into_iter().map(|(m, f)| (m, f, false, true)));
             }
-            externals.insert((module.to_string(), fun.to_string()), target.to_string());
+        }
+    }
+    let mut seen: std::collections::HashSet<String> =
+        files.iter().map(|(m, _, _, _)| m.clone()).collect();
+
+    // Import-graph BFS into vendored packages.
+    let packages_dir = std::path::Path::new(proj).join("build/packages");
+    let dep_roots: Vec<std::path::PathBuf> = if packages_dir.exists() {
+        std::fs::read_dir(&packages_dir)
+            .expect("read packages dir")
+            .filter_map(|e| {
+                let p = e.expect("dir entry").path().join("src");
+                p.exists().then_some(p)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let emitter = WarningEmitter::null();
+    let mut queue: Vec<std::path::PathBuf> = files.iter().map(|(_, f, _, _)| f.clone()).collect();
+    while let Some(file) = queue.pop() {
+        let src = std::fs::read_to_string(&file).expect("read module");
+        let path = camino::Utf8PathBuf::from(file.to_string_lossy().to_string());
+        let Ok(parsed) = parse::parse_module(path, &src, &emitter) else { continue };
+        for def in active_defs(&parsed.module) {
+            if let Definition::Import(import) = &def.definition {
+                let m = import.module.to_string();
+                if m == "gleam" || m.starts_with("gleam/") || seen.contains(&m) {
+                    continue;
+                }
+                let Some(dep_file) = dep_roots
+                    .iter()
+                    .map(|root| root.join(format!("{m}.gleam")))
+                    .find(|p| p.exists())
+                else {
+                    panic!(
+                        "module {m} not found in src/, test/, or any vendored package — \
+                         run `gleam build` first or add the package"
+                    );
+                };
+                let _ = seen.insert(m.clone());
+                // gleeunit: interface only, runtime comes from the shim.
+                let emit = !(m == "gleeunit" || m.starts_with("gleeunit/"));
+                files.push((m, dep_file.clone(), true, emit));
+                queue.push(dep_file);
+            }
         }
     }
 
-    parsed_modules.sort_by(|a, b| a.0.cmp(&b.0));
-    for (module_path, file, src, parsed, is_dep) in &parsed_modules {
-        let file_name = file.file_name().expect("file name").to_string_lossy().to_string();
-        let code = emit_module(
-            &parsed.module,
-            module_path,
-            &file_name,
-            src,
-            &global,
-            *is_dep,
-            &externals,
-        );
-        let out_path = std::path::Path::new(out_dir).join(format!("{module_path}.clj"));
+    files
+        .into_iter()
+        .map(|(path, file, is_dep, emit)| analysis::SourceModule {
+            file_name: file.to_string_lossy().to_string(),
+            src: std::fs::read_to_string(&file).expect("read module"),
+            path,
+            is_dep,
+            emit,
+        })
+        .collect()
+}
+
+fn build_typed(proj: &str, out_dir: &str, stdlib_dir: &str) {
+    let sources = gather_typed_sources(proj, stdlib_dir);
+    let analyzed = analysis::analyze(sources);
+    let global = emit::build_typed_global(&analyzed);
+    let mut externals = load_externals(proj);
+    if std::fs::canonicalize(proj).ok() != std::fs::canonicalize(stdlib_dir).ok() {
+        // Stdlib overrides apply when its modules get analyzed for interfaces
+        // but are never emitted here, so only project map entries matter; the
+        // stdlib map is still needed when emitting the stdlib itself.
+    } else {
+        externals.extend(load_externals(stdlib_dir));
+    }
+    for m in &analyzed {
+        if !m.emit {
+            continue;
+        }
+        let code = emit::emit_module(m, &global, &externals);
+        let out_path = std::path::Path::new(out_dir).join(format!("{}.clj", m.path));
         std::fs::create_dir_all(out_path.parent().expect("parent")).expect("mkdir");
         std::fs::write(&out_path, code).expect("write output");
         eprintln!("emitted {}", out_path.display());
     }
 }
+
+fn typed_single(input: &str, output: Option<&str>, stdlib_dir: &str) {
+    let stdlib_root = std::path::Path::new(stdlib_dir).join("src");
+    let mut files: Vec<(String, std::path::PathBuf, bool, bool)> = Vec::new();
+    if stdlib_root.exists() {
+        let mut v = Vec::new();
+        collect_gleam_files(&stdlib_root, &stdlib_root, &mut v);
+        files.extend(v.into_iter().map(|(m, f)| (m, f, true, false)));
+    }
+    let path = std::path::Path::new(input);
+    let stem = path.file_stem().expect("file stem").to_string_lossy().to_string();
+    files.push((stem.clone(), path.to_path_buf(), false, true));
+    let sources: Vec<analysis::SourceModule> = files
+        .into_iter()
+        .map(|(p, file, is_dep, emit)| analysis::SourceModule {
+            file_name: file
+                .file_name()
+                .expect("file name")
+                .to_string_lossy()
+                .to_string(),
+            src: std::fs::read_to_string(&file).expect("read module"),
+            path: p,
+            is_dep,
+            emit,
+        })
+        .collect();
+    let analyzed = analysis::analyze(sources);
+    let global = emit::build_typed_global(&analyzed);
+    let externals = HashMap::new();
+    let m = analyzed.iter().find(|m| m.emit).expect("target module");
+    let code = emit::emit_module(m, &global, &externals);
+    match output {
+        Some(out) => std::fs::write(out, code).expect("write output"),
+        None => print!("{code}"),
+    }
+}
+
 
 fn sp(n: usize) -> String {
     " ".repeat(n)
@@ -342,15 +272,6 @@ fn kebab(s: &str) -> String {
     s.replace('_', "-")
 }
 
-/// Where a constructor's record class lives.
-#[derive(Clone)]
-enum Origin {
-    Local,
-    Prelude,
-    Module(String),
-    /// Imported with `as`: (module, original constructor name)
-    ModuleAs(String, String),
-}
 
 /// Clojure special forms: a top-level Gleam fn with one of these names gets
 /// a `*` suffix, since e.g. `(new 1)` would hit the special form, not the var.
@@ -390,44 +311,7 @@ fn user_var(kebab_name: &str) -> String {
     }
 }
 
-struct Ctx<'a> {
-    /// alias -> full gleam module name, e.g. "dict" -> "gleam/dict"
-    aliases: HashMap<String, String>,
-    /// constructor name -> (field names, origin)
-    constructors: HashMap<String, (Vec<String>, Origin)>,
-    /// kebab-case names of this module's top-level functions
-    local_fns: std::collections::HashSet<String>,
-    /// unqualified fn imports: kebab local name -> (alias, original gleam label)
-    unqualified_fns: HashMap<String, (String, String)>,
-    /// this module's gleam path, e.g. "glick80_api"
-    module_path: String,
-    /// dependency modules use Gleam bodies as external fallbacks
-    is_dep: bool,
-    /// user-supplied externals map: (module, gleam fn) -> clojure var
-    externals: &'a HashMap<(String, String), String>,
-    /// every known module's public shape
-    global: &'a HashMap<String, ModuleInfo>,
-    /// names bound anywhere in the function currently being emitted (flat,
-    /// per top-level fn) — locals shadow module fns, as in Gleam
-    scope: std::cell::RefCell<std::collections::HashSet<String>>,
-    /// source file name, for echo location prefixes
-    file: String,
-    /// byte offset of each line start, for byte-offset -> line-number lookup
-    line_starts: Vec<u32>,
-}
 
-impl Ctx<'_> {
-    /// 1-based line number for a byte offset.
-    fn line_of(&self, byte: u32) -> usize {
-        self.line_starts.partition_point(|&s| s <= byte)
-    }
-
-    /// Module function reference: every compiled module (stdlib included)
-    /// applies the same defn rename rules the target module itself used.
-    fn module_fn(&self, alias: &str, label: &str) -> String {
-        format!("{alias}/{}", local_fn_name(&kebab(label)))
-    }
-}
 
 /// Class reference for a prelude variant, fully qualified when the simple
 /// name collides with an auto-imported java.lang class.
@@ -439,936 +323,7 @@ fn class_ref(name: &str) -> String {
     }
 }
 
-impl Ctx<'_> {
-    /// Fields of a constructor in an imported module, via its alias. Loud on
-    /// unknown modules/constructors.
-    fn imported_ctor_fields(&self, alias: &str, name: &str) -> &Vec<String> {
-        let module = self
-            .aliases
-            .get(alias)
-            .unwrap_or_else(|| panic!("unknown module alias {alias}"));
-        self.global
-            .get(module)
-            .unwrap_or_else(|| panic!("module {module} is not part of this build"))
-            .constructors
-            .get(name)
-            .unwrap_or_else(|| panic!("module {module} has no constructor {name}"))
-    }
 
-    /// Constructor function reference, e.g. `->Circle`, `p/->Ok`, `order/->Lt`.
-    fn ctor_ref(&self, name: &str) -> String {
-        match self.constructors.get(name) {
-            Some((_, Origin::Local)) => format!("->{name}"),
-            Some((_, Origin::Prelude)) => format!("p/->{name}"),
-            Some((_, Origin::Module(m))) => {
-                let alias = self.alias_of(m, name);
-                format!("{alias}/->{name}")
-            }
-            Some((_, Origin::ModuleAs(m, orig))) => {
-                let alias = self.alias_of(m, name);
-                format!("{alias}/->{orig}")
-            }
-            None => panic!("unknown constructor (v0): {name}"),
-        }
-    }
-
-    fn alias_of(&self, module: &str, ctor: &str) -> String {
-        self.aliases
-            .iter()
-            .find(|(_, v)| v.as_str() == module)
-            .map(|(k, _)| k.clone())
-            .unwrap_or_else(|| panic!("constructor {ctor} needs an import of {module}"))
-    }
-
-    /// Record class reference for instance? checks.
-    fn ctor_class(&self, name: &str) -> String {
-        match self.constructors.get(name) {
-            Some((_, Origin::Local)) => name.to_string(),
-            Some((_, Origin::Prelude)) => class_ref(name),
-            Some((_, Origin::Module(m))) => format!("{}.{name}", m.replace("/", ".")),
-            Some((_, Origin::ModuleAs(m, orig))) => {
-                format!("{}.{orig}", m.replace("/", "."))
-            }
-            None => panic!("unknown constructor in pattern (v0): {name}"),
-        }
-    }
-}
-
-fn emit_module(
-    module: &UntypedModule,
-    module_path: &str,
-    file_name: &str,
-    src: &str,
-    global: &HashMap<String, ModuleInfo>,
-    is_dep: bool,
-    externals: &HashMap<(String, String), String>,
-) -> String {
-    let mut line_starts = vec![0u32];
-    for (i, b) in src.bytes().enumerate() {
-        if b == b'\n' {
-            line_starts.push(i as u32 + 1);
-        }
-    }
-    let mut constructors = HashMap::new();
-    let val = || vec!["value".to_string()];
-    constructors.insert("Ok".to_string(), (val(), Origin::Prelude));
-    constructors.insert("Error".to_string(), (val(), Origin::Prelude));
-    for c in ["Lt", "Eq", "Gt"] {
-        constructors.insert(c.to_string(), (vec![], Origin::Module("gleam/order".into())));
-    }
-    constructors.insert("Some".to_string(), (val(), Origin::Module("gleam/option".into())));
-    constructors.insert("None".to_string(), (vec![], Origin::Module("gleam/option".into())));
-    let self_info = &global[module_path];
-    for (name, fields) in &self_info.constructors {
-        constructors.insert(name.clone(), (fields.clone(), Origin::Local));
-    }
-    let mut local_fns = std::collections::HashSet::new();
-    for def in active_defs(module) {
-        if let Definition::Function(f) = &def.definition {
-            if let Some((_, n)) = &f.name {
-                local_fns.insert(kebab(n.as_str()));
-            }
-        }
-    }
-
-    let mut ctx = Ctx {
-        aliases: HashMap::new(),
-        constructors,
-        local_fns,
-        unqualified_fns: HashMap::new(),
-        module_path: module_path.to_string(),
-        is_dep,
-        externals,
-        global,
-        scope: std::cell::RefCell::new(std::collections::HashSet::new()),
-        file: file_name.to_string(),
-        line_starts,
-    };
-    let mut requires: Vec<(String, String)> = Vec::new(); // (clj ns, alias)
-
-    // @external(javascript, "some.clojure.ns", "fn") is interpreted as the
-    // Clojure binding on this backend; its namespace must be required.
-    let mut external_nses: Vec<String> = active_defs(module)
-        .filter_map(|def| match &def.definition {
-            Definition::Function(f) => {
-                let name = f.name.as_ref().map(|(_, n)| n.to_string())?;
-                if let Some(target) =
-                    externals.get(&(module_path.to_string(), name))
-                {
-                    // Mapped external: require the target var's namespace.
-                    return target.split('/').next().map(String::from);
-                }
-                if is_dep {
-                    return None;
-                }
-                f.external_javascript.as_ref().map(|(m, _, _)| m.to_string())
-            }
-            _ => None,
-        })
-        .filter(|m| !m.contains('/'))
-        .collect();
-    external_nses.sort();
-    external_nses.dedup();
-
-    for def in active_defs(module) {
-        if let Definition::Import(import) = &def.definition {
-            let alias = match import.used_name() {
-                Some(a) => a.to_string(),
-                None => continue,
-            };
-            ctx.aliases.insert(alias.clone(), import.module.to_string());
-            let is_prelude_import = import.module.as_str() == "gleam";
-            for uv in &import.unqualified_values {
-                if is_prelude_import {
-                    // Prelude values (Ok/Error/Nil/...) are already known.
-                    continue;
-                }
-                let name = uv.name.as_str();
-                let local = uv.as_name.as_ref().map(|n| n.as_str()).unwrap_or(name);
-                if name.starts_with(char::is_uppercase) {
-                    let fields = ctx.imported_ctor_fields(&alias, name).clone();
-                    let origin = match &uv.as_name {
-                        Some(_) => {
-                            Origin::ModuleAs(import.module.to_string(), name.to_string())
-                        }
-                        None => Origin::Module(import.module.to_string()),
-                    };
-                    ctx.constructors.insert(local.to_string(), (fields, origin));
-                } else {
-                    ctx.unqualified_fns
-                        .insert(kebab(local), (alias.clone(), name.to_string()));
-                }
-            }
-            if !is_prelude_import {
-                requires.push((kebab(&import.module.replace("/", ".")), alias));
-            }
-        }
-    }
-    requires.push(("gleam.prelude".into(), "p".into()));
-    requires.sort();
-    let mut require_entries: Vec<String> = requires
-        .iter()
-        .map(|(ns, alias)| format!("[{ns} :as {alias}]"))
-        .collect();
-    require_entries.extend(external_nses.iter().map(|ns| format!("[{ns}]")));
-    require_entries.sort();
-
-    // Top-level names that will shadow clojure.core get an explicit exclude
-    // (the emitter never emits these bare; names it does emit bare are
-    // renamed via CORE_SHADOW instead).
-    let mut excludes: Vec<String> = Vec::new();
-    for def in active_defs(module) {
-        let name = match &def.definition {
-            Definition::Function(f) => {
-                f.name.as_ref().map(|(_, n)| local_fn_name(&kebab(n.as_str())))
-            }
-            Definition::ModuleConstant(c) => Some(user_var(&kebab(c.name.as_str()))),
-            _ => None,
-        };
-        if let Some(n) = name {
-            if clojure_core_names().contains(n.as_str()) {
-                excludes.push(n);
-            }
-        }
-    }
-    excludes.sort();
-    excludes.dedup();
-
-    let mut out = String::new();
-    let _ = writeln!(out, "(ns {}", kebab(&module_path.replace("/", ".")));
-    if !excludes.is_empty() {
-        let _ = writeln!(out, "  (:refer-clojure :exclude [{}])", excludes.join(" "));
-    }
-    let _ = writeln!(out, "  (:require");
-    for (i, entry) in require_entries.iter().enumerate() {
-        let end = if i + 1 == require_entries.len() { ")" } else { "" };
-        let _ = writeln!(out, "   {entry}{end}");
-    }
-    let _ = writeln!(out, "  (:import (gleam.prelude Ok)))");
-
-    for def in active_defs(module) {
-        if let Definition::CustomType(t) = &def.definition {
-            let _ = write!(out, "\n;; type {}\n", t.name);
-            for c in &t.constructors {
-                if JAVA_LANG.contains(&c.name.as_str()) {
-                    let _ = writeln!(out, "(ns-unmap *ns* '{})", c.name);
-                }
-                let (fields, _) = &ctx.constructors[c.name.as_str()];
-                let _ = writeln!(out, "(defrecord {} [{}])", c.name, fields.join(" "));
-            }
-        }
-    }
-
-    // Emit definitions in call-dependency order (gleam-core's call graph),
-    // so forward declarations are only needed for mutual-recursion groups.
-    let functions: Vec<_> = active_defs(module)
-        .filter_map(|def| match &def.definition {
-            Definition::Function(f) => Some(f.clone()),
-            _ => None,
-        })
-        .collect();
-    let constants: Vec<_> = active_defs(module)
-        .filter_map(|def| match &def.definition {
-            Definition::ModuleConstant(c) => Some(c.clone()),
-            _ => None,
-        })
-        .collect();
-    let has_pub_main = functions.iter().any(|f| {
-        f.publicity == Publicity::Public
-            && f.name.as_ref().is_some_and(|(_, n)| n.as_str() == "main")
-    });
-
-    let groups = gleam_core::call_graph::into_dependency_order(functions, constants)
-        .unwrap_or_else(|e| panic!("call graph error: {e:?}"));
-    use gleam_core::call_graph::CallGraphNode;
-    for group in groups {
-        if group.len() > 1 {
-            let names: Vec<String> = group
-                .iter()
-                .map(|node| match node {
-                    CallGraphNode::Function(f) => local_fn_name(&kebab(
-                        f.name.as_ref().expect("function name").1.as_str(),
-                    )),
-                    CallGraphNode::ModuleConstant(c) => user_var(&kebab(c.name.as_str())),
-                })
-                .collect();
-            let _ = writeln!(out, "\n(declare {})", names.join(" "));
-        }
-        for node in group {
-            match node {
-                CallGraphNode::Function(f) => {
-                    out.push('\n');
-                    out.push_str(&emit_function(&ctx, &f));
-                }
-                CallGraphNode::ModuleConstant(c) => {
-                    let private =
-                        if c.publicity == Publicity::Public { "" } else { "^:private " };
-                    let _ = write!(
-                        out,
-                        "\n(def {private}{} {})\n",
-                        user_var(&kebab(c.name.as_str())),
-                        emit_constant(&ctx, &c.value)
-                    );
-                }
-            }
-        }
-    }
-    if has_pub_main {
-        out.push_str("\n(defn -main [& _]\n  (main))\n");
-    }
-    out
-}
-
-
-/// Every name bound anywhere inside a function body (params are added by the
-/// caller): let/case/use patterns. Used as a flat per-function scope so local
-/// variables shadow same-named module fns, as they do in Gleam.
-fn collect_bound_names(stmts: &[&UntypedStatement], out: &mut std::collections::HashSet<String>) {
-    fn pattern_vars(p: &UntypedPattern, out: &mut std::collections::HashSet<String>) {
-        match p {
-            Pattern::Variable { name, .. } => {
-                out.insert(name.to_string());
-            }
-            Pattern::Assign { name, pattern, .. } => {
-                out.insert(name.to_string());
-                pattern_vars(pattern, out);
-            }
-            Pattern::Tuple { elements, .. } => {
-                for e in elements {
-                    pattern_vars(e, out);
-                }
-            }
-            Pattern::List { elements, tail, .. } => {
-                for e in elements {
-                    pattern_vars(e, out);
-                }
-                if let Some(t) = tail {
-                    pattern_vars(&t.pattern, out);
-                }
-            }
-            Pattern::Constructor { arguments, .. } => {
-                for a in arguments {
-                    pattern_vars(&a.value, out);
-                }
-            }
-            Pattern::StringPrefix {
-                left_side_assignment,
-                right_side_assignment,
-                ..
-            } => {
-                if let Some((n, _)) = left_side_assignment {
-                    out.insert(n.to_string());
-                }
-                if let gleam_core::ast::AssignName::Variable(n) = right_side_assignment {
-                    out.insert(n.to_string());
-                }
-            }
-            _ => {}
-        }
-    }
-    fn walk_expr(e: &UntypedExpr, out: &mut std::collections::HashSet<String>) {
-        match e {
-            UntypedExpr::Block { statements, .. } => {
-                let v: Vec<&UntypedStatement> = statements.iter().collect();
-                collect_bound_names(&v, out);
-            }
-            UntypedExpr::Fn { body, .. } => {
-                let v: Vec<&UntypedStatement> = body.iter().collect();
-                collect_bound_names(&v, out);
-            }
-            UntypedExpr::Case { subjects, clauses, .. } => {
-                for s in subjects {
-                    walk_expr(s, out);
-                }
-                for c in clauses.as_deref().unwrap_or_default() {
-                    for ps in std::iter::once(&c.pattern).chain(c.alternative_patterns.iter()) {
-                        for p in ps {
-                            pattern_vars(p, out);
-                        }
-                    }
-                    walk_expr(&c.then, out);
-                }
-            }
-            UntypedExpr::Call { fun, arguments, .. } => {
-                walk_expr(fun, out);
-                for a in arguments {
-                    walk_expr(&a.value, out);
-                }
-            }
-            UntypedExpr::BinOp { left, right, .. } => {
-                walk_expr(left, out);
-                walk_expr(right, out);
-            }
-            UntypedExpr::PipeLine { expressions } => {
-                for x in expressions {
-                    walk_expr(x, out);
-                }
-            }
-            UntypedExpr::List { elements, tail, .. } => {
-                for x in elements {
-                    walk_expr(x, out);
-                }
-                if let Some(t) = tail {
-                    walk_expr(t, out);
-                }
-            }
-            UntypedExpr::Tuple { elements, .. } => {
-                for x in elements {
-                    walk_expr(x, out);
-                }
-            }
-            UntypedExpr::TupleIndex { tuple, .. } => walk_expr(tuple, out),
-            UntypedExpr::FieldAccess { container, .. } => walk_expr(container, out),
-            UntypedExpr::NegateBool { value, .. } | UntypedExpr::NegateInt { value, .. } => {
-                walk_expr(value, out)
-            }
-            UntypedExpr::Echo { expression, .. } => {
-                if let Some(x) = expression {
-                    walk_expr(x, out);
-                }
-            }
-            UntypedExpr::RecordUpdate { record, arguments, .. } => {
-                walk_expr(&record.base, out);
-                for a in arguments {
-                    walk_expr(&a.value, out);
-                }
-            }
-            UntypedExpr::BitArray { segments, .. } => {
-                for seg in segments {
-                    walk_expr(&seg.value, out);
-                }
-            }
-            _ => {}
-        }
-    }
-    for stmt in stmts {
-        match stmt {
-            Statement::Expression(e) => walk_expr(e, out),
-            Statement::Assignment(a) => {
-                pattern_vars(&a.pattern, out);
-                walk_expr(&a.value, out);
-            }
-            Statement::Use(u) => {
-                for a in &u.assignments {
-                    pattern_vars(&a.pattern, out);
-                }
-                walk_expr(&u.call, out);
-            }
-            Statement::Assert(a) => walk_expr(&a.value, out),
-        }
-    }
-}
-
-fn emit_function(ctx: &Ctx, f: &Function<(), UntypedExpr>) -> String {
-    let name = local_fn_name(&kebab(f.name.as_ref().expect("function name").1.as_str()));
-    if let Some(target) = ctx.externals.get(&(
-        ctx.module_path.clone(),
-        f.name.as_ref().expect("function name").1.to_string(),
-    )) {
-        return format!("(def {name} {target})\n");
-    }
-    if let Some((module, fun, _)) = &f.external_javascript {
-        // Project convention: a javascript external that looks like a Clojure
-        // namespace (no path separators) IS the Clojure binding. Real .mjs
-        // externals need a Gleam fallback body or an externals-map entry.
-        let looks_clojure = !module.contains('/') && !module.ends_with(".mjs");
-        if looks_clojure && !ctx.is_dep {
-            return format!("(def {name} {module}/{fun})\n");
-        }
-        if f.body.is_empty() {
-            panic!(
-                "module {} fn {name} requires a native external ({module}/{fun}) \
-                 and has no Gleam fallback body — supply a Clojure implementation \
-                 via clojure-externals.txt",
-                ctx.module_path
-            );
-        }
-    }
-    if f.body.is_empty() {
-        panic!(
-            "fn {name} in {} has no body and no usable external for this backend",
-            ctx.module_path
-        );
-    }
-    // Internal = public within the package in Gleam; other compiled modules
-    // call it, so it must be a public var.
-    let defn = if matches!(f.publicity, Publicity::Private) { "defn-" } else { "defn" };
-    let args: Vec<String> = f
-        .arguments
-        .iter()
-        .map(|a| match &a.names {
-            ArgNames::Named { name, .. } | ArgNames::NamedLabelled { name, .. } => {
-                user_var(&kebab(name.as_str()))
-            }
-            ArgNames::Discard { .. } | ArgNames::LabelledDiscard { .. } => "_".into(),
-        })
-        .collect();
-
-    let mut out = format!("({defn} {name}");
-    match &f.documentation {
-        Some((_, doc)) => {
-            let text: Vec<String> = doc
-                .lines()
-                .map(|l| l.trim().replace('\\', "\\\\").replace('"', "\\\""))
-                .collect();
-            let _ = write!(out, "\n  \"{}\"", text.join("\n  ").trim_end());
-            let _ = write!(out, "\n  [{}]\n  ", args.join(" "));
-        }
-        None => {
-            let _ = write!(out, " [{}]\n  ", args.join(" "));
-        }
-    }
-    let stmts: Vec<&UntypedStatement> = f.body.iter().collect();
-    {
-        let mut scope = std::collections::HashSet::new();
-        for a in &f.arguments {
-            if let ArgNames::Named { name, .. } | ArgNames::NamedLabelled { name, .. } =
-                &a.names
-            {
-                scope.insert(name.to_string());
-            }
-        }
-        collect_bound_names(&stmts, &mut scope);
-        *ctx.scope.borrow_mut() = scope;
-    }
-    let tail = Tail { name: name.clone() };
-    out.push_str(&emit_body_t(ctx, &stmts, 2, Some(&tail)));
-    out.push_str(")\n");
-    out
-}
-
-/// Tail-position context: the enclosing function, for self-tail-call -> recur.
-struct Tail {
-    name: String,
-}
-
-fn emit_body(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize) -> String {
-    emit_body_t(ctx, stmts, ind, None)
-}
-
-/// Emit a statement sequence as one or more forms separated by newlines at `ind`.
-/// `tail` is the enclosing function when the sequence ends in tail position.
-fn emit_body_t(ctx: &Ctx, stmts: &[&UntypedStatement], ind: usize, tail: Option<&Tail>) -> String {
-    if stmts.is_empty() {
-        return "nil".into();
-    }
-    match stmts[0] {
-        Statement::Assignment(a) => match &a.kind {
-            AssignmentKind::Let | AssignmentKind::Generated => {
-                // Gather a run of consecutive `let <irrefutable pattern> = ...`
-                // into one binding vector, using Clojure destructuring.
-                let mut binds: Vec<(String, String)> = Vec::new();
-                let mut i = 0;
-                while i < stmts.len() {
-                    let Statement::Assignment(a2) = stmts[i] else { break };
-                    if !matches!(a2.kind, AssignmentKind::Let | AssignmentKind::Generated) {
-                        break;
-                    }
-                    let Some(form) = destructure_binding(ctx, &a2.pattern) else { break };
-                    let val_ind = ind + 6 + form.len() + 1; // col of value in "(let [form "
-                    binds.push((form, emit_expr(ctx, &a2.value, val_ind)));
-                    i += 1;
-                }
-                if binds.is_empty() {
-                    panic!(
-                        "unsupported let pattern (refutable pattern in plain let?): {:?}",
-                        stmts[0]
-                    );
-                }
-                let rest = emit_body_t(ctx, &stmts[i..], ind + 2, tail);
-                let bind_ind = ind + 6;
-                let binds_str = binds
-                    .iter()
-                    .map(|(n, v)| format!("{n} {v}"))
-                    .collect::<Vec<_>>()
-                    .join(&format!("\n{}", sp(bind_ind)));
-                format!("(let [{binds_str}]\n{}{rest})", sp(ind + 2))
-            }
-            AssignmentKind::Assert { message, .. } => {
-                let (_, binds) = pattern_cond(ctx, &a.pattern, "v");
-                if binds.is_empty() {
-                    let form = emit_assert(ctx, &a.value, &a.pattern, message.as_ref(), ind);
-                    if stmts.len() == 1 {
-                        form
-                    } else {
-                        format!(
-                            "{form}\n{}{}",
-                            sp(ind),
-                            emit_body_t(ctx, &stmts[1..], ind, tail)
-                        )
-                    }
-                } else {
-                    // Binding pattern: check, then destructure for the rest.
-                    let (tests, binds) = pattern_cond(ctx, &a.pattern, "v");
-                    let val = emit_expr(ctx, &a.value, ind + 8);
-                    let msg = match message {
-                        Some(m) => emit_expr(ctx, m, 0),
-                        None => "\"let assert failed\"".into(),
-                    };
-                    let test = and_join(&tests);
-                    let binds_str = binds
-                        .iter()
-                        .map(|(n, v)| format!("{n} {v}"))
-                        .collect::<Vec<_>>()
-                        .join(&format!("\n{}", sp(ind + 8)));
-                    let rest = if stmts.len() == 1 {
-                        "v".to_string()
-                    } else {
-                        emit_body_t(ctx, &stmts[1..], ind + 4, tail)
-                    };
-                    format!(
-                        "(let [v {val}]\n{i2}(when-not {test}\n{i4}(throw (ex-info {msg} {{:value v}})))\n{i2}(let [{binds_str}]\n{i4}{rest}))",
-                        i2 = sp(ind + 2),
-                        i4 = sp(ind + 4),
-                    )
-                }
-            }
-        },
-        Statement::Expression(e) => {
-            if stmts.len() == 1 {
-                emit_expr_t(ctx, e, ind, tail)
-            } else {
-                let s = emit_expr(ctx, e, ind);
-                format!("{s}\n{}{}", sp(ind), emit_body_t(ctx, &stmts[1..], ind, tail))
-            }
-        }
-        Statement::Use(_) => {
-            // Collect consecutive `use` lines into one flat with-use form.
-            let mut pairs: Vec<(String, String)> = Vec::new();
-            let mut i = 0;
-            let bind_ind = ind + 13; // col after "(p/with-use ["
-            while i < stmts.len() {
-                let Statement::Use(u) = stmts[i] else { break };
-                let params: Vec<String> = u
-                    .assignments
-                    .iter()
-                    .map(|a| {
-                        destructure_binding(ctx, &a.pattern)
-                            .unwrap_or_else(|| panic!("unsupported use pattern: {:?}", a.pattern))
-                    })
-                    .collect();
-                let params = format!("[{}]", params.join(" "));
-                let call = emit_expr(ctx, &u.call, bind_ind + params.len() + 1);
-                pairs.push((params, call));
-                i += 1;
-            }
-            let body = emit_body_t(ctx, &stmts[i..], ind + 2, None);
-            let pairs_str = pairs
-                .iter()
-                .map(|(p, c)| format!("{p} {c}"))
-                .collect::<Vec<_>>()
-                .join(&format!("\n{}", sp(bind_ind)));
-            format!("(p/with-use [{pairs_str}]\n{}{body})", sp(ind + 2))
-        }
-        Statement::Assert(a) => {
-            let val = emit_expr(ctx, &a.value, ind + 10);
-            let msg = match &a.message {
-                Some(m) => emit_expr(ctx, m, 0),
-                None => "\"assert failed\"".into(),
-            };
-            let form = format!(
-                "(when-not {val}\n{}(throw (ex-info {msg} {{:gleam/assert true}})))",
-                sp(ind + 2)
-            );
-            if stmts.len() == 1 {
-                form
-            } else {
-                format!("{form}\n{}{}", sp(ind), emit_body_t(ctx, &stmts[1..], ind, tail))
-            }
-        }
-    }
-}
-
-/// Clojure binding form for an irrefutable pattern (plain `let`), or None
-/// when the pattern could fail to match.
-fn destructure_binding(ctx: &Ctx, pattern: &UntypedPattern) -> Option<String> {
-    match pattern {
-        Pattern::Assign { name, pattern, .. } => {
-            let inner = destructure_binding(ctx, pattern)?;
-            let name = user_var(&kebab(name.as_str()));
-            if let Some(body) = inner.strip_suffix(']') {
-                Some(format!("{body} :as {name}]"))
-            } else if let Some(body) = inner.strip_suffix('}') {
-                Some(format!("{body} :as {name}}}"))
-            } else if inner == "_" {
-                Some(name)
-            } else {
-                panic!("unsupported `as` binding over non-destructuring pattern");
-            }
-        }
-        Pattern::Variable { name, .. } => Some(user_var(&kebab(name.as_str()))),
-        Pattern::Discard { .. } => Some("_".into()),
-        Pattern::Tuple { elements, .. } => {
-            let parts: Option<Vec<String>> =
-                elements.iter().map(|el| destructure_binding(ctx, el)).collect();
-            Some(format!("[{}]", parts?.join(" ")))
-        }
-        // Single-variant custom type (Gleam checked exhaustiveness): map destructure.
-        Pattern::Constructor { name, arguments, .. } => {
-            let (fields, _) = ctx.constructors.get(name.as_str())?;
-            if arguments.is_empty() {
-                return Some("_".into());
-            }
-            let mut parts = Vec::new();
-            let mut pos = 0;
-            for arg in arguments {
-                let field = match &arg.label {
-                    Some(l) => kebab(l.as_str()),
-                    None => {
-                        let f = fields.get(pos)?.clone();
-                        pos += 1;
-                        f
-                    }
-                };
-                // Discarded fields are simply not destructured (a repeated _
-                // key would be an illegal duplicate in a Clojure map form).
-                if matches!(arg.value, Pattern::Discard { .. }) {
-                    continue;
-                }
-                parts.push(format!("{} :{field}", destructure_binding(ctx, &arg.value)?));
-            }
-            if parts.is_empty() {
-                return Some("_".into());
-            }
-            Some(format!("{{{}}}", parts.join(" ")))
-        }
-        _ => None,
-    }
-}
-
-fn emit_assert(
-    ctx: &Ctx,
-    value: &UntypedExpr,
-    pattern: &UntypedPattern,
-    message: Option<&UntypedExpr>,
-    ind: usize,
-) -> String {
-    // Fully-literal pattern -> compare against the constructed value, one line.
-    if let Some(expected) = pattern_literal(ctx, pattern) {
-        let head = "(p/let-assert ";
-        let val = emit_expr(ctx, value, ind + head.len());
-        let msg = match message {
-            Some(m) => format!(" {}", emit_expr(ctx, m, 0)),
-            None => String::new(),
-        };
-        let inline = format!("{head}{expected} {val}{msg})");
-        if fits(&inline, ind) {
-            return inline;
-        }
-        return format!(
-            "{head}{expected}\n{}{val}{msg})",
-            sp(ind + head.len())
-        );
-    }
-
-    let (tests, binds) = pattern_cond(ctx, pattern, "v");
-    if !binds.is_empty() {
-        panic!("unsupported: let assert patterns that bind variables (v0)");
-    }
-    let val = emit_expr(ctx, value, ind + 8);
-    let msg = match message {
-        Some(m) => emit_expr(ctx, m, 0),
-        None => "\"let assert failed\"".into(),
-    };
-    let test = and_join(&tests);
-    format!(
-        "(let [v {val}]\n{i2}(when-not {test}\n{i4}(throw (ex-info {msg} {{:value v}}))))",
-        i2 = sp(ind + 2),
-        i4 = sp(ind + 4),
-    )
-}
-
-/// If the pattern is a pure literal (no bindings, no wildcards), the Clojure
-/// expression that constructs its value.
-fn pattern_literal(ctx: &Ctx, pattern: &UntypedPattern) -> Option<String> {
-    match pattern {
-        Pattern::Int { value, .. } => Some(int_lit(value)),
-        Pattern::Float { value, .. } => Some(int_lit(value)),
-        Pattern::String { value, .. } => Some(format!("\"{}\"", clj_string(value))),
-        Pattern::Constructor { name, arguments, spread, .. } => match name.as_str() {
-            "Nil" => Some("nil".into()),
-            "True" => Some("true".into()),
-            "False" => Some("false".into()),
-            n => {
-                if spread.is_some() {
-                    return None;
-                }
-                let (fields, _) = ctx.constructors.get(n)?;
-                // Positional-only and fully saturated, so field order is right.
-                if arguments.iter().any(|a| a.label.is_some())
-                    || arguments.len() != fields.len()
-                {
-                    return None;
-                }
-                let ctor = ctx.ctor_ref(n);
-                let mut parts = Vec::new();
-                for arg in arguments {
-                    parts.push(pattern_literal(ctx, &arg.value)?);
-                }
-                if parts.is_empty() {
-                    Some(format!("({ctor})"))
-                } else {
-                    Some(format!("({ctor} {})", parts.join(" ")))
-                }
-            }
-        },
-        Pattern::Tuple { elements, .. } => {
-            let parts: Option<Vec<String>> =
-                elements.iter().map(|el| pattern_literal(ctx, el)).collect();
-            Some(format!("[{}]", parts?.join(" ")))
-        }
-        Pattern::List { elements, tail: None, .. } => {
-            let parts: Option<Vec<String>> =
-                elements.iter().map(|el| pattern_literal(ctx, el)).collect();
-            let parts = parts?;
-            if parts.is_empty() {
-                Some("(list)".into())
-            } else {
-                Some(format!("(list {})", parts.join(" ")))
-            }
-        }
-        _ => None,
-    }
-}
-
-fn and_join(tests: &[String]) -> String {
-    match tests.len() {
-        0 => "true".into(),
-        1 => tests[0].clone(),
-        _ => format!("(and {})", tests.join(" ")),
-    }
-}
-
-/// Compile a pattern against subject expr `subj` into (tests, bindings).
-fn pattern_cond(
-    ctx: &Ctx,
-    pattern: &UntypedPattern,
-    subj: &str,
-) -> (Vec<String>, Vec<(String, String)>) {
-    let mut tests = Vec::new();
-    let mut binds = Vec::new();
-    pattern_cond_inner(ctx, pattern, subj, &mut tests, &mut binds);
-    (tests, binds)
-}
-
-fn pattern_cond_inner(
-    ctx: &Ctx,
-    pattern: &UntypedPattern,
-    subj: &str,
-    tests: &mut Vec<String>,
-    binds: &mut Vec<(String, String)>,
-) {
-    match pattern {
-        Pattern::Int { value, .. } => tests.push(format!("(= {subj} {})", int_lit(value))),
-        Pattern::Float { value, .. } => tests.push(format!("(= {subj} {})", int_lit(value))),
-        Pattern::String { value, .. } => {
-            tests.push(format!("(= {subj} \"{}\")", clj_string(value)))
-        }
-        Pattern::Variable { name, .. } => {
-            binds.push((user_var(&kebab(name.as_str())), subj.to_string()))
-        }
-        Pattern::Discard { .. } => {}
-        Pattern::Tuple { elements, .. } => {
-            for (i, el) in elements.iter().enumerate() {
-                pattern_cond_inner(ctx, el, &format!("(nth {subj} {i})"), tests, binds);
-            }
-        }
-        Pattern::Constructor { name, arguments, .. } => match name.as_str() {
-            "Nil" => tests.push(format!("(nil? {subj})")),
-            "True" => tests.push(subj.to_string()),
-            "False" => tests.push(format!("(not {subj})")),
-            n => {
-                let (fields, cls) = match pattern {
-                    Pattern::Constructor { module: Some((alias, _)), .. }
-                        if ctx.aliases.get(alias.as_str()).is_some_and(|m| m != "gleam") =>
-                    {
-                        let fields = ctx.imported_ctor_fields(alias.as_str(), n);
-                        let m = ctx.aliases[alias.as_str()].replace("/", ".");
-                        (fields, format!("{m}.{n}"))
-                    }
-                    _ => {
-                        let Some((fields, _)) = ctx.constructors.get(n) else {
-                            panic!("unknown constructor in pattern (v0): {n}");
-                        };
-                        (fields, ctx.ctor_class(n))
-                    }
-                };
-                tests.push(format!("(instance? {cls} {subj})"));
-                let mut pos = 0;
-                for arg in arguments {
-                    let field = match &arg.label {
-                        Some(l) => kebab(l.as_str()),
-                        None => {
-                            let f = fields
-                                .get(pos)
-                                .unwrap_or_else(|| panic!("too many pattern args for {n}"))
-                                .clone();
-                            pos += 1;
-                            f
-                        }
-                    };
-                    pattern_cond_inner(
-                        ctx,
-                        &arg.value,
-                        &format!("(:{field} {subj})"),
-                        tests,
-                        binds,
-                    );
-                }
-            }
-        },
-        Pattern::List { elements, tail, .. } => {
-            let n = elements.len();
-            match tail {
-                None if n == 0 => tests.push(format!("(empty? {subj})")),
-                None => {
-                    tests.push(format!("(= (count {subj}) {n})"));
-                }
-                Some(_) if n == 1 => tests.push(format!("(seq {subj})")),
-                Some(_) => tests.push(format!("(<= {n} (count {subj}))")),
-            }
-            for (i, el) in elements.iter().enumerate() {
-                let access = if i == 0 {
-                    format!("(first {subj})")
-                } else {
-                    format!("(nth {subj} {i})")
-                };
-                pattern_cond_inner(ctx, el, &access, tests, binds);
-            }
-            if let Some(t) = tail {
-                let access = if n == 1 {
-                    format!("(rest {subj})")
-                } else {
-                    format!("(nthrest {subj} {n})")
-                };
-                pattern_cond_inner(ctx, &t.pattern, &access, tests, binds);
-            }
-        }
-        Pattern::Assign { name, pattern, .. } => {
-            binds.push((user_var(&kebab(name.as_str())), subj.to_string()));
-            pattern_cond_inner(ctx, pattern, subj, tests, binds);
-        }
-        Pattern::StringPrefix {
-            left_side_string,
-            left_side_assignment,
-            right_side_assignment,
-            ..
-        } => {
-            let prefix = clj_string(left_side_string);
-            tests.push(format!("(.startsWith ^String {subj} \"{prefix}\")"));
-            if let Some((name, _)) = left_side_assignment {
-                binds.push((user_var(&kebab(name.as_str())), format!("\"{prefix}\"")));
-            }
-            if let gleam_core::ast::AssignName::Variable(name) = right_side_assignment {
-                binds.push((
-                    user_var(&kebab(name.as_str())),
-                    format!("(subs {subj} {})", gleam_str_len(left_side_string)),
-                ));
-            }
-        }
-        other => panic!("unsupported pattern (v0): {other:?}"),
-    }
-}
 
 fn int_lit(value: &str) -> String {
     let v = value.replace('_', "");
@@ -1458,702 +413,15 @@ fn gleam_str_len(value: &str) -> usize {
     n
 }
 
-fn binop(op: &BinOp) -> &'static str {
-    match op {
-        BinOp::And => "and",
-        BinOp::Or => "or",
-        BinOp::Eq => "=",
-        BinOp::NotEq => "not=",
-        BinOp::LtInt | BinOp::LtFloat => "<",
-        BinOp::LtEqInt | BinOp::LtEqFloat => "<=",
-        BinOp::GtInt | BinOp::GtFloat => ">",
-        BinOp::GtEqInt | BinOp::GtEqFloat => ">=",
-        BinOp::AddInt => "+'",
-        BinOp::AddFloat => "+",
-        BinOp::SubInt => "-'",
-        BinOp::SubFloat => "-",
-        BinOp::MultInt => "*'",
-        BinOp::MultFloat => "*",
-        BinOp::DivInt => "quot",
-        BinOp::DivFloat => "/",
-        BinOp::RemainderInt => "rem",
-        BinOp::Concatenate => "str",
-    }
-}
 
-fn emit_expr(ctx: &Ctx, e: &UntypedExpr, ind: usize) -> String {
-    emit_expr_t(ctx, e, ind, None)
-}
 
-fn emit_expr_t(ctx: &Ctx, e: &UntypedExpr, ind: usize, tail: Option<&Tail>) -> String {
-    match e {
-        UntypedExpr::Int { value, .. } => int_lit(value),
-        UntypedExpr::Float { value, .. } => int_lit(value),
-        UntypedExpr::String { value, .. } => format!("\"{}\"", clj_string(value)),
-        UntypedExpr::Var { name, .. } => match name.as_str() {
-            "Nil" => "nil".into(),
-            "True" => "true".into(),
-            "False" => "false".into(),
-            n if n.starts_with(char::is_uppercase) => match ctx.constructors.get(n) {
-                // A zero-field variant used as a value IS the constructed value.
-                Some((fields, _)) if fields.is_empty() => format!("({})", ctx.ctor_ref(n)),
-                Some(_) => ctx.ctor_ref(n),
-                None => panic!("unknown constructor (v0): {n}"),
-            },
-            n => {
-                let k = kebab(n);
-                if ctx.scope.borrow().contains(n) {
-                    user_var(&k)
-                } else if ctx.local_fns.contains(&k) {
-                    local_fn_name(&k)
-                } else if let Some((alias, label)) = ctx.unqualified_fns.get(&k) {
-                    ctx.module_fn(alias, label)
-                } else {
-                    user_var(&k)
-                }
-            }
-        },
-        UntypedExpr::FieldAccess { container, label, .. } => {
-            if let UntypedExpr::Var { name, .. } = container.as_ref() {
-                if let Some(module) = ctx.aliases.get(name.as_str()) {
-                    if module == "gleam" {
-                        // Qualified prelude access: gleam.Ok, gleam.Nil, ...
-                        return match label.as_str() {
-                            "Nil" => "nil".into(),
-                            "True" => "true".into(),
-                            "False" => "false".into(),
-                            l if l.starts_with(char::is_uppercase) => ctx.ctor_ref(l),
-                            l => panic!("unknown prelude member gleam.{l}"),
-                        };
-                    }
-                    if label.starts_with(char::is_uppercase) {
-                        let fields = ctx.imported_ctor_fields(name.as_str(), label.as_str());
-                        return if fields.is_empty() {
-                            format!("({name}/->{label})")
-                        } else {
-                            format!("{name}/->{label}")
-                        };
-                    }
-                    return ctx.module_fn(name.as_str(), label.as_str());
-                }
-            }
-            // record field access
-            format!(
-                "(:{} {})",
-                kebab(label.as_str()),
-                emit_expr(ctx, container, ind)
-            )
-        }
-        UntypedExpr::Tuple { elements, .. } => {
-            let parts: Vec<String> =
-                elements.iter().map(|el| emit_expr(ctx, el, ind + 1)).collect();
-            format!("[{}]", parts.join(" "))
-        }
-        UntypedExpr::TupleIndex { tuple, index, .. } => {
-            format!("(nth {} {index})", emit_expr(ctx, tuple, ind))
-        }
-        UntypedExpr::List { elements, tail, .. } => {
-            let parts: Vec<String> =
-                elements.iter().map(|el| emit_expr(ctx, el, ind + 6)).collect();
-            match tail {
-                None if parts.is_empty() => "(list)".into(),
-                None => format!("(list {})", parts.join(" ")),
-                Some(t) => format!(
-                    "(list* {} {})",
-                    parts.join(" "),
-                    emit_expr(ctx, t, ind)
-                ),
-            }
-        }
-        UntypedExpr::NegateInt { value, .. } => format!("(- {})", emit_expr(ctx, value, ind)),
-        UntypedExpr::NegateBool { value, .. } => format!("(not {})", emit_expr(ctx, value, ind)),
-        UntypedExpr::BinOp { operator, left, right, .. } => {
-            let op = binop(operator);
-            let l = emit_expr(ctx, left, ind);
-            let r = emit_expr(ctx, right, ind);
-            format!("({op} {l} {r})")
-        }
-        UntypedExpr::Fn { arguments, body, .. } => {
-            let args: Vec<String> = arguments
-                .iter()
-                .map(|a| match &a.names {
-                    ArgNames::Named { name, .. } | ArgNames::NamedLabelled { name, .. } => {
-                        user_var(&kebab(name.as_str()))
-                    }
-                    _ => "_".into(),
-                })
-                .collect();
-            let head = format!("(fn [{}] ", args.join(" "));
-            let stmts: Vec<&UntypedStatement> = body.iter().collect();
-            let inline_body = emit_body(ctx, &stmts, ind + head.len());
-            let inline = format!("{head}{inline_body})");
-            if fits(&inline, ind) {
-                inline
-            } else {
-                let b = emit_body(ctx, &stmts, ind + 2);
-                format!("(fn [{}]\n{}{b})", args.join(" "), sp(ind + 2))
-            }
-        }
-        UntypedExpr::Call { fun, arguments, .. } => {
-            emit_call_t(ctx, fun, arguments, ind, tail, false)
-        }
-        UntypedExpr::PipeLine { expressions } => {
-            let exprs: Vec<&UntypedExpr> = expressions.iter().collect();
-            let first = emit_expr(ctx, exprs[0], ind + 4);
-            let steps: Vec<String> = exprs[1..]
-                .iter()
-                .map(|step| match step {
-                    UntypedExpr::Call { fun, arguments, .. } => {
-                        emit_call_t(ctx, fun, arguments, ind + 4, None, true)
-                    }
-                    v @ (UntypedExpr::Var { .. } | UntypedExpr::FieldAccess { .. }) => {
-                        emit_expr(ctx, v, ind + 4)
-                    }
-                    // Anything else (fn captures etc.) must be wrapped so ->
-                    // threads into a call of it, not into its form.
-                    other => format!("({})", emit_expr(ctx, other, ind + 5)),
-                })
-                .collect();
-            let inline = format!("(-> {first} {})", steps.join(" "));
-            if fits(&inline, ind) {
-                inline
-            } else {
-                format!("(-> {first}\n{}{})", sp(ind + 4), steps.join(&format!("\n{}", sp(ind + 4))))
-            }
-        }
-        UntypedExpr::Case { subjects, clauses, .. } => {
-            emit_case(ctx, subjects, clauses.as_deref().unwrap_or_default(), ind, tail)
-        }
-        UntypedExpr::Block { statements, .. } => {
-            let stmts: Vec<&UntypedStatement> = statements.iter().collect();
-            let body = emit_body_t(ctx, &stmts, ind, tail);
-            // A block whose body reduces to a single form needs no `do`.
-            if stmts.len() == 1 || body.starts_with("(let ") {
-                body
-            } else {
-                let b = emit_body_t(ctx, &stmts, ind + 4, tail);
-                format!("(do {b})")
-            }
-        }
-        UntypedExpr::Echo { expression, message, location, .. } => {
-            // `|> echo` (no expression) threads as a bare fn reference.
-            let Some(expr) = expression else { return "p/echo".into() };
-            let prefix = match message {
-                Some(m) => emit_expr(ctx, m, ind),
-                None => format!("\"{}:{}\"", ctx.file, ctx.line_of(location.start)),
-            };
-            let inner = emit_expr(ctx, expr, ind + 8);
-            format!("(p/echo {inner} {prefix})")
-        }
-        UntypedExpr::BitArray { segments, .. } => {
-            use gleam_core::ast::BitArrayOption as Opt;
-            let parts: Vec<String> = segments
-                .iter()
-                .map(|seg| {
-                    let val = emit_expr(ctx, &seg.value, ind + 2);
-                    let utf8 = seg.options.iter().any(|o| matches!(o, Opt::Utf8 { .. }));
-                    let raw = seg
-                        .options
-                        .iter()
-                        .any(|o| matches!(o, Opt::Bits { .. } | Opt::Bytes { .. }));
-                    let size = seg.options.iter().find_map(|o| match o {
-                        Opt::Size { value, .. } => Some(emit_expr(ctx, value, ind + 2)),
-                        _ => None,
-                    });
-                    if utf8 {
-                        format!("(p/ba-utf8 {val})")
-                    } else if raw {
-                        val
-                    } else {
-                        format!("(p/ba-int {val} {})", size.unwrap_or_else(|| "8".into()))
-                    }
-                })
-                .collect();
-            format!("(p/bit-array {})", parts.join(" "))
-        }
-        UntypedExpr::RecordUpdate { record, arguments, .. } => {
-            let base = emit_expr(ctx, &record.base, ind);
-            let fields: Vec<String> = arguments
-                .iter()
-                .map(|a| {
-                    format!(
-                        ":{} {}",
-                        kebab(a.label.as_str()),
-                        emit_expr(ctx, &a.value, ind + 2)
-                    )
-                })
-                .collect();
-            format!("(assoc {base} {})", fields.join(" "))
-        }
-        UntypedExpr::Todo { message, .. } => {
-            let msg = message
-                .as_ref()
-                .map(|m| emit_expr(ctx, m, ind))
-                .unwrap_or_else(|| "\"todo\"".into());
-            format!("(throw (ex-info {msg} {{:gleam/todo true}}))")
-        }
-        UntypedExpr::Panic { message, .. } => {
-            let msg = message
-                .as_ref()
-                .map(|m| emit_expr(ctx, m, ind))
-                .unwrap_or_else(|| "\"panic\"".into());
-            format!("(throw (ex-info {msg} {{:gleam/panic true}}))")
-        }
-    }
-}
 
-/// Order call arguments by the callee's parameter labels. Labelled arguments
-/// are only accepted when their positions are provable — anything else panics.
-fn reorder_labelled<'x, T>(
-    head: &str,
-    sig: Option<&Vec<Option<String>>>,
-    arguments: &'x [CallArg<T>],
-    piped: bool,
-) -> Vec<&'x CallArg<T>> {
-    if !arguments.iter().any(|a| a.label.is_some()) {
-        return arguments.iter().collect();
-    }
-    let Some(sig) = sig else {
-        panic!(
-            "labelled arguments to `{head}` cannot be verified without type \
-             information (parse-only); add the callee to the registry or use \
-             positional arguments"
-        );
-    };
-    assert!(!piped, "piped labelled calls are handled by emit_call_t");
-    let sig: Vec<Option<String>> = sig.clone();
-    if arguments.len() != sig.len() {
-        panic!(
-            "call to `{head}` has {} args but signature has {} parameters",
-            arguments.len(),
-            sig.len()
-        );
-    }
-    let mut slots: Vec<Option<&CallArg<T>>> = vec![None; sig.len()];
-    for arg in arguments.iter().filter(|a| a.label.is_some()) {
-        let label = kebab(arg.label.as_ref().expect("label").as_str());
-        let i = sig
-            .iter()
-            .position(|s| s.as_deref() == Some(label.as_str()))
-            .unwrap_or_else(|| panic!("`{head}` has no parameter labelled {label}"));
-        if slots[i].is_some() {
-            panic!("duplicate argument for label {label} in call to `{head}`");
-        }
-        slots[i] = Some(arg);
-    }
-    let mut positional = arguments.iter().filter(|a| a.label.is_none());
-    for slot in slots.iter_mut() {
-        if slot.is_none() {
-            *slot = positional.next();
-        }
-    }
-    slots
-        .into_iter()
-        .map(|s| s.unwrap_or_else(|| panic!("missing argument in call to `{head}`")))
-        .collect()
-}
 
-fn emit_call_t(
-    ctx: &Ctx,
-    fun: &UntypedExpr,
-    arguments: &[CallArg<UntypedExpr>],
-    ind: usize,
-    tail: Option<&Tail>,
-    piped: bool,
-) -> String {
-    // Self-call in tail position -> recur (constant stack, matches BEAM TCO).
-    if let (Some(t), UntypedExpr::Var { name, .. }) = (tail, fun) {
-        if !name.starts_with(char::is_uppercase)
-            && !ctx.scope.borrow().contains(name.as_str())
-            && local_fn_name(&kebab(name.as_str())) == t.name
-        {
-            let args: Vec<String> = arguments
-                .iter()
-                .map(|a| emit_expr(ctx, &a.value, ind + 7))
-                .collect();
-            return format!("(recur {})", args.join(" "));
-        }
-    }
 
-    // Head plus, when derivable, the callee's parameter labels (kebab-case,
-    // None = positional-only) — needed to reorder labelled arguments.
-    let (head, sig): (String, Option<Vec<Option<String>>>) = match fun {
-        UntypedExpr::Var { name, .. } if name.starts_with(char::is_uppercase) => {
-            let sig = ctx
-                .constructors
-                .get(name.as_str())
-                .map(|(fields, _)| fields.iter().map(|f| Some(f.clone())).collect());
-            (ctx.ctor_ref(name.as_str()), sig)
-        }
-        UntypedExpr::Var { name, .. } => {
-            let k = kebab(name.as_str());
-            let sig = if ctx.local_fns.contains(&k) {
-                ctx.global[&ctx.module_path]
-                    .fn_labels
-                    .get(name.as_str())
-                    .map(|labels| {
-                        labels.iter().map(|l| l.as_deref().map(kebab)).collect()
-                    })
-            } else if let Some((alias, label)) = ctx.unqualified_fns.get(&k) {
-                let module = &ctx.aliases[alias];
-                ctx.global
-                    .get(module)
-                    .and_then(|m| m.fn_labels.get(label))
-                    .map(|labels| {
-                        labels.iter().map(|l| l.as_deref().map(kebab)).collect()
-                    })
-            } else {
-                None
-            };
-            (emit_expr(ctx, fun, ind), sig)
-        }
-        UntypedExpr::FieldAccess { container, label, .. } => {
-            let mut sig = None;
-            if let UntypedExpr::Var { name, .. } = container.as_ref() {
-                if let Some(module) = ctx.aliases.get(name.as_str()) {
-                    if label.starts_with(char::is_uppercase) {
-                        let fields = ctx.imported_ctor_fields(name.as_str(), label.as_str());
-                        sig = Some(fields.iter().map(|f| Some(f.clone())).collect());
-                    } else if let Some(info) = ctx.global.get(module) {
-                        sig = info.fn_labels.get(label.as_str()).map(|labels| {
-                            labels.iter().map(|l| l.as_deref().map(kebab)).collect()
-                        });
-                    }
-                }
-            }
-            (emit_expr(ctx, fun, ind), sig)
-        }
-        _ => (emit_expr(ctx, fun, ind), None),
-    };
 
-    // A piped call's threaded value fills the first parameter not taken by a
-    // labelled argument. When that slot is not position 0, `->` threading
-    // cannot express the call directly; wrap it in a unary fn.
-    if piped && arguments.iter().any(|a| a.label.is_some()) {
-        let Some(sig) = &sig else {
-            panic!(
-                "labelled arguments to piped `{head}` cannot be verified without \
-                 type information (parse-only)"
-            );
-        };
-        if arguments.len() + 1 != sig.len() {
-            panic!(
-                "piped call to `{head}` has {} args (+1 piped) but signature has \
-                 {} parameters",
-                arguments.len(),
-                sig.len()
-            );
-        }
-        let mut slots: Vec<Option<&CallArg<UntypedExpr>>> = vec![None; sig.len()];
-        for arg in arguments.iter().filter(|a| a.label.is_some()) {
-            let label = kebab(arg.label.as_ref().expect("label").as_str());
-            let i = sig
-                .iter()
-                .position(|l| l.as_deref() == Some(label.as_str()))
-                .unwrap_or_else(|| panic!("`{head}` has no parameter labelled {label}"));
-            slots[i] = Some(arg);
-        }
-        let piped_slot = slots
-            .iter()
-            .position(|s| s.is_none())
-            .expect("piped slot");
-        let mut positional = arguments.iter().filter(|a| a.label.is_none());
-        for (i, slot) in slots.iter_mut().enumerate() {
-            if i != piped_slot && slot.is_none() {
-                *slot = positional.next();
-            }
-        }
-        let arg_ind = ind + 1 + head.len() + 1;
-        let rendered: Vec<String> = slots
-            .iter()
-            .enumerate()
-            .map(|(i, slot)| match slot {
-                Some(a) => emit_expr(ctx, &a.value, arg_ind),
-                None => {
-                    assert_eq!(i, piped_slot);
-                    "piped".to_string()
-                }
-            })
-            .collect();
-        if piped_slot == 0 {
-            let rest = rendered[1..].join(" ");
-            return format!("({head} {rest})");
-        }
-        return format!("((fn [piped] ({head} {})))", rendered.join(" "));
-    }
-
-    let ordered = reorder_labelled(&head, sig.as_ref(), arguments, false);
-
-    let arg_ind = ind + 1 + head.len() + 1;
-    let args: Vec<String> = ordered
-        .iter()
-        .map(|a| emit_expr(ctx, &a.value, arg_ind))
-        .collect();
-    let inline = format!("({head} {})", args.join(" "));
-    if fits(&inline, ind) || args.is_empty() {
-        if args.is_empty() {
-            format!("({head})")
-        } else {
-            inline
-        }
-    } else {
-        format!("({head} {})", args.join(&format!("\n{}", sp(arg_ind))))
-    }
-}
-fn emit_case(
-    ctx: &Ctx,
-    subjects: &[UntypedExpr],
-    clauses: &[Clause<UntypedExpr, ()>],
-    ind: usize,
-    tail: Option<&Tail>,
-) -> String {
-    // Complex subjects get bound to temporaries; the whole case wraps in a let.
-    let mut subj_lets: Vec<(String, String)> = Vec::new();
-    let mut subjs: Vec<String> = Vec::new();
-    for (i, s) in subjects.iter().enumerate() {
-        let e = emit_expr(ctx, s, ind + 2);
-        if e.contains(' ') || e.contains('\n') {
-            let name = if subjects.len() == 1 {
-                "subject".to_string()
-            } else {
-                format!("s{i}")
-            };
-            subj_lets.push((name.clone(), e));
-            subjs.push(name);
-        } else {
-            subjs.push(e);
-        }
-    }
-    let ind = if subj_lets.is_empty() { ind } else { ind + 2 };
-
-    // (test, bindings-used-by-body, body-expr)
-    let mut branches: Vec<(String, Vec<(String, String)>, &UntypedExpr)> = Vec::new();
-    for clause in clauses {
-        // `a | b` alternatives expand to one branch each (bindings may come
-        // from different positions per alternative); bind-free alternatives
-        // collapse back into a single or-joined test.
-        let mut pattern_sets: Vec<&Vec<UntypedPattern>> = vec![&clause.pattern];
-        pattern_sets.extend(clause.alternative_patterns.iter());
-
-        let mut expanded: Vec<(Vec<String>, Vec<(String, String)>)> = Vec::new();
-        for patterns in &pattern_sets {
-            let mut tests = Vec::new();
-            let mut binds = Vec::new();
-            for (pattern, subj) in patterns.iter().zip(&subjs) {
-                pattern_cond_inner(ctx, pattern, subj, &mut tests, &mut binds);
-            }
-            expanded.push((tests, binds));
-        }
-        if expanded.len() > 1 && expanded.iter().all(|(_, b)| b.is_empty()) {
-            let alts: Vec<String> = expanded.iter().map(|(t, _)| and_join(t)).collect();
-            expanded = vec![(vec![format!("(or {})", alts.join(" "))], vec![])];
-        }
-
-        for (mut tests, binds) in expanded {
-            let env: HashMap<String, String> = binds.iter().cloned().collect();
-            if let Some(guard) = &clause.guard {
-                tests.push(emit_guard(ctx, guard, &env));
-            }
-            let used: Vec<(String, String)> = binds
-                .into_iter()
-                .filter(|(n, _)| expr_uses_var(&clause.then, n))
-                .collect();
-            branches.push((and_join(&tests), used, &clause.then));
-        }
-    }
-
-    let emit_branch_body =
-        |used: &[(String, String)], then: &UntypedExpr, body_ind: usize| -> String {
-            if used.is_empty() {
-                emit_expr_t(ctx, then, body_ind, tail)
-            } else {
-                // A bind that shadows a name other binds' accessor exprs still
-                // reference must come last, or it poisons them (sequential let).
-                let orig: Vec<(String, String)> = used.to_vec();
-                let mentions = |expr: &str, name: &str| {
-                    expr.contains(&format!("{name} ")) || expr.contains(&format!("{name})"))
-                };
-                let mut used = orig.clone();
-                used.sort_by_key(|(n, _)| {
-                    orig.iter().any(|(n2, v2)| n2 != n && mentions(v2, n))
-                });
-                let binds_str = used
-                    .iter()
-                    .map(|(n, v)| format!("{n} {v}"))
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                let inner = emit_expr_t(ctx, then, body_ind + 2, tail);
-                format!("(let [{binds_str}]\n{}{inner})", sp(body_ind + 2))
-            }
-        };
-
-    // Two branches -> `if` (Gleam exhaustiveness means clause 2 covers the rest).
-    let core = if branches.len() == 2 {
-        let (t, used1, then1) = &branches[0];
-        let (_, used2, then2) = &branches[1];
-        let b1 = emit_branch_body(used1, then1, ind + 2);
-        let b2 = emit_branch_body(used2, then2, ind + 2);
-        let inline = format!("(if {t} {b1} {b2})");
-        if fits(&inline, ind) {
-            inline
-        } else {
-            format!("(if {t}\n{i2}{b1}\n{i2}{b2})", i2 = sp(ind + 2))
-        }
-    } else {
-        let mut out = String::from("(cond\n");
-        let n = branches.len();
-        for (i, (test, used, then)) in branches.iter().enumerate() {
-            let last = i + 1 == n;
-            let test = if last && test == "true" { ":else".to_string() } else { test.clone() };
-            let body = emit_branch_body(used, then, ind + 2 + test.len() + 1);
-            let _ = write!(out, "{}{test} {}", sp(ind + 2), body);
-            out.push_str(if last { ")" } else { "\n" });
-        }
-        out
-    };
-
-    if subj_lets.is_empty() {
-        core
-    } else {
-        let binds_str = subj_lets
-            .iter()
-            .map(|(n, v)| format!("{n} {v}"))
-            .collect::<Vec<_>>()
-            .join(&format!("\n{}", sp(ind + 4)));
-        format!("(let [{binds_str}]\n{}{core})", sp(ind))
-    }
-}
-
-fn emit_guard(ctx: &Ctx, guard: &UntypedClauseGuard, env: &HashMap<String, String>) -> String {
-    use gleam_core::ast::ClauseGuard as G;
-    match guard {
-        G::Block { value, .. } => emit_guard(ctx, value, env),
-        G::Not { expression, .. } => format!("(not {})", emit_guard(ctx, expression, env)),
-        G::BinaryOperator { operator, left, right, .. } => format!(
-            "({} {} {})",
-            binop(operator),
-            emit_guard(ctx, left, env),
-            emit_guard(ctx, right, env)
-        ),
-        G::Var { name, .. } => {
-            let n = user_var(&kebab(name.as_str()));
-            env.get(&n).cloned().unwrap_or(n)
-        }
-        G::Constant(c) => emit_constant(ctx, c),
-        other => panic!("unsupported guard (v0): {other:?}"),
-    }
-}
-
-fn emit_constant(ctx: &Ctx, c: &gleam_core::ast::Constant<()>) -> String {
-    use gleam_core::ast::Constant as C;
-    match c {
-        C::Record { module, name, arguments, .. } => {
-            let (head, fields) = match module {
-                Some((alias, _)) => {
-                    let fields = ctx.imported_ctor_fields(alias.as_str(), name.as_str());
-                    (format!("{alias}/->{name}"), fields)
-                }
-                None => {
-                    let Some((fields, _)) = ctx.constructors.get(name.as_str()) else {
-                        panic!("unknown constructor in constant: {name}");
-                    };
-                    (ctx.ctor_ref(name.as_str()), fields)
-                }
-            };
-            let sig: Vec<Option<String>> = fields.iter().map(|f| Some(f.clone())).collect();
-            match arguments {
-                None => format!("({head})"),
-                Some(args) if args.is_empty() => format!("({head})"),
-                Some(args) => {
-                    let ordered = reorder_labelled(&head, Some(&sig), args, false);
-                    let parts: Vec<String> =
-                        ordered.iter().map(|a| emit_constant(ctx, &a.value)).collect();
-                    format!("({head} {})", parts.join(" "))
-                }
-            }
-        }
-        C::Int { value, .. } => int_lit(value),
-        C::Float { value, .. } => int_lit(value),
-        C::String { value, .. } => format!("\"{}\"", clj_string(value)),
-        C::Tuple { elements, .. } => {
-            let parts: Vec<String> =
-                elements.iter().map(|e| emit_constant(ctx, e)).collect();
-            format!("[{}]", parts.join(" "))
-        }
-        C::List { elements, .. } => {
-            let parts: Vec<String> =
-                elements.iter().map(|e| emit_constant(ctx, e)).collect();
-            if parts.is_empty() {
-                "(list)".into()
-            } else {
-                format!("(list {})", parts.join(" "))
-            }
-        }
-        C::Var { name, module: None, .. } => {
-            let k = kebab(name.as_str());
-            if ctx.local_fns.contains(&k) { local_fn_name(&k) } else { user_var(&k) }
-        }
-        C::Var { name, module: Some((alias, _)), .. } => {
-            ctx.module_fn(alias.as_str(), name.as_str())
-        }
-        other => panic!("unsupported constant (v0): {other:?}"),
-    }
-}
 
 fn fits(s: &str, ind: usize) -> bool {
     !s.contains('\n') && ind + s.len() <= WIDTH
 }
 
-/// Does this expression reference variable `name` (in kebab form)?
-fn expr_uses_var(e: &UntypedExpr, name: &str) -> bool {
-    match e {
-        UntypedExpr::Var { name: n, .. } => user_var(&kebab(n.as_str())) == name,
-        UntypedExpr::Int { .. }
-        | UntypedExpr::Float { .. }
-        | UntypedExpr::String { .. }
-        | UntypedExpr::Todo { .. }
-        | UntypedExpr::Panic { .. } => false,
-        UntypedExpr::Block { statements, .. } => {
-            statements.iter().any(|s| stmt_uses_var(s, name))
-        }
-        UntypedExpr::Fn { body, .. } => body.iter().any(|s| stmt_uses_var(s, name)),
-        UntypedExpr::List { elements, tail, .. } => {
-            elements.iter().any(|el| expr_uses_var(el, name))
-                || tail.as_ref().is_some_and(|t| expr_uses_var(t, name))
-        }
-        UntypedExpr::Call { fun, arguments, .. } => {
-            expr_uses_var(fun, name)
-                || arguments.iter().any(|a| expr_uses_var(&a.value, name))
-        }
-        UntypedExpr::BinOp { left, right, .. } => {
-            expr_uses_var(left, name) || expr_uses_var(right, name)
-        }
-        UntypedExpr::PipeLine { expressions } => {
-            expressions.iter().any(|x| expr_uses_var(x, name))
-        }
-        UntypedExpr::Case { subjects, clauses, .. } => {
-            subjects.iter().any(|s| expr_uses_var(s, name))
-                || clauses.as_ref().is_some_and(|cs| {
-                    cs.iter().any(|c| expr_uses_var(&c.then, name))
-                })
-        }
-        UntypedExpr::FieldAccess { container, .. } => expr_uses_var(container, name),
-        UntypedExpr::Tuple { elements, .. } => {
-            elements.iter().any(|el| expr_uses_var(el, name))
-        }
-        UntypedExpr::TupleIndex { tuple, .. } => expr_uses_var(tuple, name),
-        UntypedExpr::NegateBool { value, .. } | UntypedExpr::NegateInt { value, .. } => {
-            expr_uses_var(value, name)
-        }
-        // Conservative: unknown node shapes count as "uses it".
-        _ => true,
-    }
-}
 
-fn stmt_uses_var(s: &UntypedStatement, name: &str) -> bool {
-    match s {
-        Statement::Expression(e) => expr_uses_var(e, name),
-        Statement::Assignment(a) => expr_uses_var(&a.value, name),
-        _ => true,
-    }
-}

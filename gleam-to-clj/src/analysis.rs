@@ -24,6 +24,8 @@ pub struct SourceModule {
     pub file_name: String,
     pub src: String,
     pub is_dep: bool,
+    /// analyze-only modules (stdlib, gleeunit) are not re-emitted
+    pub emit: bool,
 }
 
 pub struct AnalyzedModule {
@@ -31,7 +33,10 @@ pub struct AnalyzedModule {
     pub file_name: String,
     pub src: String,
     pub is_dep: bool,
+    pub emit: bool,
     pub module: TypedModule,
+    /// SCC groups of fn/const names in call-dependency order
+    pub dependency_order: Vec<Vec<EcoString>>,
 }
 
 /// Analyze all sources. Panics loudly on parse or type errors — the input is
@@ -115,6 +120,7 @@ pub fn analyze(sources: Vec<SourceModule>) -> Vec<AnalyzedModule> {
                     file_name: String::new(),
                     src: String::new(),
                     is_dep: false,
+                    emit: false,
                 },
                 gleam_core::ast::UntypedModule {
                     name: "".into(),
@@ -126,6 +132,33 @@ pub fn analyze(sources: Vec<SourceModule>) -> Vec<AnalyzedModule> {
                 },
             ),
         );
+        // Dependency order comes from the untyped defs (the typed module
+        // regroups definitions by kind and loses source order).
+        let mut functions = Vec::new();
+        let mut constants = Vec::new();
+        for def in crate::active_defs(&ast) {
+            match &def.definition {
+                Definition::Function(f) => functions.push(f.clone()),
+                Definition::ModuleConstant(c) => constants.push(c.clone()),
+                _ => {}
+            }
+        }
+        let dependency_order: Vec<Vec<EcoString>> =
+            gleam_core::call_graph::into_dependency_order(functions, constants)
+                .unwrap_or_else(|e| panic!("call graph error in {}: {e:?}", source.path))
+                .into_iter()
+                .map(|group| {
+                    group
+                        .into_iter()
+                        .map(|node| match node {
+                            gleam_core::call_graph::CallGraphNode::Function(f) => {
+                                f.name.expect("fn name").1
+                            }
+                            gleam_core::call_graph::CallGraphNode::ModuleConstant(c) => c.name,
+                        })
+                        .collect()
+                })
+                .collect();
         let line_numbers = LineNumbers::new(&source.src);
         let typed = ModuleAnalyzerConstructor::<()> {
             target: Target::Erlang,
@@ -154,7 +187,9 @@ pub fn analyze(sources: Vec<SourceModule>) -> Vec<AnalyzedModule> {
             file_name: source.file_name,
             src: source.src,
             is_dep: source.is_dep,
+            emit: source.emit,
             module: typed,
+            dependency_order,
         });
     }
     out.into_iter().map(|m| m.expect("analyzed")).collect()

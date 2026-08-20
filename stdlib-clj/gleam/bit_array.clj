@@ -79,10 +79,7 @@
   "Decodes a base 64 encoded string with URL and filename safe alphabet into a
   `BitArray`."
   [encoded]
-  (-> encoded
-      (string/replace "-" "+")
-      (string/replace "_" "/")
-      (base64-decode)))
+  (-> encoded (string/replace "-" "+") (string/replace "_" "/") base64-decode))
 
 (def base16-encode gleam-ffi/ba-base16-encode)
 

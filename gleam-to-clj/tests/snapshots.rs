@@ -15,6 +15,7 @@ fn snapshots() {
             .unwrap_or_else(|e| panic!("read {expected_path:?}: {e}"));
         let out = Command::new(env!("CARGO_BIN_EXE_gleam-to-clj"))
             .arg(&input)
+            .current_dir(&root)
             .output()
             .expect("run emitter");
         assert!(out.status.success(), "{fixture}: emitter failed: {}",

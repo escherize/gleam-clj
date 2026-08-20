@@ -1592,7 +1592,7 @@
     (= (count list') 1) (let [last (first list')]
                           (p/->Ok last))
     (seq list') (let [rest' (rest list')]
-                  (last rest'))))
+                  (recur rest'))))
 
 (defn combinations
   "Return unique combinations of elements in the list.
@@ -1706,7 +1706,7 @@
   [list']
   (-> list'
       (fold (list) (fn [acc a] (list* [(float/random) a] acc)))
-      (do-shuffle-by-pair-indexes)
+      do-shuffle-by-pair-indexes
       (shuffle-pair-unwrap-loop (list))))
 
 (defn- max-loop [list' compare max']

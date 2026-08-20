@@ -153,7 +153,7 @@
   (let [path (list/map path (fn [key] (-> key cast path-segment-to-string)))
         errors (list/map (nth layer 1)
                          (fn [error]
-                           (assoc error :path (list/append path (:path error)))))]
+                           (->DecodeError (:expected error) (:found error) (list/append path (:path error)))))]
     [(nth layer 0) errors]))
 
 (defn list'

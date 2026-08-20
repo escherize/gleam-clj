@@ -66,7 +66,7 @@
   assert int.square_root(-16) == Error(Nil)
   ```"
   [x]
-  (-> x to-float (float/square-root)))
+  (-> x to-float float/square-root))
 
 (def parse gleam-ffi/int-parse)
 

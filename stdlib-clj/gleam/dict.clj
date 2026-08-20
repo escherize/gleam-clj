@@ -195,11 +195,15 @@
   (fold dict (list) (fn [acc _ value] (list* value acc))))
 
 (defn- do-filter [f dict]
-  (-> (to-transient (new*))
-      ((fn [piped] (fold dict piped (fn [transient key value]
-              (let [subject (f key value)]
-                (if subject (transient-insert key value transient) transient))))))
-      from-transient))
+  (let [-pipe (to-transient (new*))
+        -pipe (fold dict
+              -pipe
+              (fn [transient key value]
+                (let [subject (f key value)]
+                  (if subject
+                    (transient-insert key value transient)
+                    transient))))]
+    (from-transient -pipe)))
 
 (defn filter
   "Creates a new dict from a given dict, minus any entries that a given function
@@ -261,11 +265,13 @@
                               (if subject
                                 [left right combine]
                                 [right left (fn [k l r] (combine k r l))]))]
-    (-> (to-transient big)
-        ((fn [piped] (fold small piped (fn [transient key value]
-                (let [update (fn [existing] (combine key existing value))]
-                  (transient-update-with key update value transient))))))
-        from-transient)))
+    (let [-pipe (to-transient big)
+          -pipe (fold small
+                -pipe
+                (fn [transient key value]
+                  (let [update (fn [existing] (combine key existing value))]
+                    (transient-update-with key update value transient))))]
+      (from-transient -pipe))))
 
 (defn combine
   "Creates a new dict from a pair of given dicts by combining their entries.
@@ -420,7 +426,7 @@
             update (fn [existing] (list* value existing))]
         (-> transient
             ((fn [-capture]
-               (transient-update-with key update (list value) -capture)))
+              (transient-update-with key update (list value) -capture)))
             (group-loop to-key rest'))))))
 
 (defn group [key list']

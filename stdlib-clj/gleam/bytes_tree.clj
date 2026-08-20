@@ -95,7 +95,7 @@
   
   Runs in constant time."
   [bits]
-  (-> bits (list/map from-bit-array) (concat)))
+  (-> bits (list/map from-bit-array) concat))
 
 (defn from-string-tree
   "Creates a new bytes tree from a string tree.
