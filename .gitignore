@@ -12,3 +12,7 @@ tour/gen/
 /.clj-kondo/
 libs/gleam-parser/project/build/
 libs/mb-lib-parse/project/build/
+.lsp/
+.impeccable/
+.playwright-cli/
+.papercuts.jsonl
