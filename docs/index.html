@@ -379,6 +379,23 @@ git clone https://github.com/escherize/gleam-clj
 <pre class="block"><span class="pr">clojure</span> -M -m my-module
 <span class="cmt">;; => your program, on the JVM</span></pre>
     <div class="note blue">The compiler <strong>fails loud</strong>. Anything it can't compile panics at build time with the feature named — nothing is silently dropped or mistranslated. That property is what makes the verification below meaningful.</div>
+
+    <h3>Or skip the shuffle — call Gleam straight from Clojure</h3>
+    <p>Once the compiler binary is built, one command compiles a Gleam snippet and calls it, no REPL setup:</p>
+<pre class="block"><span class="cmt"># compile a Gleam fn and invoke it from Clojure in one shot</span>
+clojure -M:try <span class="st">'pub fn add(a: Int, b: Int) -> Int { a + b }'</span> add 2 40
+<span class="cmt">;; => 42</span>
+
+<span class="cmt"># or drop into a REPL with the runtime + loader wired up</span>
+clojure -M:repl</pre>
+    <p>From that REPL, <code>gleam-clj.load</code> compiles <code>.gleam</code> files on demand and loads the emitted namespace — cached by source hash, so re-loading unchanged source is free:</p>
+<pre class="block">(<span class="pr">require</span> '[gleam-clj.load <span class="fl">:as</span> gl])
+
+(gl/require-gleam <span class="st">"gleam-src/coin_change.gleam"</span>)   <span class="cmt">;; => 'coin-change</span>
+(coin-change/min-coins (<span class="pr">list</span> 1 5 10) 13)           <span class="cmt">;; => #Ok{:value 4}</span>
+
+(gl/eval-gleam <span class="st">"pub fn double(x: Int) -> Int { x * 2 }"</span>)
+<span class="cmt">;; the snippet's public fns are now callable</span></pre>
   </section>
 
   <section id="backends">
