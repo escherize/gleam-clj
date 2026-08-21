@@ -356,6 +356,13 @@ pub fn emit_module(
     let body = out;
     let mut header = String::new();
     let _ = writeln!(header, "(ns {}", kebab(&am.path.replace("/", ".")));
+    // Gleam module doc (`////` lines) becomes the namespace docstring.
+    let module_doc = am.module_doc.trim();
+    if !module_doc.is_empty() {
+        let escaped = module_doc.replace('\\', "\\\\").replace('"', "\\\"");
+        let indented = escaped.replace('\n', "\n  ");
+        let _ = writeln!(header, "  \"{indented}\"");
+    }
     if !excludes.is_empty() {
         let _ = writeln!(header, "  (:refer-clojure :exclude [{}])", excludes.join(" "));
     }

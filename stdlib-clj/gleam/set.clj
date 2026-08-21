@@ -7,7 +7,7 @@
 
 ;; type Set
 (defrecord Set [dict])
-(defn Set? [v] (instance? Set v))
+(defn Set? "True if `v` is a Set value." [v] (instance? Set v))
 
 (defn new*
   "Creates a new empty set."

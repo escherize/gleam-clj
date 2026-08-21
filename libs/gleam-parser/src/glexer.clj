@@ -14,35 +14,35 @@
 
 ;; type Lexer
 (defrecord Lexer [original-source source byte-offset preserve-whitespace preserve-comments mode newlines])
-(defn Lexer? [v] (instance? Lexer v))
+(defn Lexer? "True if `v` is a Lexer value." [v] (instance? Lexer v))
 
 ;; type LexerMode
 (defrecord Normal [])
-(defn Normal? [v] (instance? Normal v))
+(defn Normal? "True if `v` is a Normal value." [v] (instance? Normal v))
 (defrecord CheckForMinus [])
-(defn CheckForMinus? [v] (instance? CheckForMinus v))
+(defn CheckForMinus? "True if `v` is a CheckForMinus value." [v] (instance? CheckForMinus v))
 (defrecord HasNestedDot [])
-(defn HasNestedDot? [v] (instance? HasNestedDot v))
+(defn HasNestedDot? "True if `v` is a HasNestedDot value." [v] (instance? HasNestedDot v))
 
 ;; type Position
 (defrecord Position [byte-offset])
-(defn Position? [v] (instance? Position v))
+(defn Position? "True if `v` is a Position value." [v] (instance? Position v))
 
 ;; type CommentKind
 (defrecord RegularComment [])
-(defn RegularComment? [v] (instance? RegularComment v))
+(defn RegularComment? "True if `v` is a RegularComment value." [v] (instance? RegularComment v))
 (defrecord DocComment [])
-(defn DocComment? [v] (instance? DocComment v))
+(defn DocComment? "True if `v` is a DocComment value." [v] (instance? DocComment v))
 (defrecord ModuleComment [])
-(defn ModuleComment? [v] (instance? ModuleComment v))
+(defn ModuleComment? "True if `v` is a ModuleComment value." [v] (instance? ModuleComment v))
 
 ;; type LexNumberMode
 (defrecord LexInt [])
-(defn LexInt? [v] (instance? LexInt v))
+(defn LexInt? "True if `v` is a LexInt value." [v] (instance? LexInt v))
 (defrecord LexFloat [])
-(defn LexFloat? [v] (instance? LexFloat v))
+(defn LexFloat? "True if `v` is a LexFloat value." [v] (instance? LexFloat v))
 (defrecord LexFloatExponent [])
-(defn LexFloatExponent? [v] (instance? LexFloatExponent v))
+(defn LexFloatExponent? "True if `v` is a LexFloatExponent value." [v] (instance? LexFloatExponent v))
 
 (defn new*
   {:malli/schema [:=> [:cat :string] [:fn Lexer?]]}

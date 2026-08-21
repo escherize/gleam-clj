@@ -37,6 +37,8 @@ pub struct AnalyzedModule {
     pub module: TypedModule,
     /// SCC groups of fn/const names in call-dependency order
     pub dependency_order: Vec<Vec<EcoString>>,
+    /// module doc (`////` lines) sliced from source, joined with newlines
+    pub module_doc: String,
 }
 
 /// Analyze all sources. Panics loudly on parse or type errors — the input is
@@ -44,7 +46,7 @@ pub struct AnalyzedModule {
 pub fn analyze(sources: Vec<SourceModule>) -> Vec<AnalyzedModule> {
     // Parse everything first so imports drive a topological order.
     let emitter = WarningEmitter::null();
-    let mut parsed: Vec<(SourceModule, gleam_core::ast::UntypedModule)> = sources
+    let mut parsed: Vec<(SourceModule, gleam_core::ast::UntypedModule, String)> = sources
         .into_iter()
         .map(|s| {
             let p = parse::parse_module(
@@ -55,7 +57,16 @@ pub fn analyze(sources: Vec<SourceModule>) -> Vec<AnalyzedModule> {
             .unwrap_or_else(|e| panic!("parse error in {}: {e:?}", s.path));
             let mut ast = p.module;
             ast.name = EcoString::from(s.path.as_str());
-            (s, ast)
+            // `////` module doc comments live in extra as source spans; slice
+            // them now while we still hold the source.
+            let module_doc = p
+                .extra
+                .module_comments
+                .iter()
+                .map(|span| s.src[span.start as usize..span.end as usize].trim())
+                .collect::<Vec<_>>()
+                .join("\n");
+            (s, ast, module_doc)
         })
         .collect();
 
@@ -63,11 +74,11 @@ pub fn analyze(sources: Vec<SourceModule>) -> Vec<AnalyzedModule> {
     let index: HashMap<String, usize> = parsed
         .iter()
         .enumerate()
-        .map(|(i, (s, _))| (s.path.clone(), i))
+        .map(|(i, (s, _, _))| (s.path.clone(), i))
         .collect();
     let mut deps_of: Vec<HashSet<usize>> = parsed
         .iter()
-        .map(|(_, ast)| {
+        .map(|(_, ast, _)| {
             ast.definitions
                 .iter()
                 .filter_map(|d| match &d.definition {
@@ -112,7 +123,7 @@ pub fn analyze(sources: Vec<SourceModule>) -> Vec<AnalyzedModule> {
 
     let mut out: Vec<Option<AnalyzedModule>> = (0..parsed.len()).map(|_| None).collect();
     for i in order {
-        let (source, ast) = std::mem::replace(
+        let (source, ast, module_doc) = std::mem::replace(
             &mut parsed[i],
             (
                 SourceModule {
@@ -130,6 +141,7 @@ pub fn analyze(sources: Vec<SourceModule>) -> Vec<AnalyzedModule> {
                     names: Default::default(),
                     unused_definition_positions: Default::default(),
                 },
+                String::new(),
             ),
         );
         // Dependency order comes from the untyped defs (the typed module
@@ -190,6 +202,7 @@ pub fn analyze(sources: Vec<SourceModule>) -> Vec<AnalyzedModule> {
             emit: source.emit,
             module: typed,
             dependency_order,
+            module_doc,
         });
     }
     out.into_iter().map(|m| m.expect("analyzed")).collect()

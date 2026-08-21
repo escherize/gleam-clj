@@ -1,4 +1,26 @@
 (ns gleam.list
+  "Lists are an ordered sequence of elements and are one of the most common
+  data types in Gleam.
+  
+  New elements can be added and removed from the front of a list in
+  constant time, while adding and removing from the end requires traversing
+  and copying the whole list, so keep this in mind when designing your
+  programs.
+  
+  There is a dedicated syntax for prefixing to a list:
+  
+  ```gleam
+  let new_list = [1, 2, ..existing_list]
+  ```
+  
+  And a matching syntax for getting the first elements of a list:
+  
+  ```gleam
+  case list {
+  [first_element, ..rest] -> first_element
+  _ -> \"this pattern matches when the list is empty\"
+  }
+  ```"
   (:refer-clojure :exclude [chunk drop drop-while filter find flatten interleave last map partition reduce repeat reverse shuffle sort take take-while])
   (:require
    [gleam.dict :as dict]
@@ -10,15 +32,15 @@
 
 ;; type ContinueOrStop
 (defrecord Continue [value])
-(defn Continue? [v] (instance? Continue v))
+(defn Continue? "True if `v` is a Continue value." [v] (instance? Continue v))
 (defrecord Stop [value])
-(defn Stop? [v] (instance? Stop v))
+(defn Stop? "True if `v` is a Stop value." [v] (instance? Stop v))
 
 ;; type Sorting
 (defrecord Ascending [])
-(defn Ascending? [v] (instance? Ascending v))
+(defn Ascending? "True if `v` is a Ascending value." [v] (instance? Ascending v))
 (defrecord Descending [])
-(defn Descending? [v] (instance? Descending v))
+(defn Descending? "True if `v` is a Descending value." [v] (instance? Descending v))
 
 (defn- length-loop [list' count']
   (if (seq list')

@@ -1,4 +1,22 @@
 (ns gleam.string
+  "Strings are Gleam's text type, written in code using double quotes,
+  `\"like this\"`.
+  
+  Two strings can be joined together using the concatenation operator: `<>`.
+  
+  Strings use the native string type of the compilation target. On Erlang
+  they are UTF8 encoded binary strings, and on JavaScript they are UTF16
+  encoded strings.
+  
+  Several escape sequences can be used in strings:
+  
+  `\\\"` - Double quote
+  `\\\\` - Backslash
+  `\\f` - Form feed
+  `\\n` - Newline
+  `\\r` - Carriage return
+  `\\t` - Tab
+  `\\u{xxxxxx}` - Unicode codepoint, where each `x` is a digit 0-9."
   (:refer-clojure :exclude [compare concat last repeat replace reverse])
   (:require
    [gleam-ffi]
@@ -11,9 +29,9 @@
 
 ;; type Direction
 (defrecord Leading [])
-(defn Leading? [v] (instance? Leading v))
+(defn Leading? "True if `v` is a Leading value." [v] (instance? Leading v))
 (defrecord Trailing [])
-(defn Trailing? [v] (instance? Trailing v))
+(defn Trailing? "True if `v` is a Trailing value." [v] (instance? Trailing v))
 
 (defn is-empty
   "Determines if a `String` is empty.

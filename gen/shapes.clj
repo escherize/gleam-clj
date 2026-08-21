@@ -5,11 +5,11 @@
 
 ;; type Shape
 (defrecord Circle [value])
-(defn Circle? [v] (instance? Circle v))
+(defn Circle? "True if `v` is a Circle value." [v] (instance? Circle v))
 (defrecord Rect [width height])
-(defn Rect? [v] (instance? Rect v))
+(defn Rect? "True if `v` is a Rect value." [v] (instance? Rect v))
 (defrecord Point [])
-(defn Point? [v] (instance? Point v))
+(defn Point? "True if `v` is a Point value." [v] (instance? Point v))
 
 (defn area
   "Area with pi = 3.0, engineering approximation."

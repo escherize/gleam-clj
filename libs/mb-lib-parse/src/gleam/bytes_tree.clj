@@ -1,4 +1,24 @@
 (ns gleam.bytes-tree
+  "`BytesTree` is a type used for efficiently building binary content to be
+  written to a file or a socket. Internally it is represented as a tree so to
+  append or prepend to a bytes tree is a constant time operation that
+  allocates a new node in the tree without copying any of the content. When
+  writing to an output stream the tree is traversed and the content is sent
+  directly rather than copying it into a single buffer beforehand.
+  
+  If we append one bit array to another the bit arrays must be copied to a
+  new location in memory so that they can sit together. This behaviour
+  enables efficient reading of the data but copying can be expensive,
+  especially if we want to join many bit arrays together.
+  
+  BytesTree is different in that it can be joined together in constant
+  time using minimal memory, and then can be efficiently converted to a
+  bit array using the `to_bit_array` function.
+  
+  Byte trees are always byte aligned, so that a number of bits that is not
+  divisible by 8 will be padded with 0s.
+  
+  On Erlang this type is compatible with Erlang's iolists."
   (:refer-clojure :exclude [concat])
   (:require
    [gleam.bit-array :as bit_array]
@@ -7,11 +27,11 @@
 
 ;; type BytesTree
 (defrecord Bytes [value])
-(defn Bytes? [v] (instance? Bytes v))
+(defn Bytes? "True if `v` is a Bytes value." [v] (instance? Bytes v))
 (defrecord Text [value])
-(defn Text? [v] (instance? Text v))
+(defn Text? "True if `v` is a Text value." [v] (instance? Text v))
 (defrecord Many [value])
-(defn Many? [v] (instance? Many v))
+(defn Many? "True if `v` is a Many value." [v] (instance? Many v))
 
 (defn concat
   "Joins a list of bytes trees into a single one.

@@ -1,4 +1,34 @@
 (ns gleam.float
+  "Functions for working with floats.
+  
+  ## Float representation
+  
+  Floats are represented as 64 bit floating point numbers on both the Erlang
+  and JavaScript runtimes. The floating point behaviour is native to their
+  respective runtimes, so their exact behaviour will be slightly different on
+  the two runtimes.
+  
+  ### Infinity and NaN
+  
+  Under the JavaScript runtime, exceeding the maximum (or minimum)
+  representable value for a floating point value will result in Infinity (or
+  -Infinity). Should you try to divide two infinities you will get NaN as a
+  result.
+  
+  When running on BEAM, exceeding the maximum (or minimum) representable
+  value for a floating point value will raise an error.
+  
+  ## Division by zero
+  
+  Gleam runs on the Erlang virtual machine, which does not follow the IEEE
+  754 standard for floating point arithmetic and does not have an `Infinity`
+  value.  In Erlang division by zero results in a crash, however Gleam does
+  not have partial functions and operators in core so instead division by zero
+  returns zero, a behaviour taken from Pony, Coq, and Lean.
+  
+  This may seem unexpected at first, but it is no less mathematically valid
+  than crashing or returning a special value. Division by zero is undefined
+  in mathematics."
   (:refer-clojure :exclude [compare])
   (:require
    [gleam-ffi]

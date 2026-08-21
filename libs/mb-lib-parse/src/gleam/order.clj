@@ -3,11 +3,11 @@
 
 ;; type Order
 (defrecord Lt [])
-(defn Lt? [v] (instance? Lt v))
+(defn Lt? "True if `v` is a Lt value." [v] (instance? Lt v))
 (defrecord Eq [])
-(defn Eq? [v] (instance? Eq v))
+(defn Eq? "True if `v` is a Eq value." [v] (instance? Eq v))
 (defrecord Gt [])
-(defn Gt? [v] (instance? Gt v))
+(defn Gt? "True if `v` is a Gt value." [v] (instance? Gt v))
 
 (defn negate
   "Inverts an order, so less-than becomes greater-than and greater-than

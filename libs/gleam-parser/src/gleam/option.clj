@@ -6,9 +6,9 @@
 
 ;; type Option
 (defrecord Some [value])
-(defn Some? [v] (instance? Some v))
+(defn Some? "True if `v` is a Some value." [v] (instance? Some v))
 (defrecord None [])
-(defn None? [v] (instance? None v))
+(defn None? "True if `v` is a None value." [v] (instance? None v))
 
 (defn- reverse-and-prepend [prefix suffix]
   (if (empty? prefix)

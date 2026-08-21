@@ -1,4 +1,5 @@
 (ns gleam.bit-array
+  "BitArrays are a sequence of binary data of any length."
   (:refer-clojure :exclude [compare concat])
   (:require
    [gleam-ffi]

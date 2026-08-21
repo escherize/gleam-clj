@@ -1,4 +1,12 @@
 (ns gleam.uri
+  "Utilities for working with URIs
+  
+  This module provides functions for working with URIs (for example, parsing
+  URIs or encoding query strings). The functions in this module are implemented
+  according to [RFC 3986](https://tools.ietf.org/html/rfc3986).
+  
+  Query encoding (Form encoding) is defined in the
+  [W3C specification](https://www.w3.org/TR/html52/sec-forms.html#urlencoded-form-data)."
   (:refer-clojure :exclude [drop-last empty merge])
   (:require
    [gleam-ffi]
@@ -10,7 +18,7 @@
 
 ;; type Uri
 (defrecord Uri [scheme userinfo host port path query fragment])
-(defn Uri? [v] (instance? Uri v))
+(defn Uri? "True if `v` is a Uri value." [v] (instance? Uri v))
 
 (def empty (->Uri (option/->None) (option/->None) (option/->None) (option/->None) "" (option/->None) (option/->None)))
 

@@ -8,7 +8,7 @@
 
 ;; type Direction
 (defrecord All [])
-(defn All? [v] (instance? All v))
+(defn All? "True if `v` is a All value." [v] (instance? All v))
 
 (def ^{:malli/schema [:=> [:cat [:sequential :string]] [:or ]]} from-strings gleam-ffi/st-from-strings)
 

@@ -1,4 +1,6 @@
 (ns gleam.result
+  "Result represents the result of something that may succeed or not.
+  `Ok` means it was successful, `Error` means it was not successful."
   (:refer-clojure :exclude [flatten map or partition replace])
   (:require
    [gleam.list :as list]
