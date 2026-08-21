@@ -306,6 +306,10 @@ pub fn emit_module(
         }
     }
 
+    // Library builds set GLEAM_CLJ_NO_MAIN: the module is required, not run,
+    // so `main` (typically a BEAM-side self-check) and its `-main` wrapper are
+    // dropped entirely rather than shipped as dead entry-point code.
+    let suppress_main = std::env::var_os("GLEAM_CLJ_NO_MAIN").is_some();
     let mut has_pub_main = false;
     for group in &am.dependency_order {
         if group.len() > 1 {
@@ -322,9 +326,14 @@ pub fn emit_module(
                 {
                     continue;
                 }
+                let is_main =
+                    !matches!(f.publicity, Publicity::Private) && name.as_str() == "main";
+                if is_main && suppress_main {
+                    continue;
+                }
                 out.push('\n');
                 out.push_str(&emit_function(&ctx, f));
-                if !matches!(f.publicity, Publicity::Private) && name.as_str() == "main" {
+                if is_main {
                     has_pub_main = true;
                 }
             } else if let Some(c) = const_by_name.get(name.as_str()) {
@@ -338,11 +347,7 @@ pub fn emit_module(
             }
         }
     }
-    // A `-main` wrapper is emitted for runnable modules, but suppressed when
-    // GLEAM_CLJ_NO_MAIN is set (library builds: the module is required, not run,
-    // and an entry point would trip main-without-gen-class linters).
-    let suppress_main = std::env::var_os("GLEAM_CLJ_NO_MAIN").is_some();
-    if has_pub_main && !suppress_main {
+    if has_pub_main {
         out.push_str("\n(defn -main [& _]\n  (main))\n");
     }
 
