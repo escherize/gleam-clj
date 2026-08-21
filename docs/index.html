@@ -322,7 +322,7 @@
     <div class="compile-grid">
       <div class="pane pane--src">
         <div class="pane-head"><img src="assets/gleam-lucy.svg" alt=""><span class="lang">min_coins.gleam</span></div>
-<pre><span class="k">pub fn</span> <span class="fn">min_coins</span>(coins, amount)
+<pre><span class="k">pub fn</span> <span class="fn">min_coins</span>(coins: <span class="ty">List</span>(<span class="ty">Int</span>), amount: <span class="ty">Int</span>)
   -> <span class="ty">Result</span>(<span class="ty">Int</span>, <span class="ty">Nil</span>) {
   <span class="k">case</span> amount {
     <span class="pn">0</span> -> <span class="ty">Ok</span>(<span class="pn">0</span>)
