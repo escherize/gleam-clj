@@ -3,10 +3,12 @@
    [gleam.io :as io]))
 
 ;; type Fish
-(defrecord Starfish [name favourite-color])
+(defprotocol IFish)
+(defrecord Starfish [name favourite-color] IFish)
 (defn Starfish? "True if `v` is a Starfish value." [v] (instance? Starfish v))
-(defrecord Jellyfish [name jiggly])
+(defrecord Jellyfish [name jiggly] IFish)
 (defn Jellyfish? "True if `v` is a Jellyfish value." [v] (instance? Jellyfish v))
+(defn Fish? "True if `v` is any Fish value." [v] (instance? jellyfish.IFish v))
 
 (defn- describe [fish]
   (cond

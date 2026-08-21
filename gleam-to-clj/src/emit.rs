@@ -238,8 +238,16 @@ pub fn emit_module(
     excludes.dedup();
 
     let mut out = String::new();
+    // All variant names in the module: a type predicate `<Type>?` is only
+    // safe when no variant anywhere claims `<Type>` (else the two predicates
+    // collide).
+    let all_variant_names: std::collections::HashSet<&str> = defs
+        .custom_types
+        .iter()
+        .flat_map(|t| t.constructors.iter().map(|c| c.name.as_str()))
+        .collect();
     for t in &defs.custom_types {
-        emit_custom_type(&mut out, t);
+        emit_custom_type(&mut out, t, &am.path, &all_variant_names);
     }
 
     // Definitions in call-dependency order (computed pre-analysis); a declare
@@ -360,7 +368,9 @@ pub fn emit_module(
     let module_doc = am.module_doc.trim();
     if !module_doc.is_empty() {
         let escaped = module_doc.replace('\\', "\\\\").replace('"', "\\\"");
-        let indented = escaped.replace('\n', "\n  ");
+        // Continuation lines align under the docstring's text column (one
+        // column past the opening quote at indent 2 => column 3).
+        let indented = escaped.replace('\n', "\n   ");
         let _ = writeln!(header, "  \"{indented}\"");
     }
     if !excludes.is_empty() {
@@ -498,6 +508,14 @@ fn malli_type(ctx: &Emit, t: &gleam_core::type_::Type) -> String {
                     else {
                         return ":any".into();
                     };
+                    // A multi-variant type whose name no variant claims has a
+                    // single `<Type>?` interface predicate — reference that
+                    // instead of or-ing every variant.
+                    let has_type_pred =
+                        variants.len() > 1 && variants.iter().all(|v| v != n);
+                    if has_type_pred {
+                        return format!("[:fn {}]", ctx.pred_ref(m, n));
+                    }
                     let checks: Vec<String> = variants
                         .iter()
                         .map(|v| format!("[:fn {}]", ctx.pred_ref(m, v)))
@@ -513,18 +531,57 @@ fn malli_type(ctx: &Emit, t: &gleam_core::type_::Type) -> String {
     }
 }
 
-fn emit_custom_type(out: &mut String, t: &TypedCustomType) {
+fn emit_custom_type(
+    out: &mut String,
+    t: &TypedCustomType,
+    module_path: &str,
+    all_variant_names: &std::collections::HashSet<&str>,
+) {
     let _ = write!(out, "\n;; type {}\n", t.name);
+
+    // A marker protocol gives the type's variants a shared Clojure identity —
+    // the sum type as a real thing, not just a comment. Each variant record
+    // implements it, so the type predicate is an O(1) `instance?` on the
+    // protocol's generated Java interface (as fast as any variant check, NOT
+    // a slow `satisfies?`).
+    //
+    // The protocol interface name is always suffixed with `Type` so it never
+    // collides with a variant record of the same name (`type S { S F }`). The
+    // type predicate `<Type>?` is emitted only when no variant already claims
+    // that name — otherwise `S?` would be ambiguous with the S variant, so we
+    // leave the variant predicate owning it and rely on the interface for the
+    // rare "is it any S" question.
+    let type_name = t.name.as_str();
+    // Marker protocol named with the Clojure `I<Name>` interface convention;
+    // it can only collide with a Gleam variant literally named `I<Type>`,
+    // which is vanishingly unlikely for UpperCamel variant names.
+    let proto = format!("I{type_name}");
+    let variant_names_type = all_variant_names.contains(type_name);
+    let _ = writeln!(out, "(defprotocol {proto})");
+
     for c in &t.constructors {
         if JAVA_LANG.contains(&c.name.as_str()) {
             let _ = writeln!(out, "(ns-unmap *ns* '{})", c.name);
         }
         let fields = constructor_field_names(c);
-        let _ = writeln!(out, "(defrecord {} [{}])", c.name, fields.join(" "));
+        let _ = writeln!(out, "(defrecord {} [{}] {proto})", c.name, fields.join(" "));
         let _ = writeln!(
             out,
             "(defn {}? \"True if `v` is a {} value.\" [v] (instance? {} v))",
             c.name, c.name, c.name
+        );
+    }
+
+    if !variant_names_type && !JAVA_LANG.contains(&type_name) {
+        // `defprotocol` binds a var to the protocol map; the generated Java
+        // interface is a class named <munged-ns>.<Proto>. `instance?` needs
+        // the class, and Clojure munges `-` to `_` in class names, so build
+        // the class ns from the raw path (kebab for the var, underscores for
+        // the class).
+        let class_ns = kebab(&module_path.replace("/", ".")).replace('-', "_");
+        let _ = writeln!(
+            out,
+            "(defn {type_name}? \"True if `v` is any {type_name} value.\" [v] (instance? {class_ns}.{proto} v))"
         );
     }
 }
@@ -600,7 +657,7 @@ fn emit_function(ctx: &Emit, f: &TypedFunction) -> String {
                 .lines()
                 .map(|l| l.trim().replace('\\', "\\\\").replace('"', "\\\""))
                 .collect();
-            let _ = write!(out, "\n  \"{}\"", text.join("\n  ").trim_end());
+            let _ = write!(out, "\n  \"{}\"", text.join("\n   ").trim_end());
             if let Some(attr) = &attr {
                 let _ = write!(out, "\n  {attr}");
             }

@@ -3,12 +3,12 @@
 
 (defn first'
   "Returns the first element in a pair.
-  
-  ## Examples
-  
-  ```gleam
-  assert pair.first(#(1, 2)) == 1
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert pair.first(#(1, 2)) == 1
+   ```"
   {:malli/schema [:=> [:cat [:tuple :any :any]] :any]}
   [pair]
   (let [[a _] pair]
@@ -16,12 +16,12 @@
 
 (defn second
   "Returns the second element in a pair.
-  
-  ## Examples
-  
-  ```gleam
-  assert pair.second(#(1, 2)) == 2
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert pair.second(#(1, 2)) == 2
+   ```"
   {:malli/schema [:=> [:cat [:tuple :any :any]] :any]}
   [pair]
   (let [[_ a] pair]
@@ -29,12 +29,12 @@
 
 (defn swap
   "Returns a new pair with the elements swapped.
-  
-  ## Examples
-  
-  ```gleam
-  assert pair.swap(#(1, 2)) == #(2, 1)
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert pair.swap(#(1, 2)) == #(2, 1)
+   ```"
   {:malli/schema [:=> [:cat [:tuple :any :any]] [:tuple :any :any]]}
   [pair]
   (let [[a b] pair]
@@ -42,13 +42,13 @@
 
 (defn map-first
   "Returns a new pair with the first element having had `with` applied to
-  it.
-  
-  ## Examples
-  
-  ```gleam
-  assert #(1, 2) |> pair.map_first(fn(n) { n * 2 }) == #(2, 2)
-  ```"
+   it.
+   
+   ## Examples
+   
+   ```gleam
+   assert #(1, 2) |> pair.map_first(fn(n) { n * 2 }) == #(2, 2)
+   ```"
   {:malli/schema [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]]
                       [:tuple :any :any]]}
   [pair fun]
@@ -57,13 +57,13 @@
 
 (defn map-second
   "Returns a new pair with the second element having had `with` applied to
-  it.
-  
-  ## Examples
-  
-  ```gleam
-  assert #(1, 2) |> pair.map_second(fn(n) { n * 2 }) == #(1, 4)
-  ```"
+   it.
+   
+   ## Examples
+   
+   ```gleam
+   assert #(1, 2) |> pair.map_second(fn(n) { n * 2 }) == #(1, 4)
+   ```"
   {:malli/schema [:=> [:cat [:tuple :any :any] [:=> [:cat :any] :any]]
                       [:tuple :any :any]]}
   [pair fun]
@@ -72,13 +72,13 @@
 
 (defn new*
   "Returns a new pair with the given elements. This can also be done using the dedicated
-  syntax instead: `new(1, 2) == #(1, 2)`.
-  
-  ## Examples
-  
-  ```gleam
-  assert pair.new(1, 2) == #(1, 2)
-  ```"
+   syntax instead: `new(1, 2) == #(1, 2)`.
+   
+   ## Examples
+   
+   ```gleam
+   assert pair.new(1, 2) == #(1, 2)
+   ```"
   {:malli/schema [:=> [:cat :any :any] [:tuple :any :any]]}
   [first' second]
   [first' second])

@@ -5,6 +5,8 @@
    [gleam.dict :as dict]))
 
 ;; type Dynamic
+(defprotocol IDynamic)
+(defn Dynamic? "True if `v` is any Dynamic value." [v] (instance? gleam.dynamic.IDynamic v))
 
 (def ^{:malli/schema [:=> [:cat [:or ]] :string]} classify gleam-ffi/classify)
 
@@ -26,19 +28,19 @@
 
 (defn properties
   "Create a dynamic value made of an unordered series of keys and values, where
-  the keys are unique.
-  
-  On Erlang this will be a map, on JavaScript this will be a Gleam dict
-  object."
+   the keys are unique.
+   
+   On Erlang this will be a map, on JavaScript this will be a Gleam dict
+   object."
   {:malli/schema [:=> [:cat [:sequential [:tuple [:or ] [:or ]]]] [:or ]]}
   [entries]
   (cast (dict/from-list entries)))
 
 (defn nil_
   "A dynamic value representing nothing.
-  
-  On Erlang this will be the atom `nil`, on JavaScript this will be
-  `undefined`."
+   
+   On Erlang this will be the atom `nil`, on JavaScript this will be
+   `undefined`."
   {:malli/schema [:=> [:cat] [:or ]]}
   []
   (cast nil))

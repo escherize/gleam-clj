@@ -13,36 +13,44 @@
   (:import (gleam.prelude Ok)))
 
 ;; type Lexer
-(defrecord Lexer [original-source source byte-offset preserve-whitespace preserve-comments mode newlines])
+(defprotocol ILexer)
+(defrecord Lexer [original-source source byte-offset preserve-whitespace preserve-comments mode newlines] ILexer)
 (defn Lexer? "True if `v` is a Lexer value." [v] (instance? Lexer v))
 
 ;; type LexerMode
-(defrecord Normal [])
+(defprotocol ILexerMode)
+(defrecord Normal [] ILexerMode)
 (defn Normal? "True if `v` is a Normal value." [v] (instance? Normal v))
-(defrecord CheckForMinus [])
+(defrecord CheckForMinus [] ILexerMode)
 (defn CheckForMinus? "True if `v` is a CheckForMinus value." [v] (instance? CheckForMinus v))
-(defrecord HasNestedDot [])
+(defrecord HasNestedDot [] ILexerMode)
 (defn HasNestedDot? "True if `v` is a HasNestedDot value." [v] (instance? HasNestedDot v))
+(defn LexerMode? "True if `v` is any LexerMode value." [v] (instance? glexer.ILexerMode v))
 
 ;; type Position
-(defrecord Position [byte-offset])
+(defprotocol IPosition)
+(defrecord Position [byte-offset] IPosition)
 (defn Position? "True if `v` is a Position value." [v] (instance? Position v))
 
 ;; type CommentKind
-(defrecord RegularComment [])
+(defprotocol ICommentKind)
+(defrecord RegularComment [] ICommentKind)
 (defn RegularComment? "True if `v` is a RegularComment value." [v] (instance? RegularComment v))
-(defrecord DocComment [])
+(defrecord DocComment [] ICommentKind)
 (defn DocComment? "True if `v` is a DocComment value." [v] (instance? DocComment v))
-(defrecord ModuleComment [])
+(defrecord ModuleComment [] ICommentKind)
 (defn ModuleComment? "True if `v` is a ModuleComment value." [v] (instance? ModuleComment v))
+(defn CommentKind? "True if `v` is any CommentKind value." [v] (instance? glexer.ICommentKind v))
 
 ;; type LexNumberMode
-(defrecord LexInt [])
+(defprotocol ILexNumberMode)
+(defrecord LexInt [] ILexNumberMode)
 (defn LexInt? "True if `v` is a LexInt value." [v] (instance? LexInt v))
-(defrecord LexFloat [])
+(defrecord LexFloat [] ILexNumberMode)
 (defn LexFloat? "True if `v` is a LexFloat value." [v] (instance? LexFloat v))
-(defrecord LexFloatExponent [])
+(defrecord LexFloatExponent [] ILexNumberMode)
 (defn LexFloatExponent? "True if `v` is a LexFloatExponent value." [v] (instance? LexFloatExponent v))
+(defn LexNumberMode? "True if `v` is any LexNumberMode value." [v] (instance? glexer.ILexNumberMode v))
 
 (defn new*
   {:malli/schema [:=> [:cat :string] [:fn Lexer?]]}
@@ -903,7 +911,7 @@
 
 (defn- skip-comment
   "Ignores the rest of the line until it finds a newline, and signals the
-  caller to continue lexing."
+   caller to continue lexing."
   [lexer]
   (let [[prefix suffix] (splitter/split-before (:newlines lexer)
                                                (:source lexer))
@@ -1629,7 +1637,7 @@
 
 (defn lex
   {:malli/schema [:=> [:cat [:fn Lexer?]]
-                      [:sequential [:tuple [:or [:fn token/Name?] [:fn token/UpperName?] [:fn token/DiscardName?] [:fn token/Int?] [:fn token/Float?] [:fn token/String?] [:fn token/CommentDoc?] [:fn token/CommentNormal?] [:fn token/CommentModule?] [:fn token/As?] [:fn token/Assert?] [:fn token/Auto?] [:fn token/Case?] [:fn token/Const?] [:fn token/Delegate?] [:fn token/Derive?] [:fn token/Echo?] [:fn token/Else?] [:fn token/Fn?] [:fn token/If?] [:fn token/Implement?] [:fn token/Import?] [:fn token/Let?] [:fn token/Macro?] [:fn token/Opaque?] [:fn token/Panic?] [:fn token/Pub?] [:fn token/Test?] [:fn token/Todo?] [:fn token/Type?] [:fn token/Use?] [:fn token/LeftParen?] [:fn token/RightParen?] [:fn token/LeftBrace?] [:fn token/RightBrace?] [:fn token/LeftSquare?] [:fn token/RightSquare?] [:fn token/Plus?] [:fn token/Minus?] [:fn token/Star?] [:fn token/Slash?] [:fn token/Less?] [:fn token/Greater?] [:fn token/LessEqual?] [:fn token/GreaterEqual?] [:fn token/Percent?] [:fn token/PlusDot?] [:fn token/MinusDot?] [:fn token/StarDot?] [:fn token/SlashDot?] [:fn token/LessDot?] [:fn token/GreaterDot?] [:fn token/LessEqualDot?] [:fn token/GreaterEqualDot?] [:fn token/LessGreater?] [:fn token/At?] [:fn token/Colon?] [:fn token/Comma?] [:fn token/Hash?] [:fn token/Bang?] [:fn token/Equal?] [:fn token/EqualEqual?] [:fn token/NotEqual?] [:fn token/VBar?] [:fn token/VBarVBar?] [:fn token/AmperAmper?] [:fn token/LessLess?] [:fn token/GreaterGreater?] [:fn token/Pipe?] [:fn token/Dot?] [:fn token/DotDot?] [:fn token/LeftArrow?] [:fn token/RightArrow?] [:fn token/EndOfFile?] [:fn token/Space?] [:fn token/UnterminatedString?] [:fn token/UnexpectedGrapheme?]] [:fn Position?]]]]}
+                      [:sequential [:tuple [:fn token/Token?] [:fn Position?]]]]}
   [lexer]
   (-> (do-lex lexer (list)) list/reverse))
 
@@ -1694,26 +1702,26 @@
 
 (defn unescape-string
   "Convert the value of a string token to the string it represents.
-  
-  This function can fail if the original string contains invalid escape sequences.
-  
-  ```gleam
-  unescape_string(\"\\\\\\\"X\\\\\\\" marks the spot\")
-  // --> Ok(\"\\\"X\\\" marks the spot\")
-  
-  unescape_string(\"\\\\u{1F600}\")
-  // --> Ok(\"😀\")
-  
-  unescape_string(\"\\\\x\")
-  // --> Error(Nil)
-  ```"
+   
+   This function can fail if the original string contains invalid escape sequences.
+   
+   ```gleam
+   unescape_string(\"\\\\\\\"X\\\\\\\" marks the spot\")
+   // --> Ok(\"\\\"X\\\" marks the spot\")
+   
+   unescape_string(\"\\\\u{1F600}\")
+   // --> Ok(\"😀\")
+   
+   unescape_string(\"\\\\x\")
+   // --> Error(Nil)
+   ```"
   {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [string]
   (unescape-loop string ""))
 
 (defn to-source
   "Turn a sequence of tokens back to their Gleam source code representation."
-  {:malli/schema [:=> [:cat [:sequential [:tuple [:or [:fn token/Name?] [:fn token/UpperName?] [:fn token/DiscardName?] [:fn token/Int?] [:fn token/Float?] [:fn token/String?] [:fn token/CommentDoc?] [:fn token/CommentNormal?] [:fn token/CommentModule?] [:fn token/As?] [:fn token/Assert?] [:fn token/Auto?] [:fn token/Case?] [:fn token/Const?] [:fn token/Delegate?] [:fn token/Derive?] [:fn token/Echo?] [:fn token/Else?] [:fn token/Fn?] [:fn token/If?] [:fn token/Implement?] [:fn token/Import?] [:fn token/Let?] [:fn token/Macro?] [:fn token/Opaque?] [:fn token/Panic?] [:fn token/Pub?] [:fn token/Test?] [:fn token/Todo?] [:fn token/Type?] [:fn token/Use?] [:fn token/LeftParen?] [:fn token/RightParen?] [:fn token/LeftBrace?] [:fn token/RightBrace?] [:fn token/LeftSquare?] [:fn token/RightSquare?] [:fn token/Plus?] [:fn token/Minus?] [:fn token/Star?] [:fn token/Slash?] [:fn token/Less?] [:fn token/Greater?] [:fn token/LessEqual?] [:fn token/GreaterEqual?] [:fn token/Percent?] [:fn token/PlusDot?] [:fn token/MinusDot?] [:fn token/StarDot?] [:fn token/SlashDot?] [:fn token/LessDot?] [:fn token/GreaterDot?] [:fn token/LessEqualDot?] [:fn token/GreaterEqualDot?] [:fn token/LessGreater?] [:fn token/At?] [:fn token/Colon?] [:fn token/Comma?] [:fn token/Hash?] [:fn token/Bang?] [:fn token/Equal?] [:fn token/EqualEqual?] [:fn token/NotEqual?] [:fn token/VBar?] [:fn token/VBarVBar?] [:fn token/AmperAmper?] [:fn token/LessLess?] [:fn token/GreaterGreater?] [:fn token/Pipe?] [:fn token/Dot?] [:fn token/DotDot?] [:fn token/LeftArrow?] [:fn token/RightArrow?] [:fn token/EndOfFile?] [:fn token/Space?] [:fn token/UnterminatedString?] [:fn token/UnexpectedGrapheme?]] [:fn Position?]]]]
+  {:malli/schema [:=> [:cat [:sequential [:tuple [:fn token/Token?] [:fn Position?]]]]
                       :string]}
   [tokens]
   (p/with-use [[source _use1] (list/fold tokens "")]

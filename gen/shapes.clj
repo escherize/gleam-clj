@@ -4,17 +4,18 @@
    [gleam.prelude :as p]))
 
 ;; type Shape
-(defrecord Circle [value])
+(defprotocol IShape)
+(defrecord Circle [value] IShape)
 (defn Circle? "True if `v` is a Circle value." [v] (instance? Circle v))
-(defrecord Rect [width height])
+(defrecord Rect [width height] IShape)
 (defn Rect? "True if `v` is a Rect value." [v] (instance? Rect v))
-(defrecord Point [])
+(defrecord Point [] IShape)
 (defn Point? "True if `v` is a Point value." [v] (instance? Point v))
+(defn Shape? "True if `v` is any Shape value." [v] (instance? shapes.IShape v))
 
 (defn area
   "Area with pi = 3.0, engineering approximation."
-  {:malli/schema [:=> [:cat [:or [:fn Circle?] [:fn Rect?] [:fn Point?]]]
-                      :double]}
+  {:malli/schema [:=> [:cat [:fn Shape?]] :double]}
   [shape]
   (cond
     (instance? Circle shape)
@@ -35,8 +36,7 @@
       (+ x (sum rest')))))
 
 (defn total-area
-  {:malli/schema [:=> [:cat [:sequential [:or [:fn Circle?] [:fn Rect?] [:fn Point?]]]]
-                      :double]}
+  {:malli/schema [:=> [:cat [:sequential [:fn Shape?]]] :double]}
   [shapes]
   (-> shapes (list/map area) sum))
 

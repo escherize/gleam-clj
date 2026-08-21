@@ -5,16 +5,20 @@
    [gleam.list :as list]))
 
 ;; type StringTree
+(defprotocol IStringTree)
+(defn StringTree? "True if `v` is any StringTree value." [v] (instance? gleam.string_tree.IStringTree v))
 
 ;; type Direction
-(defrecord All [])
+(defprotocol IDirection)
+(defrecord All [] IDirection)
 (defn All? "True if `v` is a All value." [v] (instance? All v))
+(defn Direction? "True if `v` is any Direction value." [v] (instance? gleam.string_tree.IDirection v))
 
 (def ^{:malli/schema [:=> [:cat [:sequential :string]] [:or ]]} from-strings gleam-ffi/st-from-strings)
 
 (defn new*
   "Create an empty `StringTree`. Useful as the start of a pipe chaining many
-  trees together."
+   trees together."
   {:malli/schema [:=> [:cat] [:or ]]}
   []
   (from-strings (list)))
@@ -25,24 +29,24 @@
 
 (defn prepend
   "Prepends a `String` onto the start of some `StringTree`.
-  
-  Runs in constant time."
+   
+   Runs in constant time."
   {:malli/schema [:=> [:cat [:or ] :string] [:or ]]}
   [tree prefix]
   (append-tree (from-string prefix) tree))
 
 (defn append
   "Appends a `String` onto the end of some `StringTree`.
-  
-  Runs in constant time."
+   
+   Runs in constant time."
   {:malli/schema [:=> [:cat [:or ] :string] [:or ]]}
   [tree second]
   (append-tree tree (from-string second)))
 
 (defn prepend-tree
   "Prepends some `StringTree` onto the start of another.
-  
-  Runs in constant time."
+   
+   Runs in constant time."
   {:malli/schema [:=> [:cat [:or ] [:or ]] [:or ]]}
   [tree prefix]
   (append-tree prefix tree))
@@ -83,44 +87,44 @@
 
 (defn is-equal
   "Compares two string trees to determine if they have the same textual
-  content.
-  
-  Comparing two string trees using the `==` operator may return `False` even
-  if they have the same content as they may have been built in different ways,
-  so using this function is often preferred.
-  
-  ## Examples
-  
-  ```gleam
-  assert string_tree.from_strings([\"a\", \"b\"]) != string_tree.from_string(\"ab\")
-  ```
-  
-  ```gleam
-  assert string_tree.is_equal(
-  string_tree.from_strings([\"a\", \"b\"]),
-  string_tree.from_string(\"ab\"),
-  )
-  ```"
+   content.
+   
+   Comparing two string trees using the `==` operator may return `False` even
+   if they have the same content as they may have been built in different ways,
+   so using this function is often preferred.
+   
+   ## Examples
+   
+   ```gleam
+   assert string_tree.from_strings([\"a\", \"b\"]) != string_tree.from_string(\"ab\")
+   ```
+   
+   ```gleam
+   assert string_tree.is_equal(
+   string_tree.from_strings([\"a\", \"b\"]),
+   string_tree.from_string(\"ab\"),
+   )
+   ```"
   {:malli/schema [:=> [:cat [:or ] [:or ]] :boolean]}
   [a b]
   (= a b))
 
 (defn is-empty
   "Inspects a `StringTree` to determine if it is equivalent to an empty string.
-  
-  ## Examples
-  
-  ```gleam
-  assert !{ string_tree.from_string(\"ok\") |> string_tree.is_empty }
-  ```
-  
-  ```gleam
-  assert string_tree.from_string(\"\") |> string_tree.is_empty
-  ```
-  
-  ```gleam
-  assert string_tree.from_strings([]) |> string_tree.is_empty
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert !{ string_tree.from_string(\"ok\") |> string_tree.is_empty }
+   ```
+   
+   ```gleam
+   assert string_tree.from_string(\"\") |> string_tree.is_empty
+   ```
+   
+   ```gleam
+   assert string_tree.from_strings([]) |> string_tree.is_empty
+   ```"
   {:malli/schema [:=> [:cat [:or ]] :boolean]}
   [tree]
   (= (from-string "") tree))

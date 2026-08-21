@@ -1,26 +1,26 @@
 (ns gleam.list
   "Lists are an ordered sequence of elements and are one of the most common
-  data types in Gleam.
-  
-  New elements can be added and removed from the front of a list in
-  constant time, while adding and removing from the end requires traversing
-  and copying the whole list, so keep this in mind when designing your
-  programs.
-  
-  There is a dedicated syntax for prefixing to a list:
-  
-  ```gleam
-  let new_list = [1, 2, ..existing_list]
-  ```
-  
-  And a matching syntax for getting the first elements of a list:
-  
-  ```gleam
-  case list {
-  [first_element, ..rest] -> first_element
-  _ -> \"this pattern matches when the list is empty\"
-  }
-  ```"
+   data types in Gleam.
+   
+   New elements can be added and removed from the front of a list in
+   constant time, while adding and removing from the end requires traversing
+   and copying the whole list, so keep this in mind when designing your
+   programs.
+   
+   There is a dedicated syntax for prefixing to a list:
+   
+   ```gleam
+   let new_list = [1, 2, ..existing_list]
+   ```
+   
+   And a matching syntax for getting the first elements of a list:
+   
+   ```gleam
+   case list {
+   [first_element, ..rest] -> first_element
+   _ -> \"this pattern matches when the list is empty\"
+   }
+   ```"
   (:refer-clojure :exclude [chunk drop drop-while filter find flatten interleave last map partition reduce repeat reverse shuffle sort take take-while])
   (:require
    [gleam.dict :as dict]
@@ -31,16 +31,20 @@
   (:import (gleam.prelude Ok)))
 
 ;; type ContinueOrStop
-(defrecord Continue [value])
+(defprotocol IContinueOrStop)
+(defrecord Continue [value] IContinueOrStop)
 (defn Continue? "True if `v` is a Continue value." [v] (instance? Continue v))
-(defrecord Stop [value])
+(defrecord Stop [value] IContinueOrStop)
 (defn Stop? "True if `v` is a Stop value." [v] (instance? Stop v))
+(defn ContinueOrStop? "True if `v` is any ContinueOrStop value." [v] (instance? gleam.list.IContinueOrStop v))
 
 ;; type Sorting
-(defrecord Ascending [])
+(defprotocol ISorting)
+(defrecord Ascending [] ISorting)
 (defn Ascending? "True if `v` is a Ascending value." [v] (instance? Ascending v))
-(defrecord Descending [])
+(defrecord Descending [] ISorting)
 (defn Descending? "True if `v` is a Descending value." [v] (instance? Descending v))
+(defn Sorting? "True if `v` is any Sorting value." [v] (instance? gleam.list.ISorting v))
 
 (defn- length-loop [list' count']
   (if (seq list')
@@ -50,26 +54,26 @@
 
 (defn length
   "Counts the number of elements in a given list.
-  
-  This function has to traverse the list to determine the number of elements,
-  so it runs in linear time.
-  
-  This function is natively implemented by the virtual machine and is highly
-  optimised.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.length([]) == 0
-  ```
-  
-  ```gleam
-  assert list.length([1]) == 1
-  ```
-  
-  ```gleam
-  assert list.length([1, 2]) == 2
-  ```"
+   
+   This function has to traverse the list to determine the number of elements,
+   so it runs in linear time.
+   
+   This function is natively implemented by the virtual machine and is highly
+   optimised.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.length([]) == 0
+   ```
+   
+   ```gleam
+   assert list.length([1]) == 1
+   ```
+   
+   ```gleam
+   assert list.length([1, 2]) == 2
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any]] :int]}
   [list']
   (length-loop list' 0))
@@ -84,23 +88,23 @@
 
 (defn count'
   "Counts the number of elements in a given list satisfying a given predicate.
-  
-  This function has to traverse the list to determine the number of elements,
-  so it runs in linear time.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.count([], fn(a) { a > 0 }) == 0
-  ```
-  
-  ```gleam
-  assert list.count([1], fn(a) { a > 0 }) == 1
-  ```
-  
-  ```gleam
-  assert list.count([1, 2, 3], int.is_odd) == 2
-  ```"
+   
+   This function has to traverse the list to determine the number of elements,
+   so it runs in linear time.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.count([], fn(a) { a > 0 }) == 0
+   ```
+   
+   ```gleam
+   assert list.count([1], fn(a) { a > 0 }) == 1
+   ```
+   
+   ```gleam
+   assert list.count([1, 2, 3], int.is_odd) == 2
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
                       :int]}
   [list' predicate]
@@ -108,8 +112,8 @@
 
 (defn- reverse-and-prepend
   "Reverses a list and prepends it to another list.
-  This function runs in linear time, proportional to the length of the list
-  to prepend."
+   This function runs in linear time, proportional to the length of the list
+   to prepend."
   [prefix suffix]
   (if (empty? prefix)
     suffix
@@ -118,80 +122,80 @@
 
 (defn reverse
   "Creates a new list from a given list containing the same elements but in the
-  opposite order.
-  
-  This function has to traverse the list to create the new reversed list, so
-  it runs in linear time.
-  
-  This function is natively implemented by the virtual machine and is highly
-  optimised.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.reverse([]) == []
-  ```
-  
-  ```gleam
-  assert list.reverse([1]) == [1]
-  ```
-  
-  ```gleam
-  assert list.reverse([1, 2]) == [2, 1]
-  ```"
+   opposite order.
+   
+   This function has to traverse the list to create the new reversed list, so
+   it runs in linear time.
+   
+   This function is natively implemented by the virtual machine and is highly
+   optimised.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.reverse([]) == []
+   ```
+   
+   ```gleam
+   assert list.reverse([1]) == [1]
+   ```
+   
+   ```gleam
+   assert list.reverse([1, 2]) == [2, 1]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any]] [:sequential :any]]}
   [list']
   (reverse-and-prepend list' (list)))
 
 (defn is-empty
   "Determines whether or not the list is empty.
-  
-  This function runs in constant time.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.is_empty([])
-  ```
-  
-  ```gleam
-  assert !list.is_empty([1])
-  ```
-  
-  ```gleam
-  assert !list.is_empty([1, 1])
-  ```"
+   
+   This function runs in constant time.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.is_empty([])
+   ```
+   
+   ```gleam
+   assert !list.is_empty([1])
+   ```
+   
+   ```gleam
+   assert !list.is_empty([1, 1])
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any]] :boolean]}
   [list']
   (= list' (list)))
 
 (defn contains
   "Determines whether or not a given element exists within a given list.
-  
-  This function traverses the list to find the element, so it runs in linear
-  time.
-  
-  ## Examples
-  
-  ```gleam
-  assert !list.contains([], any: 0)
-  ```
-  
-  ```gleam
-  assert [0] |> list.contains(any: 0)
-  ```
-  
-  ```gleam
-  assert !list.contains([1], any: 0)
-  ```
-  
-  ```gleam
-  assert !list.contains([1, 1], any: 0)
-  ```
-  
-  ```gleam
-  assert [1, 0] |> list.contains(any: 0)
-  ```"
+   
+   This function traverses the list to find the element, so it runs in linear
+   time.
+   
+   ## Examples
+   
+   ```gleam
+   assert !list.contains([], any: 0)
+   ```
+   
+   ```gleam
+   assert [0] |> list.contains(any: 0)
+   ```
+   
+   ```gleam
+   assert !list.contains([1], any: 0)
+   ```
+   
+   ```gleam
+   assert !list.contains([1, 1], any: 0)
+   ```
+   
+   ```gleam
+   assert [1, 0] |> list.contains(any: 0)
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :any] :boolean]}
   [list' elem]
   (cond
@@ -207,20 +211,20 @@
 
 (defn first'
   "Gets the first element from the start of the list, if there is one.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.first([]) == Error(Nil)
-  ```
-  
-  ```gleam
-  assert list.first([0]) == Ok(0)
-  ```
-  
-  ```gleam
-  assert list.first([1, 2]) == Ok(1)
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.first([]) == Error(Nil)
+   ```
+   
+   ```gleam
+   assert list.first([0]) == Ok(0)
+   ```
+   
+   ```gleam
+   assert list.first([1, 2]) == Ok(1)
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list']
@@ -231,23 +235,23 @@
 
 (defn rest'
   "Returns the list minus the first element. If the list is empty, `Error(Nil)` is
-  returned.
-  
-  This function runs in constant time and does not make a copy of the list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.rest([]) == Error(Nil)
-  ```
-  
-  ```gleam
-  assert list.rest([0]) == Ok([])
-  ```
-  
-  ```gleam
-  assert list.rest([1, 2]) == Ok([2])
-  ```"
+   returned.
+   
+   This function runs in constant time and does not make a copy of the list.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.rest([]) == Error(Nil)
+   ```
+   
+   ```gleam
+   assert list.rest([0]) == Ok([])
+   ```
+   
+   ```gleam
+   assert list.rest([1, 2]) == Ok([2])
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list']
@@ -258,35 +262,35 @@
 
 (defn group
   "Groups the elements from the given list by the given key function.
-  
-  Does not preserve the initial value order.
-  
-  ## Examples
-  
-  ```gleam
-  import gleam/dict
-  
-  assert [Ok(3), Error(\"Wrong\"), Ok(200), Ok(73)]
-  |> list.group(by: fn(i) {
-  case i {
-  Ok(_) -> \"Successful\"
-  Error(_) -> \"Failed\"
-  }
-  })
-  |> dict.to_list
-  == [
-  #(\"Failed\", [Error(\"Wrong\")]),
-  #(\"Successful\", [Ok(73), Ok(200), Ok(3)]),
-  ]
-  ```
-  
-  ```gleam
-  import gleam/dict
-  
-  assert list.group([1, 2, 3, 4, 5], by: fn(i) { i - i / 3 * 3 })
-  |> dict.to_list
-  == [#(0, [3]), #(1, [4, 1]), #(2, [5, 2])]
-  ```"
+   
+   Does not preserve the initial value order.
+   
+   ## Examples
+   
+   ```gleam
+   import gleam/dict
+   
+   assert [Ok(3), Error(\"Wrong\"), Ok(200), Ok(73)]
+   |> list.group(by: fn(i) {
+   case i {
+   Ok(_) -> \"Successful\"
+   Error(_) -> \"Failed\"
+   }
+   })
+   |> dict.to_list
+   == [
+   #(\"Failed\", [Error(\"Wrong\")]),
+   #(\"Successful\", [Ok(73), Ok(200), Ok(3)]),
+   ]
+   ```
+   
+   ```gleam
+   import gleam/dict
+   
+   assert list.group([1, 2, 3, 4, 5], by: fn(i) { i - i / 3 * 3 })
+   |> dict.to_list
+   == [#(0, [3]), #(1, [4, 1]), #(2, [5, 2])]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]]
                       [:map-of :any [:sequential :any]]]}
   [list' key]
@@ -300,17 +304,17 @@
 
 (defn filter
   "Returns a new list containing only the elements from the first list for
-  which the given functions returns `True`.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.filter([2, 4, 6, 1], fn(x) { x > 2 }) == [4, 6]
-  ```
-  
-  ```gleam
-  assert list.filter([2, 4, 6, 1], fn(x) { x > 6 }) == []
-  ```"
+   which the given functions returns `True`.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.filter([2, 4, 6, 1], fn(x) { x > 2 }) == [4, 6]
+   ```
+   
+   ```gleam
+   assert list.filter([2, 4, 6, 1], fn(x) { x > 6 }) == []
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
                       [:sequential :any]]}
   [list' predicate]
@@ -324,17 +328,17 @@
 
 (defn filter-map
   "Returns a new list containing only the elements from the first list for
-  which the given functions returns `Ok(_)`.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.filter_map([2, 4, 6, 1], Error) == []
-  ```
-  
-  ```gleam
-  assert list.filter_map([2, 4, 6, 1], fn(x) { Ok(x + 1) }) == [3, 5, 7, 2]
-  ```"
+   which the given functions returns `Ok(_)`.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.filter_map([2, 4, 6, 1], Error) == []
+   ```
+   
+   ```gleam
+   assert list.filter_map([2, 4, 6, 1], fn(x) { Ok(x + 1) }) == [3, 5, 7, 2]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
                       [:sequential :any]]}
   [list' fun]
@@ -348,12 +352,12 @@
 
 (defn map
   "Returns a new list containing the results of applying the supplied function to each element.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.map([2, 4, 6], fn(x) { x * 2 }) == [4, 8, 12]
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.map([2, 4, 6], fn(x) { x * 2 }) == [4, 8, 12]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]]
                       [:sequential :any]]}
   [list' fun]
@@ -367,19 +371,19 @@
 
 (defn map2
   "Combines two lists into a single list using the given function.
-  
-  If a list is longer than the other, the extra elements are dropped.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.map2([1, 2, 3], [4, 5, 6], fn(x, y) { x + y }) == [5, 7, 9]
-  ```
-  
-  ```gleam
-  assert list.map2([1, 2], [\"a\", \"b\", \"c\"], fn(i, x) { #(i, x) })
-  == [#(1, \"a\"), #(2, \"b\")]
-  ```"
+   
+   If a list is longer than the other, the extra elements are dropped.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.map2([1, 2, 3], [4, 5, 6], fn(x, y) { x + y }) == [5, 7, 9]
+   ```
+   
+   ```gleam
+   assert list.map2([1, 2], [\"a\", \"b\", \"c\"], fn(i, x) { #(i, x) })
+   == [#(1, \"a\"), #(2, \"b\")]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any] [:=> [:cat :any :any] :any]]
                       [:sequential :any]]}
   [list1 list2 fun]
@@ -393,15 +397,15 @@
 
 (defn map-fold
   "Similar to `map` but also lets you pass around an accumulated value.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.map_fold(over: [1, 2, 3], from: 100, with: fn(memo, i) {
-  #(memo + i, i * 2)
-  })
-  == #(106, [2, 4, 6])
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.map_fold(over: [1, 2, 3], from: 100, with: fn(memo, i) {
+   #(memo + i, i * 2)
+   })
+   == #(106, [2, 4, 6])
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:tuple :any :any]]]
                       [:tuple :any [:sequential :any]]]}
   [list' initial fun]
@@ -415,17 +419,17 @@
 
 (defn index-map
   "Similar to `map`, but the supplied function will also be passed the index
-  of the element being mapped as an additional argument.
-  
-  The index starts at 0, so the first element is 0, the second is 1, and so
-  on.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.index_map([\"a\", \"b\"], fn(x, i) { #(i, x) })
-  == [#(0, \"a\"), #(1, \"b\")]
-  ```"
+   of the element being mapped as an additional argument.
+   
+   The index starts at 0, so the first element is 0, the second is 1, and so
+   on.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.index_map([\"a\", \"b\"], fn(x, i) { #(i, x) })
+   == [#(0, \"a\"), #(1, \"b\")]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :int] :any]]
                       [:sequential :any]]}
   [list' fun]
@@ -443,32 +447,32 @@
 
 (defn try-map
   "Takes a function that returns a `Result` and applies it to each element in a
-  given list in turn.
-  
-  If the function returns `Ok(new_value)` for all elements in the list then a
-  list of the new values is returned.
-  
-  If the function returns `Error(reason)` for any of the elements then it is
-  returned immediately. None of the elements in the list are processed after
-  one returns an `Error`.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.try_map([1, 2, 3], fn(x) { Ok(x + 2) }) == Ok([3, 4, 5])
-  ```
-  
-  ```gleam
-  assert list.try_map([1, 2, 3], fn(_) { Error(0) }) == Error(0)
-  ```
-  
-  ```gleam
-  assert list.try_map([[1], [2, 3]], list.first) == Ok([1, 2])
-  ```
-  
-  ```gleam
-  assert list.try_map([[1], [], [2]], list.first) == Error(Nil)
-  ```"
+   given list in turn.
+   
+   If the function returns `Ok(new_value)` for all elements in the list then a
+   list of the new values is returned.
+   
+   If the function returns `Error(reason)` for any of the elements then it is
+   returned immediately. None of the elements in the list are processed after
+   one returns an `Error`.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.try_map([1, 2, 3], fn(x) { Ok(x + 2) }) == Ok([3, 4, 5])
+   ```
+   
+   ```gleam
+   assert list.try_map([1, 2, 3], fn(_) { Error(0) }) == Error(0)
+   ```
+   
+   ```gleam
+   assert list.try_map([[1], [2, 3]], list.first) == Ok([1, 2])
+   ```
+   
+   ```gleam
+   assert list.try_map([[1], [], [2]], list.first) == Error(Nil)
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' fun]
@@ -476,22 +480,22 @@
 
 (defn drop
   "Returns a list that is the given list with up to the given number of
-  elements removed from the front of the list.
-  
-  If the list has less than the number of elements an empty list is
-  returned.
-  
-  This function runs in linear time but does not copy the list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.drop([1, 2, 3, 4], 2) == [3, 4]
-  ```
-  
-  ```gleam
-  assert list.drop([1, 2, 3, 4], 9) == []
-  ```"
+   elements removed from the front of the list.
+   
+   If the list has less than the number of elements an empty list is
+   returned.
+   
+   This function runs in linear time but does not copy the list.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.drop([1, 2, 3, 4], 2) == [3, 4]
+   ```
+   
+   ```gleam
+   assert list.drop([1, 2, 3, 4], 9) == []
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential :any]]}
   [list' n]
   (let [subject (<= n 0)]
@@ -513,54 +517,54 @@
 
 (defn take
   "Returns a list containing the first given number of elements from the given
-  list.
-  
-  If the list has less than the number of elements then the full list is
-  returned.
-  
-  This function runs in linear time.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.take([1, 2, 3, 4], 2) == [1, 2]
-  ```
-  
-  ```gleam
-  assert list.take([1, 2, 3, 4], 9) == [1, 2, 3, 4]
-  ```"
+   list.
+   
+   If the list has less than the number of elements then the full list is
+   returned.
+   
+   This function runs in linear time.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.take([1, 2, 3, 4], 2) == [1, 2]
+   ```
+   
+   ```gleam
+   assert list.take([1, 2, 3, 4], 9) == [1, 2, 3, 4]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential :any]]}
   [list' n]
   (take-loop list' n (list)))
 
 (defn new*
   "Returns a new empty list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.new() == []
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.new() == []
+   ```"
   {:malli/schema [:=> [:cat] [:sequential :any]]}
   []
   (list))
 
 (defn wrap
   "Returns the given item wrapped in a list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.wrap(1) == [1]
-  ```
-  
-  ```gleam
-  assert list.wrap([\"a\", \"b\", \"c\"]) == [[\"a\", \"b\", \"c\"]]
-  ```
-  
-  ```gleam
-  assert list.wrap([[]]) == [[[]]]
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.wrap(1) == [1]
+   ```
+   
+   ```gleam
+   assert list.wrap([\"a\", \"b\", \"c\"]) == [[\"a\", \"b\", \"c\"]]
+   ```
+   
+   ```gleam
+   assert list.wrap([[]]) == [[[]]]
+   ```"
   {:malli/schema [:=> [:cat :any] [:sequential :any]]}
   [item]
   (list item))
@@ -573,15 +577,15 @@
 
 (defn append
   "Joins one list onto the end of another.
-  
-  This function runs in linear time, and it traverses and copies the first
-  list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.append([1, 2], [3]) == [1, 2, 3]
-  ```"
+   
+   This function runs in linear time, and it traverses and copies the first
+   list.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.append([1, 2], [3]) == [1, 2, 3]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]]
                       [:sequential :any]]}
   [first' second]
@@ -589,17 +593,17 @@
 
 (defn prepend
   "Prefixes an item to a list. This can also be done using the dedicated
-  syntax instead.
-  
-  ```gleam
-  let existing_list = [2, 3, 4]
-  assert [1, ..existing_list] == [1, 2, 3, 4]
-  ```
-  
-  ```gleam
-  let existing_list = [2, 3, 4]
-  assert list.prepend(to: existing_list, this: 1) == [1, 2, 3, 4]
-  ```"
+   syntax instead.
+   
+   ```gleam
+   let existing_list = [2, 3, 4]
+   assert [1, ..existing_list] == [1, 2, 3, 4]
+   ```
+   
+   ```gleam
+   let existing_list = [2, 3, 4]
+   assert list.prepend(to: existing_list, this: 1) == [1, 2, 3, 4]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :any] [:sequential :any]]}
   [list' item]
   (list* item list'))
@@ -612,15 +616,15 @@
 
 (defn flatten
   "Joins a list of lists into a single list.
-  
-  This function traverses all elements twice on the JavaScript target.
-  This function traverses all elements once on the Erlang target.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.flatten([[1], [2, 3], []]) == [1, 2, 3]
-  ```"
+   
+   This function traverses all elements twice on the JavaScript target.
+   This function traverses all elements once on the Erlang target.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.flatten([[1], [2, 3], []]) == [1, 2, 3]
+   ```"
   {:malli/schema [:=> [:cat [:sequential [:sequential :any]]]
                       [:sequential :any]]}
   [lists]
@@ -628,12 +632,12 @@
 
 (defn flat-map
   "Maps the list with the given function into a list of lists, and then flattens it.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.flat_map([2, 4, 6], fn(x) { [x, x + 1] }) == [2, 3, 4, 5, 6, 7]
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.flat_map([2, 4, 6], fn(x) { [x, x + 1] }) == [2, 3, 4, 5, 6, 7]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:sequential :any]]]
                       [:sequential :any]]}
   [list' fun]
@@ -641,12 +645,12 @@
 
 (defn fold
   "Reduces a list of elements into a single value by calling a given function
-  on each element, going from left to right.
-  
-  `fold([1, 2, 3], 0, add)` is the equivalent of
-  `add(add(add(0, 1), 2), 3)`.
-  
-  This function runs in linear time."
+   on each element, going from left to right.
+   
+   `fold([1, 2, 3], 0, add)` is the equivalent of
+   `add(add(add(0, 1), 2), 3)`.
+   
+   This function runs in linear time."
   {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]]
                       :any]}
   [list' initial fun]
@@ -657,15 +661,15 @@
 
 (defn fold-right
   "Reduces a list of elements into a single value by calling a given function
-  on each element, going from right to left.
-  
-  `fold_right([1, 2, 3], 0, add)` is the equivalent of
-  `add(add(add(0, 3), 2), 1)`.
-  
-  This function runs in linear time.
-  
-  Unlike `fold` this function is not tail recursive. Where possible use
-  `fold` instead as it will use less memory."
+   on each element, going from right to left.
+   
+   `fold_right([1, 2, 3], 0, add)` is the equivalent of
+   `add(add(add(0, 3), 2), 1)`.
+   
+   This function runs in linear time.
+   
+   Unlike `fold` this function is not tail recursive. Where possible use
+   `fold` instead as it will use less memory."
   {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]]
                       :any]}
   [list' initial fun]
@@ -682,22 +686,22 @@
 
 (defn index-fold
   "Like `fold` but the folding function also receives the index of the current element.
-  
-  ## Examples
-  
-  ```gleam
-  assert [\"a\", \"b\", \"c\"]
-  |> list.index_fold(\"\", fn(acc, item, index) {
-  acc <> int.to_string(index) <> \":\" <> item <> \" \"
-  })
-  == \"0:a 1:b 2:c\"
-  ```
-  
-  ```gleam
-  assert [10, 20, 30]
-  |> list.index_fold(0, fn(acc, item, index) { acc + item * index })
-  == 80
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert [\"a\", \"b\", \"c\"]
+   |> list.index_fold(\"\", fn(acc, item, index) {
+   acc <> int.to_string(index) <> \":\" <> item <> \" \"
+   })
+   == \"0:a 1:b 2:c\"
+   ```
+   
+   ```gleam
+   assert [10, 20, 30]
+   |> list.index_fold(0, fn(acc, item, index) { acc + item * index })
+   == 80
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any :int] :any]]
                       :any]}
   [list' initial fun]
@@ -705,23 +709,23 @@
 
 (defn try-fold
   "A variant of fold that might fail.
-  
-  The folding function should return `Result(accumulator, error)`.
-  If the returned value is `Ok(accumulator)` try_fold will try the next value in the list.
-  If the returned value is `Error(error)` try_fold will stop and return that error.
-  
-  ## Examples
-  
-  ```gleam
-  assert [1, 2, 3, 4]
-  |> list.try_fold(0, fn(acc, i) {
-  case i < 3 {
-  True -> Ok(acc + i)
-  False -> Error(Nil)
-  }
-  })
-  == Error(Nil)
-  ```"
+   
+   The folding function should return `Result(accumulator, error)`.
+   If the returned value is `Ok(accumulator)` try_fold will try the next value in the list.
+   If the returned value is `Error(error)` try_fold will stop and return that error.
+   
+   ## Examples
+   
+   ```gleam
+   assert [1, 2, 3, 4]
+   |> list.try_fold(0, fn(acc, i) {
+   case i < 3 {
+   True -> Ok(acc + i)
+   False -> Error(Nil)
+   }
+   })
+   == Error(Nil)
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' initial fun]
@@ -736,24 +740,24 @@
 
 (defn fold-until
   "A variant of fold that allows to stop folding earlier.
-  
-  The folding function should return `ContinueOrStop(accumulator)`.
-  If the returned value is `Continue(accumulator)` fold_until will try the next value in the list.
-  If the returned value is `Stop(accumulator)` fold_until will stop and return that accumulator.
-  
-  ## Examples
-  
-  ```gleam
-  assert [1, 2, 3, 4]
-  |> list.fold_until(0, fn(acc, i) {
-  case i < 3 {
-  True -> Continue(acc + i)
-  False -> Stop(acc)
-  }
-  })
-  == 3
-  ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:or [:fn Continue?] [:fn Stop?]]]]
+   
+   The folding function should return `ContinueOrStop(accumulator)`.
+   If the returned value is `Continue(accumulator)` fold_until will try the next value in the list.
+   If the returned value is `Stop(accumulator)` fold_until will stop and return that accumulator.
+   
+   ## Examples
+   
+   ```gleam
+   assert [1, 2, 3, 4]
+   |> list.fold_until(0, fn(acc, i) {
+   case i < 3 {
+   True -> Continue(acc + i)
+   False -> Stop(acc)
+   }
+   })
+   == 3
+   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:fn ContinueOrStop?]]]
                       :any]}
   [list' initial fun]
   (if (empty? list')
@@ -767,23 +771,23 @@
 
 (defn find
   "Finds the first element in a given list for which the given function returns
-  `True`.
-  
-  Returns `Error(Nil)` if no such element is found.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.find([1, 2, 3], fn(x) { x > 2 }) == Ok(3)
-  ```
-  
-  ```gleam
-  assert list.find([1, 2, 3], fn(x) { x > 4 }) == Error(Nil)
-  ```
-  
-  ```gleam
-  assert list.find([], fn(_) { True }) == Error(Nil)
-  ```"
+   `True`.
+   
+   Returns `Error(Nil)` if no such element is found.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.find([1, 2, 3], fn(x) { x > 2 }) == Ok(3)
+   ```
+   
+   ```gleam
+   assert list.find([1, 2, 3], fn(x) { x > 4 }) == Error(Nil)
+   ```
+   
+   ```gleam
+   assert list.find([], fn(_) { True }) == Error(Nil)
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' is-desired]
@@ -794,23 +798,23 @@
 
 (defn find-map
   "Finds the first element in a given list for which the given function returns
-  `Ok(new_value)`, then returns the wrapped `new_value`.
-  
-  Returns `Error(Nil)` if no such element is found.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.find_map([[], [2], [3]], list.first) == Ok(2)
-  ```
-  
-  ```gleam
-  assert list.find_map([[], []], list.first) == Error(Nil)
-  ```
-  
-  ```gleam
-  assert list.find_map([], list.first) == Error(Nil)
-  ```"
+   `Ok(new_value)`, then returns the wrapped `new_value`.
+   
+   Returns `Error(Nil)` if no such element is found.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.find_map([[], [2], [3]], list.first) == Ok(2)
+   ```
+   
+   ```gleam
+   assert list.find_map([[], []], list.first) == Error(Nil)
+   ```
+   
+   ```gleam
+   assert list.find_map([], list.first) == Error(Nil)
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' fun]
@@ -824,22 +828,22 @@
 
 (defn all
   "Returns `True` if the given function returns `True` for all the elements in
-  the given list. If the function returns `False` for any of the elements it
-  immediately returns `False` without checking the rest of the list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.all([], fn(x) { x > 3 })
-  ```
-  
-  ```gleam
-  assert list.all([4, 5], fn(x) { x > 3 })
-  ```
-  
-  ```gleam
-  assert !list.all([4, 3], fn(x) { x > 3 })
-  ```"
+   the given list. If the function returns `False` for any of the elements it
+   immediately returns `False` without checking the rest of the list.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.all([], fn(x) { x > 3 })
+   ```
+   
+   ```gleam
+   assert list.all([4, 5], fn(x) { x > 3 })
+   ```
+   
+   ```gleam
+   assert !list.all([4, 3], fn(x) { x > 3 })
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
                       :boolean]}
   [list' predicate]
@@ -850,26 +854,26 @@
 
 (defn any
   "Returns `True` if the given function returns `True` for any the elements in
-  the given list. If the function returns `True` for any of the elements it
-  immediately returns `True` without checking the rest of the list.
-  
-  ## Examples
-  
-  ```gleam
-  assert !list.any([], fn(x) { x > 3 })
-  ```
-  
-  ```gleam
-  assert list.any([4, 5], fn(x) { x > 3 })
-  ```
-  
-  ```gleam
-  assert list.any([4, 3], fn(x) { x > 4 })
-  ```
-  
-  ```gleam
-  assert list.any([3, 4], fn(x) { x > 3 })
-  ```"
+   the given list. If the function returns `True` for any of the elements it
+   immediately returns `True` without checking the rest of the list.
+   
+   ## Examples
+   
+   ```gleam
+   assert !list.any([], fn(x) { x > 3 })
+   ```
+   
+   ```gleam
+   assert list.any([4, 5], fn(x) { x > 3 })
+   ```
+   
+   ```gleam
+   assert list.any([4, 3], fn(x) { x > 4 })
+   ```
+   
+   ```gleam
+   assert list.any([3, 4], fn(x) { x > 3 })
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
                       :boolean]}
   [list' predicate]
@@ -886,27 +890,27 @@
 
 (defn zip
   "Takes two lists and returns a single list of 2-element tuples.
-  
-  If one of the lists is longer than the other, the remaining elements from
-  the longer list are not used.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.zip([], []) == []
-  ```
-  
-  ```gleam
-  assert list.zip([1, 2], [3]) == [#(1, 3)]
-  ```
-  
-  ```gleam
-  assert list.zip([1], [3, 4]) == [#(1, 3)]
-  ```
-  
-  ```gleam
-  assert list.zip([1, 2], [3, 4]) == [#(1, 3), #(2, 4)]
-  ```"
+   
+   If one of the lists is longer than the other, the remaining elements from
+   the longer list are not used.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.zip([], []) == []
+   ```
+   
+   ```gleam
+   assert list.zip([1, 2], [3]) == [#(1, 3)]
+   ```
+   
+   ```gleam
+   assert list.zip([1], [3, 4]) == [#(1, 3)]
+   ```
+   
+   ```gleam
+   assert list.zip([1, 2], [3, 4]) == [#(1, 3), #(2, 4)]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]]
                       [:sequential [:tuple :any :any]]]}
   [list' other]
@@ -926,26 +930,26 @@
 
 (defn strict-zip
   "Takes two lists and returns a single list of 2-element tuples.
-  
-  If one of the lists is longer than the other, an `Error` is returned.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.strict_zip([], []) == Ok([])
-  ```
-  
-  ```gleam
-  assert list.strict_zip([1, 2], [3]) == Error(Nil)
-  ```
-  
-  ```gleam
-  assert list.strict_zip([1], [3, 4]) == Error(Nil)
-  ```
-  
-  ```gleam
-  assert list.strict_zip([1, 2], [3, 4]) == Ok([#(1, 3), #(2, 4)])
-  ```"
+   
+   If one of the lists is longer than the other, an `Error` is returned.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.strict_zip([], []) == Ok([])
+   ```
+   
+   ```gleam
+   assert list.strict_zip([1, 2], [3]) == Error(Nil)
+   ```
+   
+   ```gleam
+   assert list.strict_zip([1], [3, 4]) == Error(Nil)
+   ```
+   
+   ```gleam
+   assert list.strict_zip([1, 2], [3, 4]) == Ok([#(1, 3), #(2, 4)])
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' other]
@@ -959,16 +963,16 @@
 
 (defn unzip
   "Takes a single list of 2-element tuples and returns two lists.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.unzip([#(1, 2), #(3, 4)]) == #([1, 3], [2, 4])
-  ```
-  
-  ```gleam
-  assert list.unzip([]) == #([], [])
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.unzip([#(1, 2), #(3, 4)]) == #([1, 3], [2, 4])
+   ```
+   
+   ```gleam
+   assert list.unzip([]) == #([], [])
+   ```"
   {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]]]
                       [:tuple [:sequential :any] [:sequential :any]]]}
   [input]
@@ -982,18 +986,18 @@
 
 (defn intersperse
   "Inserts a given value between each existing element in a given list.
-  
-  This function runs in linear time and copies the list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.intersperse([1, 1, 1], 2) == [1, 2, 1, 2, 1]
-  ```
-  
-  ```gleam
-  assert list.intersperse([], 2) == []
-  ```"
+   
+   This function runs in linear time and copies the list.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.intersperse([1, 1, 1], 2) == [1, 2, 1, 2, 1]
+   ```
+   
+   ```gleam
+   assert list.intersperse([], 2) == []
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :any] [:sequential :any]]}
   [list' elem]
   (if (or (empty? list') (= (count list') 1))
@@ -1011,27 +1015,27 @@
 
 (defn unique
   "Removes any duplicate elements from a given list.
-  
-  This function returns in loglinear time.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.unique([1, 1, 1, 4, 7, 3, 3, 4]) == [1, 4, 7, 3]
-  ```"
+   
+   This function returns in loglinear time.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.unique([1, 1, 1, 4, 7, 3, 3, 4]) == [1, 4, 7, 3]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any]] [:sequential :any]]}
   [list']
   (unique-loop list' (dict/new*) (list)))
 
 (defn- merge-descendings
   "This is exactly the same as merge_ascendings but mirrored: it merges two
-  lists sorted in descending order into a single list sorted in ascending
-  order according to the given comparator function.
-  
-  This reversing of the sort order is not avoidable if we want to implement
-  merge as a tail recursive function. We could reverse the accumulator before
-  returning it but that would end up being less efficient; so the merging
-  algorithm has to play around this."
+   lists sorted in descending order into a single list sorted in ascending
+   order according to the given comparator function.
+   
+   This reversing of the sort order is not avoidable if we want to implement
+   merge as a tail recursive function. We could reverse the accumulator before
+   returning it but that would end up being less efficient; so the merging
+   algorithm has to play around this."
   [list1 list2 compare acc]
   (cond
     (empty? list1)
@@ -1065,12 +1069,12 @@
 
 (defn- merge-ascendings
   "Merges two lists sorted in ascending order into a single list sorted in
-  descending order according to the given comparator function.
-  
-  This reversing of the sort order is not avoidable if we want to implement
-  merge as a tail recursive function. We could reverse the accumulator before
-  returning it but that would end up being less efficient; so the merging
-  algorithm has to play around this."
+   descending order according to the given comparator function.
+   
+   This reversing of the sort order is not avoidable if we want to implement
+   merge as a tail recursive function. We could reverse the accumulator before
+   returning it but that would end up being less efficient; so the merging
+   algorithm has to play around this."
   [list1 list2 compare acc]
   (cond
     (empty? list1)
@@ -1089,8 +1093,8 @@
 
 (defn- merge-ascending-pairs
   "Given a list of ascending lists, it merges adjacent pairs into a single
-  descending list, halving their number.
-  It returns a list of the remaining descending lists."
+   descending list, halving their number.
+   It returns a list of the remaining descending lists."
   [sequences compare acc]
   (cond
     (empty? sequences)
@@ -1106,8 +1110,8 @@
 
 (defn- merge-all
   "Given some some sorted sequences (assumed to be sorted in `direction`) it
-  merges them all together until we're left with just a list sorted in
-  ascending order."
+   merges them all together until we're left with just a list sorted in
+   ascending order."
   [sequences direction compare]
   (cond
     (empty? sequences)
@@ -1131,27 +1135,27 @@
 
 (defn- sequences
   "Given a list it returns slices of it that are locally sorted in ascending
-  order.
-  
-  Imagine you have this list:
-  
-  ```
-  [1, 2, 3, 2, 1, 0]
-  ^^^^^^^  ^^^^^^^ This is a slice in descending order
-  |
-  | This is a slice that is sorted in ascending order
-  ```
-  
-  So the produced result will contain these two slices, each one sorted in
-  ascending order: `[[1, 2, 3], [0, 1, 2]]`.
-  
-  - `growing` is an accumulator with the current slice being grown
-  - `direction` is the growing direction of the slice being grown, it could
-  either be ascending or strictly descending
-  - `prev` is the previous element that needs to be added to the growing slice
-  it is carried around to check whether we have to keep growing the current
-  slice or not
-  - `acc` is the accumulator containing the slices sorted in ascending order"
+   order.
+   
+   Imagine you have this list:
+   
+   ```
+   [1, 2, 3, 2, 1, 0]
+   ^^^^^^^  ^^^^^^^ This is a slice in descending order
+   |
+   | This is a slice that is sorted in ascending order
+   ```
+   
+   So the produced result will contain these two slices, each one sorted in
+   ascending order: `[[1, 2, 3], [0, 1, 2]]`.
+   
+   - `growing` is an accumulator with the current slice being grown
+   - `direction` is the growing direction of the slice being grown, it could
+   either be ascending or strictly descending
+   - `prev` is the previous element that needs to be added to the growing slice
+   it is carried around to check whether we have to keep growing the current
+   slice or not
+   - `acc` is the accumulator containing the slices sorted in ascending order"
   [list' compare growing direction prev acc]
   (let [growing (list* prev growing)]
     (if (empty? list')
@@ -1171,17 +1175,17 @@
 
 (defn sort
   "Sorts from smallest to largest based upon the ordering specified by a given
-  function.
-  
-  ## Examples
-  
-  ```gleam
-  import gleam/int
-  
-  assert list.sort([4, 3, 6, 5, 4, 1, 2], by: int.compare)
-  == [1, 2, 3, 4, 4, 5, 6]
-  ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:or [:fn order/Lt?] [:fn order/Eq?] [:fn order/Gt?]]]]
+   function.
+   
+   ## Examples
+   
+   ```gleam
+   import gleam/int
+   
+   assert list.sort([4, 3, 6, 5, 4, 1, 2], by: int.compare)
+   == [1, 2, 3, 4, 4, 5, 6]
+   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:fn order/Order?]]]
                       [:sequential :any]]}
   [list' compare]
   (cond
@@ -1202,16 +1206,16 @@
 
 (defn repeat
   "Builds a list of a given value a given number of times.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.repeat(\"a\", times: 0) == []
-  ```
-  
-  ```gleam
-  assert list.repeat(\"a\", times: 5) == [\"a\", \"a\", \"a\", \"a\", \"a\"]
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.repeat(\"a\", times: 0) == []
+   ```
+   
+   ```gleam
+   assert list.repeat(\"a\", times: 5) == [\"a\", \"a\", \"a\", \"a\", \"a\"]
+   ```"
   {:malli/schema [:=> [:cat :any :int] [:sequential :any]]}
   [a times]
   (repeat-loop a times (list)))
@@ -1227,23 +1231,23 @@
 
 (defn split
   "Splits a list in two before the given index.
-  
-  If the list is not long enough to have the given index the before list will
-  be the input list, and the after list will be empty.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.split([6, 7, 8, 9], 0) == #([], [6, 7, 8, 9])
-  ```
-  
-  ```gleam
-  assert list.split([6, 7, 8, 9], 2) == #([6, 7], [8, 9])
-  ```
-  
-  ```gleam
-  assert list.split([6, 7, 8, 9], 4) == #([6, 7, 8, 9], [])
-  ```"
+   
+   If the list is not long enough to have the given index the before list will
+   be the input list, and the after list will be empty.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.split([6, 7, 8, 9], 0) == #([], [6, 7, 8, 9])
+   ```
+   
+   ```gleam
+   assert list.split([6, 7, 8, 9], 2) == #([6, 7], [8, 9])
+   ```
+   
+   ```gleam
+   assert list.split([6, 7, 8, 9], 4) == #([6, 7, 8, 9], [])
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :int]
                       [:tuple [:sequential :any] [:sequential :any]]]}
   [list' index]
@@ -1257,22 +1261,22 @@
 
 (defn split-while
   "Splits a list in two before the first element that a given function returns
-  `False` for.
-  
-  If the function returns `True` for all elements the first list will be the
-  input list, and the second list will be empty.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.split_while([1, 2, 3, 4, 5], fn(x) { x <= 3 })
-  == #([1, 2, 3], [4, 5])
-  ```
-  
-  ```gleam
-  assert list.split_while([1, 2, 3, 4, 5], fn(x) { x <= 5 })
-  == #([1, 2, 3, 4, 5], [])
-  ```"
+   `False` for.
+   
+   If the function returns `True` for all elements the first list will be the
+   input list, and the second list will be empty.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.split_while([1, 2, 3, 4, 5], fn(x) { x <= 3 })
+   == #([1, 2, 3], [4, 5])
+   ```
+   
+   ```gleam
+   assert list.split_while([1, 2, 3, 4, 5], fn(x) { x <= 5 })
+   == #([1, 2, 3, 4, 5], [])
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
                       [:tuple [:sequential :any] [:sequential :any]]]}
   [list' predicate]
@@ -1280,26 +1284,26 @@
 
 (defn key-find
   "Given a list of 2-element tuples, finds the first tuple that has a given
-  key as the first element and returns the second element.
-  
-  If no tuple is found with the given key then `Error(Nil)` is returned.
-  
-  This function may be useful for interacting with Erlang code where lists of
-  tuples are common.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.key_find([#(\"a\", 0), #(\"b\", 1)], \"a\") == Ok(0)
-  ```
-  
-  ```gleam
-  assert list.key_find([#(\"a\", 0), #(\"b\", 1)], \"b\") == Ok(1)
-  ```
-  
-  ```gleam
-  assert list.key_find([#(\"a\", 0), #(\"b\", 1)], \"c\") == Error(Nil)
-  ```"
+   key as the first element and returns the second element.
+   
+   If no tuple is found with the given key then `Error(Nil)` is returned.
+   
+   This function may be useful for interacting with Erlang code where lists of
+   tuples are common.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.key_find([#(\"a\", 0), #(\"b\", 1)], \"a\") == Ok(0)
+   ```
+   
+   ```gleam
+   assert list.key_find([#(\"a\", 0), #(\"b\", 1)], \"b\") == Ok(1)
+   ```
+   
+   ```gleam
+   assert list.key_find([#(\"a\", 0), #(\"b\", 1)], \"c\") == Error(Nil)
+   ```"
   {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [keyword-list desired-key]
@@ -1310,20 +1314,20 @@
 
 (defn key-filter
   "Given a list of 2-element tuples, finds all tuples that have a given
-  key as the first element and returns the second element.
-  
-  This function may be useful for interacting with Erlang code where lists of
-  tuples are common.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.key_filter([#(\"a\", 0), #(\"b\", 1), #(\"a\", 2)], \"a\") == [0, 2]
-  ```
-  
-  ```gleam
-  assert list.key_filter([#(\"a\", 0), #(\"b\", 1)], \"c\") == []
-  ```"
+   key as the first element and returns the second element.
+   
+   This function may be useful for interacting with Erlang code where lists of
+   tuples are common.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.key_filter([#(\"a\", 0), #(\"b\", 1), #(\"a\", 2)], \"a\") == [0, 2]
+   ```
+   
+   ```gleam
+   assert list.key_filter([#(\"a\", 0), #(\"b\", 1)], \"c\") == []
+   ```"
   {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any]
                       [:sequential :any]]}
   [keyword-list desired-key]
@@ -1347,24 +1351,24 @@
 
 (defn key-pop
   "Given a list of 2-element tuples, finds the first tuple that has a given
-  key as the first element. This function will return the second element
-  of the found tuple and list with tuple removed.
-  
-  If no tuple is found with the given key then `Error(Nil)` is returned.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.key_pop([#(\"a\", 0), #(\"b\", 1)], \"a\") == Ok(#(0, [#(\"b\", 1)]))
-  ```
-  
-  ```gleam
-  assert list.key_pop([#(\"a\", 0), #(\"b\", 1)], \"b\") == Ok(#(1, [#(\"a\", 0)]))
-  ```
-  
-  ```gleam
-  assert list.key_pop([#(\"a\", 0), #(\"b\", 1)], \"c\") == Error(Nil)
-  ```"
+   key as the first element. This function will return the second element
+   of the found tuple and list with tuple removed.
+   
+   If no tuple is found with the given key then `Error(Nil)` is returned.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.key_pop([#(\"a\", 0), #(\"b\", 1)], \"a\") == Ok(#(0, [#(\"b\", 1)]))
+   ```
+   
+   ```gleam
+   assert list.key_pop([#(\"a\", 0), #(\"b\", 1)], \"b\") == Ok(#(1, [#(\"a\", 0)]))
+   ```
+   
+   ```gleam
+   assert list.key_pop([#(\"a\", 0), #(\"b\", 1)], \"c\") == Error(Nil)
+   ```"
   {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' key]
@@ -1385,20 +1389,20 @@
 
 (defn key-set
   "Given a list of 2-element tuples, inserts a key and value into the list.
-  
-  If there was already a tuple with the key then it is replaced, otherwise it
-  is added to the end of the list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.key_set([#(5, 0), #(4, 1)], 4, 100) == [#(5, 0), #(4, 100)]
-  ```
-  
-  ```gleam
-  assert list.key_set([#(5, 0), #(4, 1)], 1, 100)
-  == [#(5, 0), #(4, 1), #(1, 100)]
-  ```"
+   
+   If there was already a tuple with the key then it is replaced, otherwise it
+   is added to the end of the list.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.key_set([#(5, 0), #(4, 1)], 4, 100) == [#(5, 0), #(4, 100)]
+   ```
+   
+   ```gleam
+   assert list.key_set([#(5, 0), #(4, 1)], 1, 100)
+   == [#(5, 0), #(4, 1), #(1, 100)]
+   ```"
   {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any :any]
                       [:sequential [:tuple :any :any]]]}
   [list' key value]
@@ -1406,17 +1410,17 @@
 
 (defn each
   "Calls a function for each element in a list, discarding the return value.
-  
-  Useful for calling a side effect for every item of a list.
-  
-  ```gleam
-  import gleam/io
-  
-  assert list.each([\"1\", \"2\", \"3\"], io.println) == Nil
-  // 1
-  // 2
-  // 3
-  ```"
+   
+   Useful for calling a side effect for every item of a list.
+   
+   ```gleam
+   import gleam/io
+   
+   assert list.each([\"1\", \"2\", \"3\"], io.println) == Nil
+   // 1
+   // 2
+   // 3
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]] :nil]}
   [list' f]
   (if (empty? list')
@@ -1427,17 +1431,17 @@
 
 (defn try-each
   "Calls a `Result` returning function for each element in a list, discarding
-  the return value. If the function returns `Error` then the iteration is
-  stopped and the error is returned.
-  
-  Useful for calling a side effect for every item of a list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.try_each(over: [1, 2, 3], with: function_that_might_fail)
-  == Ok(Nil)
-  ```"
+   the return value. If the function returns `Error` then the iteration is
+   stopped and the error is returned.
+   
+   Useful for calling a side effect for every item of a list.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.try_each(over: [1, 2, 3], with: function_that_might_fail)
+   == Ok(Nil)
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' fun]
@@ -1459,15 +1463,15 @@
 
 (defn partition
   "Partitions a list into a tuple/pair of lists
-  by a given categorisation function.
-  
-  ## Examples
-  
-  ```gleam
-  import gleam/int
-  
-  assert [1, 2, 3, 4, 5] |> list.partition(int.is_odd) == #([1, 3, 5], [2, 4])
-  ```"
+   by a given categorisation function.
+   
+   ## Examples
+   
+   ```gleam
+   import gleam/int
+   
+   assert [1, 2, 3, 4, 5] |> list.partition(int.is_odd) == #([1, 3, 5], [2, 4])
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
                       [:tuple [:sequential :any] [:sequential :any]]]}
   [list' categorise]
@@ -1493,12 +1497,12 @@
 
 (defn permutations
   "Returns all the permutations of a list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.permutations([1, 2]) == [[1, 2], [2, 1]]
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.permutations([1, 2]) == [[1, 2], [2, 1]]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any]]
                       [:sequential [:sequential :any]]]}
   [list']
@@ -1513,16 +1517,16 @@
 
 (defn window
   "Returns a list of sliding windows.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.window([1, 2, 3, 4, 5], 3) == [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
-  ```
-  
-  ```gleam
-  assert list.window([1, 2], 4) == []
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.window([1, 2, 3, 4, 5], 3) == [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
+   ```
+   
+   ```gleam
+   assert list.window([1, 2], 4) == []
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :int]
                       [:sequential [:sequential :any]]]}
   [list' n]
@@ -1531,16 +1535,16 @@
 
 (defn window-by-2
   "Returns a list of tuples containing two contiguous elements.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.window_by_2([1, 2, 3, 4]) == [#(1, 2), #(2, 3), #(3, 4)]
-  ```
-  
-  ```gleam
-  assert list.window_by_2([1]) == []
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.window_by_2([1, 2, 3, 4]) == [#(1, 2), #(2, 3), #(3, 4)]
+   ```
+   
+   ```gleam
+   assert list.window_by_2([1]) == []
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any]]
                       [:sequential [:tuple :any :any]]]}
   [list']
@@ -1548,12 +1552,12 @@
 
 (defn drop-while
   "Drops the first elements in a given list for which the predicate function returns `True`.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.drop_while([1, 2, 3, 4], fn(x) { x < 3 }) == [3, 4]
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.drop_while([1, 2, 3, 4], fn(x) { x < 3 }) == [3, 4]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
                       [:sequential :any]]}
   [list' predicate]
@@ -1570,12 +1574,12 @@
 
 (defn take-while
   "Takes the first elements in a given list for which the predicate function returns `True`.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.take_while([1, 2, 3, 2, 4], fn(x) { x < 3 }) == [1, 2]
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.take_while([1, 2, 3, 2, 4], fn(x) { x < 3 }) == [1, 2]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
                       [:sequential :any]]}
   [list' predicate]
@@ -1592,14 +1596,14 @@
 
 (defn chunk
   "Returns a list of chunks in which
-  the return value of calling `f` on each element is the same.
-  
-  ## Examples
-  
-  ```gleam
-  assert [1, 2, 2, 3, 4, 4, 6, 7, 7] |> list.chunk(by: fn(n) { n % 2 })
-  == [[1], [2, 2], [3], [4, 4, 6], [7, 7]]
-  ```"
+   the return value of calling `f` on each element is the same.
+   
+   ## Examples
+   
+   ```gleam
+   assert [1, 2, 2, 3, 4, 4, 6, 7, 7] |> list.chunk(by: fn(n) { n % 2 })
+   == [[1], [2, 2], [3], [4, 4, 6], [7, 7]]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :any]]
                       [:sequential [:sequential :any]]]}
   [list' f]
@@ -1621,23 +1625,23 @@
 
 (defn sized-chunk
   "Returns a list of chunks containing `count` elements each.
-  
-  If the last chunk does not have `count` elements, it is instead
-  a partial chunk, with less than `count` elements.
-  
-  For any `count` less than 1 this function behaves as if it was set to 1.
-  
-  ## Examples
-  
-  ```gleam
-  assert [1, 2, 3, 4, 5, 6] |> list.sized_chunk(into: 2)
-  == [[1, 2], [3, 4], [5, 6]]
-  ```
-  
-  ```gleam
-  assert [1, 2, 3, 4, 5, 6, 7, 8] |> list.sized_chunk(into: 3)
-  == [[1, 2, 3], [4, 5, 6], [7, 8]]
-  ```"
+   
+   If the last chunk does not have `count` elements, it is instead
+   a partial chunk, with less than `count` elements.
+   
+   For any `count` less than 1 this function behaves as if it was set to 1.
+   
+   ## Examples
+   
+   ```gleam
+   assert [1, 2, 3, 4, 5, 6] |> list.sized_chunk(into: 2)
+   == [[1, 2], [3, 4], [5, 6]]
+   ```
+   
+   ```gleam
+   assert [1, 2, 3, 4, 5, 6, 7, 8] |> list.sized_chunk(into: 3)
+   == [[1, 2, 3], [4, 5, 6], [7, 8]]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :int]
                       [:sequential [:sequential :any]]]}
   [list' count']
@@ -1645,22 +1649,22 @@
 
 (defn reduce
   "This function acts similar to fold, but does not take an initial state.
-  Instead, it starts from the first element in the list
-  and combines it with each subsequent element in turn using the given
-  function. The function is called as `fun(accumulator, current_element)`.
-  
-  Returns `Ok` to indicate a successful run, and `Error` if called on an
-  empty list.
-  
-  ## Examples
-  
-  ```gleam
-  assert [] |> list.reduce(fn(acc, x) { acc + x }) == Error(Nil)
-  ```
-  
-  ```gleam
-  assert [1, 2, 3, 4, 5] |> list.reduce(fn(acc, x) { acc + x }) == Ok(15)
-  ```"
+   Instead, it starts from the first element in the list
+   and combines it with each subsequent element in turn using the given
+   function. The function is called as `fun(accumulator, current_element)`.
+   
+   Returns `Ok` to indicate a successful run, and `Error` if called on an
+   empty list.
+   
+   ## Examples
+   
+   ```gleam
+   assert [] |> list.reduce(fn(acc, x) { acc + x }) == Error(Nil)
+   ```
+   
+   ```gleam
+   assert [1, 2, 3, 4, 5] |> list.reduce(fn(acc, x) { acc + x }) == Ok(15)
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] :any]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' fun]
@@ -1677,13 +1681,13 @@
 
 (defn scan
   "Similar to `fold`, but yields the state of the accumulator at each stage.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.scan(over: [1, 2, 3], from: 100, with: fn(acc, i) { acc + i })
-  == [101, 103, 106]
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.scan(over: [1, 2, 3], from: 100, with: fn(acc, i) { acc + i })
+   == [101, 103, 106]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] :any]]
                       [:sequential :any]]}
   [list' initial fun]
@@ -1691,20 +1695,20 @@
 
 (defn last
   "Returns the last element in the given list.
-  
-  Returns `Error(Nil)` if the list is empty.
-  
-  This function runs in linear time.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.last([]) == Error(Nil)
-  ```
-  
-  ```gleam
-  assert list.last([1, 2, 3, 4, 5]) == Ok(5)
-  ```"
+   
+   Returns `Error(Nil)` if the list is empty.
+   
+   This function runs in linear time.
+   
+   ## Examples
+   
+   ```gleam
+   assert list.last([]) == Error(Nil)
+   ```
+   
+   ```gleam
+   assert list.last([1, 2, 3, 4, 5]) == Ok(5)
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list']
@@ -1722,17 +1726,17 @@
 
 (defn combinations
   "Return unique combinations of elements in the list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.combinations([1, 2, 3], 2) == [[1, 2], [1, 3], [2, 3]]
-  ```
-  
-  ```gleam
-  assert list.combinations([1, 2, 3, 4], 3)
-  == [[1, 2, 3], [1, 2, 4], [1, 3, 4], [2, 3, 4]]
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.combinations([1, 2, 3], 2) == [[1, 2], [1, 3], [2, 3]]
+   ```
+   
+   ```gleam
+   assert list.combinations([1, 2, 3, 4], 3)
+   == [[1, 2, 3], [1, 2, 4], [1, 3, 4], [2, 3, 4]]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :int]
                       [:sequential [:sequential :any]]]}
   [items n]
@@ -1759,12 +1763,12 @@
 
 (defn combination-pairs
   "Return unique pair combinations of elements in the list.
-  
-  ## Examples
-  
-  ```gleam
-  assert list.combination_pairs([1, 2, 3]) == [#(1, 2), #(1, 3), #(2, 3)]
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.combination_pairs([1, 2, 3]) == [#(1, 2), #(1, 3), #(2, 3)]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any]]
                       [:sequential [:tuple :any :any]]]}
   [items]
@@ -1793,17 +1797,17 @@
 
 (defn transpose
   "Transpose rows and columns of the list of lists.
-  
-  Notice: This function is not tail recursive,
-  and thus may exceed stack size if called,
-  with large lists (on the JavaScript target).
-  
-  ## Examples
-  
-  ```gleam
-  assert list.transpose([[1, 2, 3], [101, 102, 103]])
-  == [[1, 101], [2, 102], [3, 103]]
-  ```"
+   
+   Notice: This function is not tail recursive,
+   and thus may exceed stack size if called,
+   with large lists (on the JavaScript target).
+   
+   ## Examples
+   
+   ```gleam
+   assert list.transpose([[1, 2, 3], [101, 102, 103]])
+   == [[1, 101], [2, 102], [3, 103]]
+   ```"
   {:malli/schema [:=> [:cat [:sequential [:sequential :any]]]
                       [:sequential [:sequential :any]]]}
   [list-of-lists]
@@ -1811,13 +1815,13 @@
 
 (defn interleave
   "Make a list alternating the elements from the given lists
-  
-  ## Examples
-  
-  ```gleam
-  assert list.interleave([[1, 2], [101, 102], [201, 202]])
-  == [1, 101, 201, 2, 102, 202]
-  ```"
+   
+   ## Examples
+   
+   ```gleam
+   assert list.interleave([[1, 2], [101, 102], [201, 202]])
+   == [1, 101, 201, 2, 102, 202]
+   ```"
   {:malli/schema [:=> [:cat [:sequential [:sequential :any]]]
                       [:sequential :any]]}
   [list']
@@ -1835,15 +1839,15 @@
 
 (defn shuffle
   "Takes a list, randomly sorts all items and returns the shuffled list.
-  
-  This function uses `float.random` to decide the order of the elements.
-  
-  ## Example
-  
-  ```gleam
-  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] |> list.shuffle
-  // -> [1, 6, 9, 10, 3, 8, 4, 2, 7, 5]
-  ```"
+   
+   This function uses `float.random` to decide the order of the elements.
+   
+   ## Example
+   
+   ```gleam
+   [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] |> list.shuffle
+   // -> [1, 6, 9, 10, 3, 8, 4, 2, 7, 5]
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any]] [:sequential :any]]}
   [list']
   (-> list'
@@ -1861,17 +1865,17 @@
 
 (defn max'
   "Takes a list and a comparator, and returns the maximum element in the list
-  
-  ## Examples
-  
-  ```gleam
-  assert [1, 2, 3, 4, 5] |> list.max(int.compare) == Ok(5)
-  ```
-  
-  ```gleam
-  assert [\"a\", \"c\", \"b\"] |> list.max(string.compare) == Ok(\"c\")
-  ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:or [:fn order/Lt?] [:fn order/Eq?] [:fn order/Gt?]]]]
+   
+   ## Examples
+   
+   ```gleam
+   assert [1, 2, 3, 4, 5] |> list.max(int.compare) == Ok(5)
+   ```
+   
+   ```gleam
+   assert [\"a\", \"c\", \"b\"] |> list.max(string.compare) == Ok(\"c\")
+   ```"
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:fn order/Order?]]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [list' compare]
   (if (empty? list')
@@ -1910,27 +1914,27 @@
 
 (defn- build-reservoir
   "Builds the initial reservoir used by Algorithm L.
-  This is a dictionary with keys ranging from `0` up to `n - 1` where each
-  value is the corresponding element at that position in `list`.
-  
-  This also returns the remaining elements of `list` that didn't end up in
-  the reservoir."
+   This is a dictionary with keys ranging from `0` up to `n - 1` where each
+   value is the corresponding element at that position in `list`.
+   
+   This also returns the remaining elements of `list` that didn't end up in
+   the reservoir."
   [list' n]
   (build-reservoir-loop list' n (dict/new*)))
 
 (defn sample
   "Returns a random sample of up to n elements from a list using reservoir
-  sampling via [Algorithm L](https://en.wikipedia.org/wiki/Reservoir_sampling#Optimal:_Algorithm_L).
-  Returns an empty list if the sample size is less than or equal to 0.
-  
-  Order is not random, only selection is.
-  
-  ## Examples
-  
-  ```gleam
-  list.sample([1, 2, 3, 4, 5], 3)
-  // -> [2, 4, 5]  // A random sample of 3 items
-  ```"
+   sampling via [Algorithm L](https://en.wikipedia.org/wiki/Reservoir_sampling#Optimal:_Algorithm_L).
+   Returns an empty list if the sample size is less than or equal to 0.
+   
+   Order is not random, only selection is.
+   
+   ## Examples
+   
+   ```gleam
+   list.sample([1, 2, 3, 4, 5], 3)
+   // -> [2, 4, 5]  // A random sample of 3 items
+   ```"
   {:malli/schema [:=> [:cat [:sequential :any] :int] [:sequential :any]]}
   [list' n]
   (let [[reservoir rest'] (build-reservoir list' n) subject (dict/is-empty reservoir)]

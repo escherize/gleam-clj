@@ -1,12 +1,12 @@
 (ns gleam.uri
   "Utilities for working with URIs
-  
-  This module provides functions for working with URIs (for example, parsing
-  URIs or encoding query strings). The functions in this module are implemented
-  according to [RFC 3986](https://tools.ietf.org/html/rfc3986).
-  
-  Query encoding (Form encoding) is defined in the
-  [W3C specification](https://www.w3.org/TR/html52/sec-forms.html#urlencoded-form-data)."
+   
+   This module provides functions for working with URIs (for example, parsing
+   URIs or encoding query strings). The functions in this module are implemented
+   according to [RFC 3986](https://tools.ietf.org/html/rfc3986).
+   
+   Query encoding (Form encoding) is defined in the
+   [W3C specification](https://www.w3.org/TR/html52/sec-forms.html#urlencoded-form-data)."
   (:refer-clojure :exclude [drop-last empty merge])
   (:require
    [gleam-ffi]
@@ -17,7 +17,8 @@
    [gleam.string :as string]))
 
 ;; type Uri
-(defrecord Uri [scheme userinfo host port path query fragment])
+(defprotocol IUri)
+(defrecord Uri [scheme userinfo host port path query fragment] IUri)
 (defn Uri? "True if `v` is a Uri value." [v] (instance? Uri v))
 
 (def empty (->Uri (option/->None) (option/->None) (option/->None) (option/->None) "" (option/->None) (option/->None)))
@@ -370,24 +371,24 @@
 
 (defn parse
   "Parses a compliant URI string into the `Uri` type.
-  If the string is not a valid URI string then an error is returned.
-  
-  The opposite operation is `uri.to_string`.
-  
-  ## Examples
-  
-  ```gleam
-  assert uri.parse(\"https://example.com:1234/a/b?query=true#fragment\")
-  == Ok(Uri(
-  scheme: Some(\"https\"),
-  userinfo: None,
-  host: Some(\"example.com\"),
-  port: Some(1234),
-  path: \"/a/b\",
-  query: Some(\"query=true\"),
-  fragment: Some(\"fragment\"),
-  ))
-  ```"
+   If the string is not a valid URI string then an error is returned.
+   
+   The opposite operation is `uri.to_string`.
+   
+   ## Examples
+   
+   ```gleam
+   assert uri.parse(\"https://example.com:1234/a/b?query=true#fragment\")
+   == Ok(Uri(
+   scheme: Some(\"https\"),
+   userinfo: None,
+   host: Some(\"example.com\"),
+   port: Some(1234),
+   path: \"/a/b\",
+   query: Some(\"query=true\"),
+   fragment: Some(\"fragment\"),
+   ))
+   ```"
   {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [uri-string]
   (parse-scheme-loop uri-string uri-string empty 0))
@@ -404,14 +405,14 @@
 
 (defn query-to-string
   "Encodes a list of key value pairs as a URI query string.
-  
-  The opposite operation is `uri.parse_query`.
-  
-  ## Examples
-  
-  ```gleam
-  assert uri.query_to_string([#(\"a\", \"1\"), #(\"b\", \"2\")]) == \"a=1&b=2\"
-  ```"
+   
+   The opposite operation is `uri.parse_query`.
+   
+   ## Examples
+   
+   ```gleam
+   assert uri.query_to_string([#(\"a\", \"1\"), #(\"b\", \"2\")]) == \"a=1&b=2\"
+   ```"
   {:malli/schema [:=> [:cat [:sequential [:tuple :string :string]]] :string]}
   [query]
   (-> query (list/map query-pair) (string/join "&")))
@@ -429,30 +430,30 @@
 
 (defn path-segments
   "Splits the path section of a URI into its constituent segments.
-  
-  Removes empty segments and resolves dot-segments as specified in
-  [section 5.2](https://www.ietf.org/rfc/rfc3986.html#section-5.2) of the RFC.
-  
-  ## Examples
-  
-  ```gleam
-  assert uri.path_segments(\"/users/1\") == [\"users\", \"1\"]
-  ```"
+   
+   Removes empty segments and resolves dot-segments as specified in
+   [section 5.2](https://www.ietf.org/rfc/rfc3986.html#section-5.2) of the RFC.
+   
+   ## Examples
+   
+   ```gleam
+   assert uri.path_segments(\"/users/1\") == [\"users\", \"1\"]
+   ```"
   {:malli/schema [:=> [:cat :string] [:sequential :string]]}
   [path]
   (remove-dot-segments (string/split path "/")))
 
 (defn to-string
   "Encodes a `Uri` value as a URI string.
-  
-  The opposite operation is `uri.parse`.
-  
-  ## Examples
-  
-  ```gleam
-  let uri = Uri(..empty, scheme: Some(\"https\"), host: Some(\"example.com\"))
-  assert uri.to_string(uri) == \"https://example.com\"
-  ```"
+   
+   The opposite operation is `uri.parse`.
+   
+   ## Examples
+   
+   ```gleam
+   let uri = Uri(..empty, scheme: Some(\"https\"), host: Some(\"example.com\"))
+   assert uri.to_string(uri) == \"https://example.com\"
+   ```"
   {:malli/schema [:=> [:cat [:fn Uri?]] :string]}
   [uri]
   (let [out (let [subject (:scheme uri)]
@@ -479,19 +480,19 @@
 
 (defn origin
   "Fetches the origin of a URI.
-  
-  Returns the origin of a uri as defined in
-  [RFC 6454](https://tools.ietf.org/html/rfc6454)
-  
-  The supported URI schemes are `http` and `https`.
-  URLs without a scheme will return `Error`.
-  
-  ## Examples
-  
-  ```gleam
-  let assert Ok(uri) = uri.parse(\"https://example.com/path?foo#bar\")
-  assert uri.origin(uri) == Ok(\"https://example.com\")
-  ```"
+   
+   Returns the origin of a uri as defined in
+   [RFC 6454](https://tools.ietf.org/html/rfc6454)
+   
+   The supported URI schemes are `http` and `https`.
+   URLs without a scheme will return `Error`.
+   
+   ## Examples
+   
+   ```gleam
+   let assert Ok(uri) = uri.parse(\"https://example.com/path?foo#bar\")
+   assert uri.origin(uri) == Ok(\"https://example.com\")
+   ```"
   {:malli/schema [:=> [:cat [:fn Uri?]] [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [uri]
   (let [{scheme :scheme host :host port :port} uri]
@@ -522,10 +523,10 @@
 
 (defn merge
   "Resolves a URI with respect to the given base URI.
-  
-  The base URI must be an absolute URI or this function will return an error.
-  The algorithm for merging URIs is described in
-  [RFC 3986](https://tools.ietf.org/html/rfc3986#section-5.2)."
+   
+   The base URI must be an absolute URI or this function will return an error.
+   The algorithm for merging URIs is described in
+   [RFC 3986](https://tools.ietf.org/html/rfc3986#section-5.2)."
   {:malli/schema [:=> [:cat [:fn Uri?] [:fn Uri?]]
                       [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [base relative]
