@@ -423,6 +423,35 @@ git clone https://github.com/escherize/gleam-clj
       </div>
     </div>
     <div class="note pink">Arithmetic compiles to Clojure's promoting operators (<code>+'</code>, <code>-'</code>, <code>*'</code>) on purpose: Gleam ints are arbitrary precision on the BEAM, so unchecked longs would be <strong>wrong</strong>, not merely faster.</div>
+
+    <h3>Custom types keep their sum-ness</h3>
+    <p>A Gleam custom type is a <em>closed</em> set of variants. That structure survives the compile: each variant becomes a <code>defrecord</code>, they share a marker protocol so the sum type is a real Clojure thing (not a comment), and every variant plus the type itself gets a predicate.</p>
+    <div class="compile" style="margin-top:18px">
+      <div class="compile-grid">
+        <div class="pane pane--src">
+          <div class="pane-head"><img src="assets/gleam-lucy.svg" alt=""><span class="lang">shape.gleam</span></div>
+<pre><span class="k">pub type</span> <span class="ty">Shape</span> {
+  <span class="ty">Circle</span>(<span class="ty">Float</span>)
+  <span class="ty">Rect</span>(width: <span class="ty">Float</span>, height: <span class="ty">Float</span>)
+  <span class="ty">Point</span>
+}</pre>
+        </div>
+        <div class="seam"><span class="chip">compiles to</span></div>
+        <div class="pane pane--out">
+          <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">shape.clj</span></div>
+<pre><span class="cm">;; type Shape</span>
+(<span class="k">defprotocol</span> <span class="ty">IShape</span>)
+(<span class="k">defrecord</span> <span class="ty">Circle</span> [value] <span class="ty">IShape</span>)
+(<span class="k">defn</span> <span class="fn">Circle?</span> [v] (<span class="k">instance?</span> <span class="ty">Circle</span> v))
+(<span class="k">defrecord</span> <span class="ty">Rect</span> [width height] <span class="ty">IShape</span>)
+(<span class="k">defn</span> <span class="fn">Rect?</span> [v] (<span class="k">instance?</span> <span class="ty">Rect</span> v))
+(<span class="k">defrecord</span> <span class="ty">Point</span> [] <span class="ty">IShape</span>)
+(<span class="k">defn</span> <span class="fn">Point?</span> [v] (<span class="k">instance?</span> <span class="ty">Point</span> v))
+(<span class="k">defn</span> <span class="fn">Shape?</span> [v] (<span class="k">instance?</span> shape.<span class="ty">IShape</span> v))</pre>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:16px"><code>Shape?</code> is a plain <code>instance?</code> on the protocol's generated interface — an O(1) check, exactly as fast as the per-variant predicates, not a slow <code>satisfies?</code>. And it feeds the derived malli schema: a <code>Shape</code> argument becomes <code>[:fn Shape?]</code> rather than an <code>[:or …]</code> of every variant.</p>
   </section>
 
   <section id="verify">
