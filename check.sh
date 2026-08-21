@@ -64,6 +64,11 @@ else
   echo "== clj-kondo not installed, skipping lint"
 fi
 
+echo "== REPL loader (compile + load Gleam from Clojure)"
+clojure -Sdeps '{:paths ["src" "stdlib-clj" "test"]}' -M -m gleam-clj.load-test >/dev/null 2>&1 \
+  && echo "loader ok (require-gleam + eval-gleam)" \
+  || { echo "LOADER FAILED"; exit 1; }
+
 echo "== gleam-parser library (compiled glance): build, tests, lint"
 if [ -d libs/gleam-parser/project/build ]; then
   ./libs/gleam-parser/build.sh >/dev/null

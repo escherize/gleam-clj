@@ -150,6 +150,24 @@ generated ns, and names the emitter itself emits bare (`first`, `rest`,
 table is gone. Graphemes are real (BreakIterator). A few bit-level fns are
 whole-fn overrides in the externals map (sub-byte bit patterns).
 
+## Load and run Gleam from a Clojure REPL
+
+`gleam-clj.load` compiles a `.gleam` on demand and loads the result, so you
+can drive Gleam from a running REPL. The runtime (`src/` + `stdlib-clj/`)
+must be on the classpath; the compiler binary is found via `GLEAM_TO_CLJ`,
+`PATH`, or the repo's debug build.
+
+    (require '[gleam-clj.load :as gl])
+
+    (gl/require-gleam "gleam-src/coin_change.gleam")   ; => 'coin-change
+    (coin-change/min-coins (list 1 5 10) 13)           ; => #Ok{:value 4}
+
+    (gl/eval-gleam "pub fn double(x: Int) -> Int { x * 2 }")
+    ;; => a namespace symbol; its public fns are now callable
+
+Compiled modules are cached by source hash, so re-loading unchanged source
+is free; pass `:reload true` to force recompilation.
+
 ## Dependencies and tests
 
 `build` walks `src/` and `test/`, then follows the import graph into the
