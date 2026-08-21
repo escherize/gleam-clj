@@ -396,6 +396,33 @@ clojure -M:repl</pre>
 
 (gl/eval-gleam <span class="st">"pub fn double(x: Int) -> Int { x * 2 }"</span>)
 <span class="cmt">;; the snippet's public fns are now callable</span></pre>
+    <p>And when the Gleam doesn't hold up, you get <strong>Gleam's own compiler error</strong> — the same diagnostic <code>gleam build</code> prints, right there in your REPL. Forget a variant in a <code>case</code> and the type checker names the one you missed before a single line runs:</p>
+<pre class="block">(gl/eval-gleam <span class="st">"
+  pub type Shape { Circle Square Triangle }
+  pub fn name(s: Shape) -> String {
+    case s {
+      Circle -> \"circle\"
+      Square -> \"square\"
+    }
+  }"</span>)
+
+<span class="cmt">;; Gleam compile error:
+;;
+;; error: Inexhaustive patterns
+;;   ┌─ …:4:5
+;;   │
+;; 4 │ ╭     case s {
+;; 5 │ │       Circle -> "circle"
+;; 6 │ │       Square -> "square"
+;; 7 │ │     }
+;;   │ ╰─────^
+;;
+;; This case expression does not have a pattern for all possible values.
+;;
+;; The missing patterns are:
+;;
+;;     Triangle</span></pre>
+    <p>That check runs in Gleam's real type checker (this project reuses it), so exhaustiveness, type mismatches, and syntax errors all surface with source spans and hints — never a stack trace from the machinery underneath.</p>
   </section>
 
   <section id="backends">
