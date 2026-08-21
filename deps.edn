@@ -3,4 +3,9 @@
  {:golden {:extra-paths ["golden"]}
   :gen {:extra-paths ["gen"]}
   :rosetta {:extra-paths ["rosetta/gen"]}
-  :tour {:extra-paths ["tour/gen"]}}}
+  :tour {:extra-paths ["tour/gen"]}
+  ;; `clojure -M:repl` — a REPL with the runtime + loader on the classpath.
+  :repl {:extra-paths ["test"]}
+  ;; `clojure -M:try` — compile and run a Gleam snippet, no REPL needed.
+  :try {:extra-paths ["test"]
+        :main-opts ["-m" "gleam-clj.try"]}}}
