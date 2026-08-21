@@ -54,7 +54,15 @@ pub fn analyze(sources: Vec<SourceModule>) -> Vec<AnalyzedModule> {
                 &s.src,
                 &emitter,
             )
-            .unwrap_or_else(|e| panic!("parse error in {}: {e:?}", s.path));
+            .unwrap_or_else(|error| {
+                let err = gleam_core::error::Error::Parse {
+                    path: Utf8PathBuf::from(&s.file_name),
+                    src: EcoString::from(s.src.as_str()),
+                    error: Box::new(error),
+                };
+                eprintln!("{}", err.pretty_string());
+                std::process::exit(1);
+            });
             let mut ast = p.module;
             ast.name = EcoString::from(s.path.as_str());
             // `////` module doc comments live in extra as source spans; slice
@@ -189,7 +197,27 @@ pub fn analyze(sources: Vec<SourceModule>) -> Vec<AnalyzedModule> {
             Utf8PathBuf::from(&source.file_name),
         )
         .into_result()
-        .unwrap_or_else(|e| panic!("type error in {}: {e:?}", source.path));
+        .unwrap_or_else(|errors| {
+            // Render Gleam's own diagnostic (source span, expected/given, hint)
+            // instead of a Debug dump, then exit — the caller wants the error
+            // message, not a Rust panic backtrace.
+            let mut failed = std::collections::HashMap::new();
+            let _ = failed.insert(
+                EcoString::from(source.path.as_str()),
+                gleam_core::error::FailedModule {
+                    path: Utf8PathBuf::from(&source.file_name),
+                    src: EcoString::from(source.src.as_str()),
+                    errors,
+                    names: Box::new(Default::default()),
+                },
+            );
+            let err = gleam_core::error::Error::Type {
+                skipped_modules: Vec::new(),
+                failed_modules: failed,
+            };
+            eprintln!("{}", err.pretty_string());
+            std::process::exit(1);
+        });
         let _ = interfaces.insert(
             EcoString::from(source.path.as_str()),
             typed.type_info.clone(),

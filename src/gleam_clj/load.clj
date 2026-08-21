@@ -59,8 +59,10 @@
   (let [{:keys [exit err]}
         (shell/sh *binary* "typed" (str gleam-path) (str out-path) *stdlib-src*)]
     (when-not (zero? exit)
-      (throw (ex-info (str "gleam-to-clj failed:\n" err)
-                      {:gleam-path (str gleam-path) :exit exit})))
+      ;; err is Gleam's own diagnostic (source span, expected/found) — surface
+      ;; it verbatim, without a Rust-panic wrapper.
+      (throw (ex-info (str "Gleam compile error:\n\n" (str/trim err))
+                      {:gleam-path (str gleam-path)})))
     out-path))
 
 (defn require-gleam
