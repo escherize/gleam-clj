@@ -338,7 +338,11 @@ pub fn emit_module(
             }
         }
     }
-    if has_pub_main {
+    // A `-main` wrapper is emitted for runnable modules, but suppressed when
+    // GLEAM_CLJ_NO_MAIN is set (library builds: the module is required, not run,
+    // and an entry point would trip main-without-gen-class linters).
+    let suppress_main = std::env::var_os("GLEAM_CLJ_NO_MAIN").is_some();
+    if has_pub_main && !suppress_main {
         out.push_str("\n(defn -main [& _]\n  (main))\n");
     }
 
@@ -505,7 +509,11 @@ fn emit_custom_type(out: &mut String, t: &TypedCustomType) {
         }
         let fields = constructor_field_names(c);
         let _ = writeln!(out, "(defrecord {} [{}])", c.name, fields.join(" "));
-        let _ = writeln!(out, "(defn {}? [v] (instance? {} v))", c.name, c.name);
+        let _ = writeln!(
+            out,
+            "(defn {}? \"True if `v` is a {} value.\" [v] (instance? {} v))",
+            c.name, c.name, c.name
+        );
     }
 }
 

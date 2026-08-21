@@ -132,6 +132,11 @@ fn apply_pattern(pieces: List(Piece), pattern: Pattern) -> List(Piece) {
   })
 }
 
+/// Split raw query text into an interleaved list of string fragments and
+/// tokens. Patterns are applied in sequence (pass by pass), so an earlier
+/// pattern's matches shadow later ones over the same span — this ordering,
+/// not a single left-to-right scan, is what the original Clojure does. When
+/// `handle_sql_comments` is False, comment tokens are not recognized.
 pub fn tokenize(s: String, handle_sql_comments: Bool) -> List(Piece) {
   let patterns = case handle_sql_comments {
     True -> sql_patterns()
@@ -417,8 +422,11 @@ fn enter_comment(
   }
 }
 
-/// Parse parameters in `s`, returning literal fragments interleaved with
-/// Param and Optional fragments.
+/// Parse parameters in `s`, returning literal text fragments interleaved
+/// with `Param` and `Optional` fragments. `handle_sql_comments` skips params
+/// inside `--` and `/* */` comments when True. `strict` mirrors the original
+/// `:parse-error-type` option: when True an invalid clause is an `Error`;
+/// when False a terminated-but-invalid clause dissolves to nothing instead.
 pub fn parse(
   s: String,
   handle_sql_comments: Bool,
@@ -435,6 +443,8 @@ pub fn parse(
   }
 }
 
+/// Self-check: asserts a representative set of parses on the BEAM, so
+/// `gleam run` proves the same semantics the compiled Clojure claims.
 pub fn main() {
   // BEAM-side sanity: real gleam runs the same semantics this module claims.
   let assert Ok([Literal("select 1")]) = parse("select 1", True, True)
