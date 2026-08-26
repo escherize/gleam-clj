@@ -1236,6 +1236,8 @@ fn flattenable(op: &BinOp) -> bool {
             | BinOp::MultInt
             | BinOp::MultFloat
             | BinOp::DivFloat
+            | BinOp::And
+            | BinOp::Or
     )
 }
 

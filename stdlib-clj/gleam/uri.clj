@@ -264,7 +264,7 @@
   "is_valid_host_within_brackets_char(char: Int) -> Bool"
   {:gleam/src "stdlib-src/src/gleam/uri.gleam:286"}
   [char]
-  (or (or (or (or (and (>= 48 char) (<= char 57)) (and (>= 65 char) (<= char 90))) (and (>= 97 char) (<= char 122))) (= char 58)) (= char 46)))
+  (or (and (>= 48 char) (<= char 57)) (and (>= 65 char) (<= char 90)) (and (>= 97 char) (<= char 122)) (= char 58) (= char 46)))
 
 (defn- parse-host-within-brackets-loop
   "parse_host_within_brackets_loop(original: String, uri_string: String, pieces: Uri, size: Int) -> Result(Uri, Nil)"
