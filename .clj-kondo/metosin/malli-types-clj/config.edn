@@ -1,0 +1,6 @@
+{:linters {:unresolved-symbol {:exclude [(malli.core/=>)]},
+           :type-mismatch {:namespaces {coin-change {main {:arities {0 {:args [], :ret :any}}},
+                                                     min-coins {:arities {2 {:args [:sequential :int], :ret :any}}}},
+                                        shapes {main {:arities {0 {:args [], :ret :double}}},
+                                                total-area {:arities {1 {:args [:sequential], :ret :double}}},
+                                                area {:arities {1 {:args [:any], :ret :double}}}}}}}}

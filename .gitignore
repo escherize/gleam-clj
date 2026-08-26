@@ -16,3 +16,4 @@ libs/mb-lib-parse/project/build/
 .impeccable/
 .playwright-cli/
 .papercuts.jsonl
+clj-kondo.exports/**/.cache/
