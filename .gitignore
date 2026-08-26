@@ -9,11 +9,11 @@ rosetta/work/
 tour/work/
 tour/expected/
 tour/gen/
-.clj-kondo/.cache/
+**/.clj-kondo/.cache/
 libs/gleam-parser/project/build/
 libs/mb-lib-parse/project/build/
 .lsp/
 .impeccable/
 .playwright-cli/
 .papercuts.jsonl
-clj-kondo.exports/**/.cache/
+**/clj-kondo.exports/**/.cache/
