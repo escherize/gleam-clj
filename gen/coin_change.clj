@@ -6,7 +6,10 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(defn- step [coins table a]
+(defn- step
+  "step(coins: List(Int), table: Dict(Int, Int), a: Int) -> Dict(Int, Int)"
+  {:gleam/src "coin_change.gleam:19"}
+  [coins table a]
   (p/echo ["step" "a: " a ", table: " table] "coin_change.gleam:20")
   (let [best (-> coins
                  (list/filter-map (fn [c] (dict/get table (-' a c))))
@@ -17,9 +20,12 @@
       table)))
 
 (defn min-coins
-  "Fewest coins summing to `amount`. Error(Nil) if unreachable."
+  "min_coins(coins: List(Int), amount: Int) -> Result(Int, Nil)
+
+   Fewest coins summing to `amount`. Error(Nil) if unreachable."
   {:malli/schema [:=> [:cat [:sequential :int] :int]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+   :gleam/src "coin_change.gleam:6"}
   [coins amount]
   (cond
     (= amount 0)
@@ -36,7 +42,9 @@
         (dict/get amount))))
 
 (defn main
-  {:malli/schema [:=> [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]}
+  "main() -> Result(Int, Nil)"
+  {:malli/schema [:=> [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]
+   :gleam/src "coin_change.gleam:31"}
   []
   (p/let-assert (p/->Ok 0) (min-coins (list 1 5 10) 0))
   (p/let-assert (p/->Ok 1) (min-coins (list 1 5 10) 10))

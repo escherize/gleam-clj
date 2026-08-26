@@ -3,10 +3,11 @@
    [clojure.string]
    [gleam.io :as io]))
 
-(def shout clojure.string/upper-case)
+(def ^{:gleam/src "ffi_demo.gleam:4"} shout clojure.string/upper-case)
 
 (defn main
-  {:malli/schema [:=> [:cat] :nil]}
+  "main() -> Nil"
+  {:malli/schema [:=> [:cat] :nil] :gleam/src "ffi_demo.gleam:6"}
   []
   (io/println (shout "hello from clojure interop")))
 

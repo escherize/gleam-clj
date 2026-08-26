@@ -563,7 +563,14 @@ fn emit_custom_type(
         if JAVA_LANG.contains(&c.name.as_str()) {
             let _ = writeln!(out, "(ns-unmap *ns* '{})", c.name);
         }
-        let fields = constructor_field_names(c);
+        let fields: Vec<String> = constructor_field_names(c)
+            .iter()
+            .zip(&c.arguments)
+            .map(|(n, a)| match jvm_hint(&a.type_) {
+                Some(h) => format!("{h} {n}"),
+                None => n.clone(),
+            })
+            .collect();
         let _ = writeln!(out, "(defrecord {} [{}] {proto})", c.name, fields.join(" "));
         let _ = writeln!(
             out,
@@ -602,16 +609,78 @@ fn fn_schema(ctx: &Emit, f: &TypedFunction) -> String {
     format!("[:=> {cat} {ret}]")
 }
 
-/// The schema attr-map, wrapped when it would overflow the line: the return
-/// schema aligns under the argument schema.
-fn schema_attr(ctx: &Emit, f: &TypedFunction, ind: usize) -> String {
+/// `file.gleam:line` of a fn's definition, for :gleam/src metadata.
+fn gleam_src(ctx: &Emit, f: &TypedFunction) -> String {
+    format!("{}:{}", ctx.file, ctx.line_of(f.location.start))
+}
+
+/// The defn attr-map: the Gleam source location, plus the function schema for
+/// public fns — wrapped when it would overflow the line (the return schema
+/// aligns under the argument schema, :gleam/src under :malli/schema).
+fn fn_attr(ctx: &Emit, f: &TypedFunction, ind: usize, public: bool) -> String {
+    let src_entry = format!(":gleam/src \"{}\"", gleam_src(ctx, f));
+    if !public {
+        return format!("{{{src_entry}}}");
+    }
     let (cat, ret) = fn_schema_parts(ctx, f);
-    let inline = format!("{{:malli/schema [:=> {cat} {ret}]}}");
+    let inline = format!("{{:malli/schema [:=> {cat} {ret}] {src_entry}}}");
     if fits(&inline, ind) {
         return inline;
     }
+    let sep = format!("\n{}", sp(ind + 1));
+    let schema_line = format!("{{:malli/schema [:=> {cat} {ret}]");
+    if fits(&schema_line, ind) {
+        return format!("{schema_line}{sep}{src_entry}}}");
+    }
     let pad = ind + "{:malli/schema [:=> ".len();
-    format!("{{:malli/schema [:=> {cat}\n{}{ret}]}}", sp(pad))
+    format!("{{:malli/schema [:=> {cat}\n{}{ret}]{sep}{src_entry}}}", sp(pad))
+}
+
+/// One-line Gleam signature for docstrings: `name(x: Int, y: Float) -> Bool`.
+fn gleam_signature(f: &TypedFunction, gleam_name: &str) -> String {
+    let mut printer = gleam_core::type_::pretty::Printer::new();
+    let mut one_line = |t: &gleam_core::type_::Type| {
+        printer.pretty_print(t, 0).split_whitespace().collect::<Vec<_>>().join(" ")
+    };
+    let args: Vec<String> = f
+        .arguments
+        .iter()
+        .map(|a| {
+            let t = one_line(&a.type_);
+            match &a.names {
+                ArgNames::Named { name, .. } | ArgNames::Discard { name, .. } => {
+                    format!("{name}: {t}")
+                }
+                ArgNames::NamedLabelled { label, name, .. }
+                | ArgNames::LabelledDiscard { label, name, .. } => {
+                    format!("{label} {name}: {t}")
+                }
+            }
+        })
+        .collect();
+    let ret = one_line(&f.return_type);
+    format!("{gleam_name}({}) -> {ret}", args.join(", "))
+}
+
+/// JVM type hint for a checked Gleam type. Int is deliberately unhinted:
+/// Gleam Int is arbitrary-precision (the promoting +'/-'/*' ops), so ^long
+/// would be wrong the moment a value overflows into BigInt.
+fn jvm_hint(t: &gleam_core::type_::Type) -> Option<&'static str> {
+    use gleam_core::type_::{Type, TypeVar};
+    match t {
+        Type::Var { type_ } => match &*type_.borrow() {
+            TypeVar::Link { type_ } => jvm_hint(type_),
+            _ => None,
+        },
+        Type::Named { module, name, .. } => match (module.as_str(), name.as_str()) {
+            ("gleam", "Float") => Some("^double"),
+            // Fully qualified: a Gleam variant named `String` ns-unmaps the
+            // java.lang default, after which a bare ^String cannot resolve.
+            ("gleam", "String") => Some("^java.lang.String"),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 fn emit_function(ctx: &Emit, f: &TypedFunction) -> String {
@@ -619,9 +688,9 @@ fn emit_function(ctx: &Emit, f: &TypedFunction) -> String {
     let name = local_fn_name(&kebab(&gleam_name));
     let public = !matches!(f.publicity, Publicity::Private);
     let def_meta = if public {
-        format!("^{{:malli/schema {}}} ", fn_schema(ctx, f))
+        format!("^{{:malli/schema {} :gleam/src \"{}\"}} ", fn_schema(ctx, f), gleam_src(ctx, f))
     } else {
-        String::new()
+        format!("^{{:gleam/src \"{}\"}} ", gleam_src(ctx, f))
     };
     if let Some(target) = ctx.externals.get(&(ctx.module_path.to_string(), gleam_name.clone())) {
         return format!("(def {def_meta}{name} {target})\n");
@@ -647,34 +716,57 @@ fn emit_function(ctx: &Emit, f: &TypedFunction) -> String {
         );
     }
     let defn = if matches!(f.publicity, Publicity::Private) { "defn-" } else { "defn" };
-    let args: Vec<String> = f.arguments.iter().map(arg_name).collect();
 
-    let mut out = format!("({defn} {name}");
-    let attr = public.then(|| schema_attr(ctx, f, 2));
-    match &f.documentation {
-        Some((_, doc)) => {
-            let text: Vec<String> = doc
-                .lines()
-                .map(|l| l.trim().replace('\\', "\\\\").replace('"', "\\\""))
-                .collect();
-            let _ = write!(out, "\n  \"{}\"", text.join("\n   ").trim_end());
-            if let Some(attr) = &attr {
-                let _ = write!(out, "\n  {attr}");
-            }
-            let _ = write!(out, "\n  [{}]\n  ", args.join(" "));
-        }
-        None => match &attr {
-            Some(attr) => {
-                let _ = write!(out, "\n  {attr}\n  [{}]\n  ", args.join(" "));
-            }
-            None => {
-                let _ = write!(out, " [{}]\n  ", args.join(" "));
-            }
-        },
-    }
+    // Body first: a primitive arg hint is a compile error when a boxed
+    // expression reaches its `recur` slot, so self-recursive fns keep
+    // object args. Primitive fn interfaces also stop at 4 params.
     let stmts: Vec<&TypedStatement> = f.body.iter().collect();
     let tail = Tail { name: name.clone() };
-    out.push_str(&emit_body(ctx, &stmts, 2, Some(&tail)));
+    let body = emit_body(ctx, &stmts, 2, Some(&tail));
+    let allow_prim_args = f.arguments.len() <= 4 && !body.contains("(recur");
+    let args: Vec<String> = f
+        .arguments
+        .iter()
+        .map(|a| {
+            let n = arg_name(a);
+            match jvm_hint(&a.type_) {
+                Some(h) if h != "^double" || allow_prim_args => format!("{h} {n}"),
+                _ => n,
+            }
+        })
+        .collect();
+    let arg_vec = {
+        let inner = args.join(" ");
+        match jvm_hint(&f.return_type) {
+            Some("^double") if f.arguments.len() > 4 => format!("[{inner}]"),
+            Some(h) => format!("{h} [{inner}]"),
+            None => format!("[{inner}]"),
+        }
+    };
+
+    // Docstring: the checked Gleam signature, then the doc comment if any.
+    let mut raw = gleam_signature(f, &gleam_name);
+    if let Some((_, doc)) = &f.documentation {
+        raw.push_str("\n\n");
+        raw.push_str(doc.trim_end());
+    }
+    let mut rendered = String::new();
+    for (i, l) in raw.lines().enumerate() {
+        let e = l.trim().replace('\\', "\\\\").replace('"', "\\\"");
+        if i > 0 {
+            rendered.push('\n');
+            if !e.is_empty() {
+                rendered.push_str("   ");
+            }
+        }
+        rendered.push_str(&e);
+    }
+
+    let mut out = format!("({defn} {name}");
+    let _ = write!(out, "\n  \"{rendered}\"");
+    let _ = write!(out, "\n  {}", fn_attr(ctx, f, 2, public));
+    let _ = write!(out, "\n  {arg_vec}\n  ");
+    out.push_str(&body);
     out.push_str(")\n");
     out
 }
