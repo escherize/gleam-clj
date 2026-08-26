@@ -17,3 +17,6 @@ libs/mb-lib-parse/project/build/
 .playwright-cli/
 .papercuts.jsonl
 **/clj-kondo.exports/**/.cache/
+.private/
+.private-remote
+**/.lsp/.cache/
