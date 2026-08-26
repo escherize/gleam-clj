@@ -324,7 +324,9 @@
     <div class="compile-grid">
       <div class="pane pane--src">
         <div class="pane-head"><img src="assets/gleam-lucy.svg" alt=""><span class="lang">min_coins.gleam</span></div>
-<pre><span class="k">pub fn</span> <span class="fn">min_coins</span>(coins: <span class="ty">List</span>(<span class="ty">Int</span>), amount: <span class="ty">Int</span>)
+<pre><span class="cm">/// Fewest coins summing to `amount`.
+/// Error(Nil) if unreachable.</span>
+<span class="k">pub fn</span> <span class="fn">min_coins</span>(coins: <span class="ty">List</span>(<span class="ty">Int</span>), amount: <span class="ty">Int</span>)
   -> <span class="ty">Result</span>(<span class="ty">Int</span>, <span class="ty">Nil</span>) {
   <span class="k">case</span> amount {
     <span class="pn">0</span> -> <span class="ty">Ok</span>(<span class="pn">0</span>)
@@ -341,7 +343,10 @@
         <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">min_coins.clj</span></div>
 <pre>(<span class="k">defn</span> <span class="fn">min-coins</span>
   <span class="st">"min_coins(coins: List(Int), amount: Int)
-   -> Result(Int, Nil)"</span>
+   -> Result(Int, Nil)
+
+   Fewest coins summing to `amount`.
+   Error(Nil) if unreachable."</span>
   {<span class="ty">:malli/schema</span> [:=> [:cat [:sequential :int] :int]
                   (p/<span class="fn">result-of</span> :int :nil)]}
   [coins amount]
