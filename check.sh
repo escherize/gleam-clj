@@ -28,13 +28,13 @@ echo "== cargo build + snapshot tests (emitter output locked against gen/)"
 (cd gleam-to-clj && cargo build -q && cargo test -q)
 
 echo "== fixtures: hand-written programs, compiled and executed on the JVM"
-for f in coin_change shapes sum_to jellyfish ffi_demo; do
+for f in coin_change shapes sum_to jellyfish ffi_demo permissions; do
   ./gleam-to-clj/target/debug/gleam-to-clj "gleam-src/$f.gleam" "gen/$f.clj"
 done
-for m in coin-change shapes sum-to jellyfish ffi-demo; do
+for m in coin-change shapes sum-to jellyfish ffi-demo permissions; do
   clojure -A:gen -M -m "$m" >/dev/null 2>&1 || { echo "FIXTURE FAILED: $m"; exit 1; }
 done
-echo "fixtures ok (5/5)"
+echo "fixtures ok (6/6)"
 
 suite() {
   if [ -z "$(ls "$1/tasks"/*.gleam 2>/dev/null)" ]; then

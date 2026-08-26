@@ -302,8 +302,10 @@
       <a href="#start">Start</a>
       <a href="#backends">vs erlang/js</a>
       <a href="#runtime">Runtime</a>
+      <a href="#samples">Samples</a>
       <a href="#verify">Verification</a>
       <a href="#libs">Packaging</a>
+      <a href="blog/parse-dont-validate.html">Writing</a>
       <a class="gh" href="https://github.com/escherize/gleam-clj">GitHub ↗</a>
     </nav>
   </div>
@@ -338,6 +340,8 @@
       <div class="pane pane--out">
         <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">min_coins.clj</span></div>
 <pre>(<span class="k">defn</span> <span class="fn">min-coins</span>
+  <span class="st">"min_coins(coins: List(Int), amount: Int)
+   -> Result(Int, Nil)"</span>
   {<span class="ty">:malli/schema</span> [:=> [:cat [:sequential :int] :int]
                   [:or [:fn p/Ok?] [:fn p/Error?]]]}
   [coins amount]
@@ -485,9 +489,9 @@ clojure -M:repl</pre>
           <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">shape.clj</span></div>
 <pre><span class="cm">;; type Shape</span>
 (<span class="k">defprotocol</span> <span class="ty">IShape</span>)
-(<span class="k">defrecord</span> <span class="ty">Circle</span> [value] <span class="ty">IShape</span>)
+(<span class="k">defrecord</span> <span class="ty">Circle</span> [^double value] <span class="ty">IShape</span>)
 (<span class="k">defn</span> <span class="fn">Circle?</span> [v] (<span class="k">instance?</span> <span class="ty">Circle</span> v))
-(<span class="k">defrecord</span> <span class="ty">Rect</span> [width height] <span class="ty">IShape</span>)
+(<span class="k">defrecord</span> <span class="ty">Rect</span> [^double width ^double height] <span class="ty">IShape</span>)
 (<span class="k">defn</span> <span class="fn">Rect?</span> [v] (<span class="k">instance?</span> <span class="ty">Rect</span> v))
 (<span class="k">defrecord</span> <span class="ty">Point</span> [] <span class="ty">IShape</span>)
 (<span class="k">defn</span> <span class="fn">Point?</span> [v] (<span class="k">instance?</span> <span class="ty">Point</span> v))
@@ -495,7 +499,196 @@ clojure -M:repl</pre>
         </div>
       </div>
     </div>
-    <p style="margin-top:16px"><code>Shape?</code> is a plain <code>instance?</code> on the protocol's generated interface — an O(1) check, exactly as fast as the per-variant predicates, not a slow <code>satisfies?</code>. And it feeds the derived malli schema: a <code>Shape</code> argument becomes <code>[:fn Shape?]</code> rather than an <code>[:or …]</code> of every variant.</p>
+    <p style="margin-top:16px"><code>Shape?</code> is a plain <code>instance?</code> on the protocol's generated interface — an O(1) check, exactly as fast as the per-variant predicates, not a slow <code>satisfies?</code>. And it feeds the derived malli schema: a <code>Shape</code> argument becomes <code>[:fn Shape?]</code> rather than an <code>[:or …]</code> of every variant. Note the <code>^double</code> field hints: <code>Float</code> fields compile to primitive record slots, because the checker already proved they hold doubles.</p>
+  </section>
+
+  <section id="samples">
+    <div class="sec-tag">Samples</div>
+    <h2>A whole program, before and after</h2>
+    <p class="lede">The snippets above are excerpts. This is the real thing: a complete fixture from the repo's test corpus — dynamic-programming coin change, with pipes, guards, higher-order functions, and deliberate <code>echo</code> debugging — and the <strong>unedited compiler output</strong> next to it. CI regenerates and re-runs this file on every push.</p>
+    <div class="compile" style="margin-top:26px">
+      <div class="compile-grid">
+        <div class="pane pane--src">
+          <div class="pane-head"><img src="assets/gleam-lucy.svg" alt=""><span class="lang">coin_change.gleam</span></div>
+<pre><span class="k">import</span> gleam/dict.{<span class="k">type</span> <span class="ty">Dict</span>}
+<span class="k">import</span> gleam/int
+<span class="k">import</span> gleam/list
+
+<span class="cm">/// Fewest coins summing to `amount`.
+/// Error(Nil) if unreachable.</span>
+<span class="k">pub fn</span> <span class="fn">min_coins</span>(coins: <span class="ty">List</span>(<span class="ty">Int</span>), amount: <span class="ty">Int</span>)
+  -> <span class="ty">Result</span>(<span class="ty">Int</span>, <span class="ty">Nil</span>) {
+  <span class="k">case</span> amount {
+    <span class="pn">0</span> -> <span class="ty">Ok</span>(<span class="pn">0</span>)
+    a <span class="k">if</span> a &lt; <span class="pn">0</span> -> <span class="ty">Error</span>(<span class="ty">Nil</span>)
+    _ -> {
+      int.<span class="fn">range</span>(<span class="pn">1</span>, amount + <span class="pn">1</span>,
+        dict.<span class="fn">from_list</span>([#(<span class="pn">0</span>, <span class="pn">0</span>)]),
+        <span class="k">fn</span>(table, a) { <span class="fn">step</span>(coins, table, a) })
+      |> dict.<span class="fn">get</span>(amount)
+    }
+  }
+}
+
+<span class="k">fn</span> <span class="fn">step</span>(coins: <span class="ty">List</span>(<span class="ty">Int</span>),
+        table: <span class="ty">Dict</span>(<span class="ty">Int</span>, <span class="ty">Int</span>),
+        a: <span class="ty">Int</span>) -> <span class="ty">Dict</span>(<span class="ty">Int</span>, <span class="ty">Int</span>) {
+  <span class="k">echo</span> #(<span class="st">"step"</span>, <span class="st">"a: "</span>, a, <span class="st">", table: "</span>, table)
+  <span class="k">let</span> best =
+    coins
+    |> list.<span class="fn">filter_map</span>(<span class="k">fn</span>(c) { dict.<span class="fn">get</span>(table, a - c) })
+    |> list.<span class="fn">reduce</span>(int.<span class="fn">min</span>)
+  <span class="k">case</span> best {
+    <span class="ty">Ok</span>(b) -> dict.<span class="fn">insert</span>(table, a, b + <span class="pn">1</span>)
+    <span class="ty">Error</span>(_) -> table
+  }
+}
+
+<span class="k">pub fn</span> <span class="fn">main</span>() {
+  <span class="k">let assert</span> <span class="ty">Ok</span>(<span class="pn">0</span>) = <span class="fn">min_coins</span>([<span class="pn">1</span>, <span class="pn">5</span>, <span class="pn">10</span>], <span class="pn">0</span>)
+  <span class="k">let assert</span> <span class="ty">Ok</span>(<span class="pn">1</span>) = <span class="fn">min_coins</span>([<span class="pn">1</span>, <span class="pn">5</span>, <span class="pn">10</span>], <span class="pn">10</span>)
+  <span class="k">let assert</span> <span class="ty">Ok</span>(<span class="pn">2</span>) = <span class="fn">min_coins</span>([<span class="pn">1</span>, <span class="pn">5</span>, <span class="pn">10</span>], <span class="pn">15</span>)
+  <span class="k">let assert</span> <span class="ty">Ok</span>(<span class="pn">4</span>) = <span class="fn">min_coins</span>([<span class="pn">1</span>, <span class="pn">5</span>, <span class="pn">10</span>], <span class="pn">13</span>)
+  <span class="cm">// greedy trap: greedy picks 4+1+1, optimal 3+3</span>
+  <span class="k">let assert</span> <span class="ty">Ok</span>(<span class="pn">2</span>) = <span class="fn">min_coins</span>([<span class="pn">1</span>, <span class="pn">3</span>, <span class="pn">4</span>], <span class="pn">6</span>)
+  <span class="k">let assert</span> <span class="ty">Error</span>(<span class="ty">Nil</span>) = <span class="fn">min_coins</span>([<span class="pn">5</span>, <span class="pn">10</span>], <span class="pn">3</span>)
+  <span class="k">let assert</span> <span class="ty">Error</span>(<span class="ty">Nil</span>) = <span class="fn">min_coins</span>([], <span class="pn">7</span>)
+}</pre>
+        </div>
+        <div class="seam"><span class="chip">compiles to</span></div>
+        <div class="pane pane--out">
+          <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">coin_change.clj — unedited</span></div>
+<pre>(<span class="k">ns</span> <span class="fn">coin-change</span>
+  (:require
+   [gleam.dict <span class="ty">:as</span> dict]
+   [gleam.int <span class="ty">:as</span> int]
+   [gleam.list <span class="ty">:as</span> list]
+   [gleam.prelude <span class="ty">:as</span> p])
+  (:import (gleam.prelude <span class="ty">Ok</span>)))
+
+(<span class="k">defn-</span> <span class="fn">step</span>
+  <span class="st">"step(coins: List(Int), table: Dict(Int, Int), a: Int) -> Dict(Int, Int)"</span>
+  {<span class="ty">:gleam/src</span> <span class="st">"coin_change.gleam:19"</span>}
+  [coins table a]
+  (p/<span class="fn">echo</span> [<span class="st">"step"</span> <span class="st">"a: "</span> a <span class="st">", table: "</span> table] <span class="st">"coin_change.gleam:20"</span>)
+  (<span class="k">let</span> [best (-&gt; coins
+                 (list/<span class="fn">filter-map</span> (<span class="k">fn</span> [c] (dict/<span class="fn">get</span> table (-' a c))))
+                 (list/<span class="fn">reduce</span> int/<span class="fn">min'</span>))]
+    (<span class="k">if</span> (<span class="k">instance?</span> <span class="ty">Ok</span> best)
+      (<span class="k">let</span> [b (:value best)]
+        (dict/<span class="fn">insert</span> table a (+' b 1)))
+      table)))
+
+(<span class="k">defn</span> <span class="fn">min-coins</span>
+  <span class="st">"min_coins(coins: List(Int), amount: Int) -> Result(Int, Nil)
+
+   Fewest coins summing to `amount`. Error(Nil) if unreachable."</span>
+  {<span class="ty">:malli/schema</span> [:=&gt; [:cat [:sequential :int] :int]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+   <span class="ty">:gleam/src</span> <span class="st">"coin_change.gleam:6"</span>}
+  [coins amount]
+  (<span class="k">cond</span>
+    (= amount 0)
+    (p/-&gt;<span class="ty">Ok</span> 0)
+
+    (&lt; amount 0)
+    (p/-&gt;<span class="ty">Error</span> nil)
+
+    <span class="ty">:else</span>
+    (-&gt; (int/<span class="fn">range</span> 1
+                   (+' amount 1)
+                   (dict/<span class="fn">from-list</span> (list [0 0]))
+                   (<span class="k">fn</span> [table a] (<span class="fn">step</span> coins table a)))
+        (dict/<span class="fn">get</span> amount))))
+
+(<span class="k">defn</span> <span class="fn">main</span>
+  <span class="st">"main() -> Result(Int, Nil)"</span>
+  {<span class="ty">:malli/schema</span> [:=&gt; [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]
+   <span class="ty">:gleam/src</span> <span class="st">"coin_change.gleam:31"</span>}
+  []
+  (p/<span class="fn">let-assert</span> (p/-&gt;<span class="ty">Ok</span> 0) (<span class="fn">min-coins</span> (list 1 5 10) 0))
+  (p/<span class="fn">let-assert</span> (p/-&gt;<span class="ty">Ok</span> 1) (<span class="fn">min-coins</span> (list 1 5 10) 10))
+  (p/<span class="fn">let-assert</span> (p/-&gt;<span class="ty">Ok</span> 2) (<span class="fn">min-coins</span> (list 1 5 10) 15))
+  (p/<span class="fn">let-assert</span> (p/-&gt;<span class="ty">Ok</span> 4) (<span class="fn">min-coins</span> (list 1 5 10) 13))
+  (p/<span class="fn">let-assert</span> (p/-&gt;<span class="ty">Ok</span> 2) (<span class="fn">min-coins</span> (list 1 3 4) 6))
+  (p/<span class="fn">let-assert</span> (p/-&gt;<span class="ty">Error</span> nil) (<span class="fn">min-coins</span> (list 5 10) 3))
+  (p/<span class="fn">let-assert</span> (p/-&gt;<span class="ty">Error</span> nil) (<span class="fn">min-coins</span> (list) 7)))
+
+(<span class="k">defn</span> <span class="fn">-main</span> [&amp; _]
+  (<span class="fn">main</span>))</pre>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:20px">Worth noticing, because each one is the type checker's knowledge surviving into the output:</p>
+    <ul class="clean">
+      <li><strong>Docstrings lead with the checked Gleam signature</strong> — <code>(doc min-coins)</code> in a REPL tells you the real types, and the <code>///</code> doc comment follows it.</li>
+      <li><strong><code>:gleam/src</code> points home.</strong> Every fn carries the <code>.gleam</code> file and line that defined it; even <code>echo</code> prints its original source position.</li>
+      <li><strong>Pipes become threading, guards become <code>cond</code></strong> — with the pattern order the checker verified, not a heuristic rewrite.</li>
+      <li><strong>Int math uses <code>+'</code>/<code>-'</code></strong>, Clojure's promoting ops, because Gleam ints are arbitrary-precision. <code>Float</code> args would get primitive <code>^double</code> hints instead — see <a href="#runtime">the runtime model</a>.</li>
+    </ul>
+
+    <h3>Types that carry proof — and keep it through the compile</h3>
+    <p>A bigger sample with <code>opaque</code> types: parse an untrusted user-id string once, mint a permission proof at the boundary, and let privileged functions demand the proof in their signature. The Gleam type checker makes unauthorized calls unrepresentable; the compiled Clojure keeps the discipline as <code>instance?</code> predicates and malli schemas:</p>
+    <div class="compile" style="margin-top:18px">
+      <div class="compile-grid">
+        <div class="pane pane--src">
+          <div class="pane-head"><img src="assets/gleam-lucy.svg" alt=""><span class="lang">permissions.gleam</span></div>
+<pre><span class="k">pub opaque type</span> <span class="ty">UserId</span> {
+  <span class="ty">UserId</span>(<span class="ty">Int</span>)
+}
+
+<span class="cm">/// Parse untrusted input into a UserId —
+/// the only way to make one.</span>
+<span class="k">pub fn</span> <span class="fn">parse_user_id</span>(raw: <span class="ty">String</span>)
+  -> <span class="ty">Result</span>(<span class="ty">UserId</span>, <span class="ty">IdError</span>) {
+  <span class="k">case</span> string.<span class="fn">trim</span>(raw) {
+    <span class="st">""</span> -> <span class="ty">Error</span>(<span class="ty">Empty</span>)
+    trimmed ->
+      <span class="k">case</span> int.<span class="fn">parse</span>(trimmed) {
+        <span class="ty">Error</span>(_) -> <span class="ty">Error</span>(<span class="ty">NotANumber</span>(trimmed))
+        <span class="ty">Ok</span>(n) <span class="k">if</span> n &lt; <span class="pn">1</span> -> <span class="ty">Error</span>(<span class="ty">OutOfRange</span>(n))
+        <span class="ty">Ok</span>(n) -> <span class="ty">Ok</span>(<span class="ty">UserId</span>(n))
+      }
+  }
+}</pre>
+        </div>
+        <div class="seam"><span class="chip">compiles to</span></div>
+        <div class="pane pane--out">
+          <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">permissions.clj — excerpt, unedited</span></div>
+<pre><span class="cm">;; type UserId</span>
+(<span class="k">defprotocol</span> <span class="ty">IUserId</span>)
+(<span class="k">defrecord</span> <span class="ty">UserId</span> [value] <span class="ty">IUserId</span>)
+(<span class="k">defn</span> <span class="fn">UserId?</span> <span class="st">"True if `v` is a UserId value."</span>
+  [v] (<span class="k">instance?</span> <span class="ty">UserId</span> v))
+
+(<span class="k">defn</span> <span class="fn">parse-user-id</span>
+  <span class="st">"parse_user_id(raw: String) -> Result(UserId, IdError)
+
+   Parse untrusted input into a UserId —
+   the only way to make one."</span>
+  {<span class="ty">:malli/schema</span> [:=&gt; [:cat :string]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+   <span class="ty">:gleam/src</span> <span class="st">"permissions.gleam:16"</span>}
+  [^java.lang.String raw]
+  (<span class="k">let</span> [subject (string/<span class="fn">trim</span> raw)]
+    (<span class="k">if</span> (= subject <span class="st">""</span>)
+      (p/-&gt;<span class="ty">Error</span> (-&gt;<span class="ty">Empty</span>))
+      (<span class="k">let</span> [trimmed subject subject (int/<span class="fn">parse</span> trimmed)]
+        (<span class="k">cond</span>
+          (<span class="k">instance?</span> gleam.prelude.<span class="ty">Error</span> subject)
+          (p/-&gt;<span class="ty">Error</span> (-&gt;<span class="ty">NotANumber</span> trimmed))
+
+          (<span class="k">and</span> (<span class="k">instance?</span> <span class="ty">Ok</span> subject) (&lt; (:value subject) 1))
+          (<span class="k">let</span> [n (:value subject)]
+            (p/-&gt;<span class="ty">Error</span> (-&gt;<span class="ty">OutOfRange</span> n)))
+
+          (<span class="k">instance?</span> <span class="ty">Ok</span> subject)
+          (<span class="k">let</span> [n (:value subject)]
+            (p/-&gt;<span class="ty">Ok</span> (-&gt;<span class="ty">UserId</span> n))))))))</pre>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:20px">The <code>^java.lang.String</code> hint comes from the checked argument type; the error variants each became a record you can dispatch on from Clojure. The full walkthrough — why the permission check should <em>mint a value</em> instead of returning a <code>Bool</code>, with the compiler's verbatim refusals — is its own post: <a href="blog/parse-dont-validate.html"><strong>Permission checks are parsers →</strong></a></p>
   </section>
 
   <section id="verify">
@@ -529,7 +722,7 @@ clojure -M:repl</pre>
         {<span class="fl">:git/url</span> <span class="st">"https://github.com/escherize/gleam-clj"</span>
          <span class="fl">:git/sha</span> <span class="st">"..."</span>
          <span class="fl">:deps/root</span> <span class="st">"libs/gleam-parser"</span>}}}</pre>
-    <p>Every public function carries <code>{:malli/schema …}</code> metadata derived from the Gleam types — so <a href="https://github.com/metosin/malli">malli</a> instrumentation and clj-kondo type-linting work out of the box, with zero runtime cost until you opt in.</p>
+    <p>Every public function carries <code>{:malli/schema …}</code> metadata derived from the Gleam types — so <a href="https://github.com/metosin/malli">malli</a> instrumentation and clj-kondo type-linting work out of the box, with zero runtime cost until you opt in. The rest of the checker's knowledge ships too: every fn's docstring leads with its <strong>Gleam signature</strong>, <code>:gleam/src</code> metadata names the defining <code>.gleam</code> file and line, and <code>Float</code>/<code>String</code> types become JVM type hints (<code>^double</code>, <code>^java.lang.String</code>) — primitive math and reflection-free interop, no annotations written by hand.</p>
   </section>
 
   <section id="limits">
@@ -554,6 +747,7 @@ clojure -M:repl</pre>
   <a href="#start">Getting started</a>
   <a href="#backends">vs erlang / js</a>
   <a href="#runtime">Runtime model</a>
+  <a href="#samples">Samples</a>
   <a href="#verify">Verification</a>
   <a href="#libs">Packaging</a>
   <a href="#limits">Status &amp; limits</a>

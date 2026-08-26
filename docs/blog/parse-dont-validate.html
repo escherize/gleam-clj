@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Permission checks are parsers — gleam-clj</title>
+<meta name="description" content="Parse, don't validate, applied to authorization: turn a user id's permission check into a value the type system can demand, in Gleam, and watch the proof survive compilation to Clojure.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500;1,6..72,600&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --font-display: 'Newsreader', Georgia, serif;
+    --font-body: 'Outfit', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+    --paper: #fbfcfe;
+    --paper2: #f2f5fa;
+    --ink: #12161d;
+    --ink-dim: #55606f;
+    --ink-faint: #8892a0;
+    --line: rgba(18, 22, 29, 0.10);
+    --line-soft: rgba(18, 22, 29, 0.06);
+
+    --clj-blue: #4066c4;
+    --clj-blue-lite: #90b4fe;
+    --clj-blue-dim: rgba(88, 129, 216, 0.10);
+    --clj-green: #3f8a1f;
+    --clj-green-lite: #91dc47;
+    --clj-green-dim: rgba(99, 177, 50, 0.11);
+
+    --gleam-pink: #d64fb0;
+    --gleam-pink-lite: #ffaff3;
+    --gleam-pink-dim: rgba(255, 175, 243, 0.16);
+
+    --code-bg: #14171e;
+    --code-bg2: #1b1f28;
+    --code-line: rgba(255, 255, 255, 0.08);
+    --code-text: #d7dde6;
+    --code-dim: #7d8798;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0e1116;
+      --paper2: #161b22;
+      --ink: #e9edf3;
+      --ink-dim: #a3adba;
+      --ink-faint: #6b7686;
+      --line: rgba(255, 255, 255, 0.11);
+      --line-soft: rgba(255, 255, 255, 0.06);
+      --clj-blue: #90b4fe;
+      --clj-blue-dim: rgba(144, 180, 254, 0.12);
+      --clj-green: #91dc47;
+      --clj-green-dim: rgba(145, 220, 71, 0.12);
+      --gleam-pink: #ffaff3;
+      --gleam-pink-dim: rgba(255, 175, 243, 0.13);
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  ::selection { background: var(--clj-green-lite); color: #12161d; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  a { color: var(--clj-blue); text-decoration: none; text-underline-offset: 3px; }
+  a:hover { text-decoration: underline; }
+
+  code { font-family: var(--font-mono); font-size: 0.86em; }
+  :not(pre) > code {
+    background: color-mix(in srgb, var(--clj-blue) 9%, transparent);
+    color: color-mix(in srgb, var(--clj-blue) 88%, var(--ink));
+    padding: 1.5px 6px; border-radius: 5px;
+    font-size: 0.82em;
+  }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--paper) 82%, transparent);
+    backdrop-filter: saturate(1.4) blur(14px);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .topbar-inner {
+    max-width: 1160px; margin: 0 auto; padding: 14px 32px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; font-family: var(--font-mono); font-weight: 600; font-size: 15px; letter-spacing: -0.02em; color: var(--ink); }
+  .brand .glyphs { display: flex; align-items: center; gap: 3px; }
+  .brand .glyphs img { height: 22px; width: auto; display: block; }
+  .brand .arrow { color: var(--ink-faint); font-size: 13px; }
+  .brand b { color: var(--clj-blue); }
+  .nav-links { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+  .nav-links a {
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-dim);
+    padding: 7px 11px; border-radius: 7px; transition: background 0.15s, color 0.15s;
+  }
+  .nav-links a:hover { background: var(--paper2); color: var(--ink); text-decoration: none; }
+  .nav-links a.gh { color: var(--ink); border: 1px solid var(--line); }
+
+  article { max-width: 720px; margin: 0 auto; padding: 0 32px 80px; }
+  @media (max-width: 640px) { article, .topbar-inner { padding-left: 20px; padding-right: 20px; } }
+
+  .post-head { padding: 68px 0 30px; position: relative; }
+  .post-head::before {
+    content: ""; position: absolute; inset: -40px -200px auto -200px; height: 340px; z-index: -1;
+    background:
+      radial-gradient(ellipse 40% 60% at 22% 30%, var(--gleam-pink-dim) 0%, transparent 60%),
+      radial-gradient(ellipse 45% 70% at 78% 40%, var(--clj-green-dim) 0%, transparent 62%),
+      radial-gradient(ellipse 50% 60% at 55% 10%, var(--clj-blue-dim) 0%, transparent 60%);
+  }
+  .post-kicker { font-family: var(--font-mono); font-size: 11px; color: var(--clj-blue); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; }
+  .post-kicker::before { content: "("; color: var(--ink-faint); font-size: 15px; margin-right: 6px; }
+  .post-kicker::after { content: ")"; color: var(--ink-faint); font-size: 15px; margin-left: 6px; }
+  h1 {
+    font-family: var(--font-display); font-weight: 600; font-size: clamp(2.2rem, 5.5vw, 3.4rem);
+    line-height: 1.05; letter-spacing: -0.03em; text-wrap: balance;
+  }
+  h1 .pink { color: var(--gleam-pink); font-style: italic; }
+  .post-sub { font-size: 1.18rem; color: var(--ink-dim); margin-top: 18px; line-height: 1.55; max-width: 58ch; }
+  .post-meta { margin-top: 22px; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-faint); }
+
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.5rem, 3vw, 1.95rem); letter-spacing: -0.02em; line-height: 1.12; margin: 54px 0 14px; text-wrap: balance; }
+  article p { margin: 16px 0; color: var(--ink-dim); }
+  article p strong { color: var(--ink); font-weight: 600; }
+
+  pre.block { background: var(--code-bg); color: var(--code-text); border-radius: 12px; padding: 18px 20px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.62; margin: 20px 0; border: 1px solid var(--code-line); }
+
+  .pane-label {
+    display: flex; align-items: center; gap: 8px; margin: 24px 0 -14px;
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-faint);
+  }
+  .pane-label img { height: 15px; }
+  .pane-label .lang { font-weight: 600; }
+  .pane-label .lang.gleam { color: var(--gleam-pink); }
+  .pane-label .lang.clj { color: var(--clj-green); }
+  .pane-label .lang.err { color: #e06c75; }
+
+  .k  { color: var(--gleam-pink-lite); }
+  .ty { color: var(--clj-blue-lite); }
+  .st { color: #e5c07b; }
+  .cm { color: var(--code-dim); font-style: italic; }
+  .fn { color: var(--clj-green-lite); }
+  .er { color: #e06c75; }
+
+  .note { margin: 26px 0; padding: 18px 22px; background: var(--clj-green-dim); border-radius: 12px; font-size: 14.5px; line-height: 1.6; color: var(--ink); }
+  .note strong { color: var(--clj-green); }
+  .note.blue { background: var(--clj-blue-dim); }
+  .note.blue strong { color: var(--clj-blue); }
+  .note.pink { background: var(--gleam-pink-dim); }
+  .note.pink strong { color: var(--gleam-pink); }
+
+  ul.clean { list-style: none; margin: 18px 0; display: grid; gap: 11px; }
+  ul.clean li { padding-left: 26px; position: relative; color: var(--ink-dim); font-size: 15px; line-height: 1.55; }
+  ul.clean li::before { content: ")"; position: absolute; left: 6px; top: -1px; color: var(--clj-green); font-family: var(--font-mono); font-weight: 600; }
+  ul.clean li strong { color: var(--ink); font-weight: 600; }
+
+  footer { border-top: 1px solid var(--line); padding: 44px 0 70px; margin-top: 60px; }
+  footer .inner { max-width: 720px; margin: 0 auto; padding: 0 32px; display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+  footer p { font-size: 13.5px; color: var(--ink-dim); font-family: var(--font-mono); }
+  footer .glyphs { display: flex; gap: 4px; align-items: center; }
+  footer .glyphs img { height: 20px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html">
+      <span class="glyphs">
+        <img src="../assets/gleam-lucy.svg" alt="Gleam">
+        <span class="arrow">→</span>
+        <img src="../assets/clojure.svg" alt="Clojure">
+      </span>
+      gleam<b>-clj</b>
+    </a>
+    <nav class="nav-links">
+      <a href="../index.html">Docs</a>
+      <a class="gh" href="https://github.com/escherize/gleam-clj">GitHub ↗</a>
+    </nav>
+  </div>
+</div>
+
+<article>
+<div class="post-head">
+  <div class="post-kicker">Writing · type-driven design</div>
+  <h1>Permission checks are <span class="pink">parsers</span></h1>
+  <p class="post-sub">"Parse, don't validate," applied to authorization: make the permission check on a user id return a value only it can create — then require that value where the privilege is used. In Gleam, and in the Clojure it compiles to.</p>
+  <p class="post-meta">gleam-clj · every snippet below was compiled and run by the compiler in this repo; the error messages are verbatim</p>
+</div>
+
+<p>Alexis King's <a href="https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/">Parse, don't validate</a> names a habit good type-driven code shares: when you learn something about a value, <strong>record what you learned in its type</strong>. A validator inspects data and returns the same data plus a yes/no. A parser inspects data and returns <em>different, more informative</em> data — or an error. The validator's knowledge evaporates one line later; the parser's knowledge is carried by the value itself.</p>
+
+<p>Authorization is the sharpest place to apply this, because the cost of the validator habit is a security bug, not a style complaint.</p>
+
+<h2>The validator version, and where it rots</h2>
+
+<p>Here is the shape most codebases have. A boolean check, and privileged functions that trust their caller already performed it:</p>
+
+<div class="pane-label"><span class="lang gleam">the boolean-blind version</span></div>
+<pre class="block"><span class="k">pub fn</span> <span class="fn">can_edit</span>(user_id: <span class="ty">String</span>) -&gt; <span class="ty">Bool</span>
+
+<span class="cm">// ...and, somewhere else entirely:</span>
+<span class="k">pub fn</span> <span class="fn">rename_dashboard</span>(user_id: <span class="ty">String</span>, name: <span class="ty">String</span>) -&gt; <span class="ty">String</span> {
+  <span class="cm">// hope the caller checked. everyone hopes.</span>
+}</pre>
+
+<p>Three failure modes, all invisible to the compiler:</p>
+<ul class="clean">
+  <li><strong>Boolean blindness.</strong> <code>can_edit</code> learned something real and returned <code>True</code> — one bit. Which user? Checked against what? The answer existed for one expression, then vanished.</li>
+  <li><strong>The check and the use drift apart.</strong> The call site that checks and the function that acts are held together by convention. Refactors add a new path to <code>rename_dashboard</code>; nothing forces the new path to check.</li>
+  <li><strong>The id is still a string.</strong> Empty string, <code>"0"</code>, <code>"robert'); DROP"</code> — every function that touches a raw id re-inherits every doubt about it.</li>
+</ul>
+
+<h2>Step one: parse the id at the boundary</h2>
+
+<p>First, the id itself. An <code>opaque type</code> in Gleam exports the type but not its constructor — so the only way for the rest of the program to obtain a <code>UserId</code> is through the function that scrutinizes the raw string. The doubts are handled once, in one place, and the result is a value that can no longer be empty, negative, or unparsed:</p>
+
+<div class="pane-label"><img src="../assets/gleam-lucy.svg" alt=""><span class="lang gleam">permissions.gleam</span></div>
+<pre class="block"><span class="k">pub opaque type</span> <span class="ty">UserId</span> {
+  <span class="ty">UserId</span>(<span class="ty">Int</span>)
+}
+
+<span class="k">pub type</span> <span class="ty">IdError</span> {
+  <span class="ty">Empty</span>
+  <span class="ty">NotANumber</span>(<span class="ty">String</span>)
+  <span class="ty">OutOfRange</span>(<span class="ty">Int</span>)
+}
+
+<span class="cm">/// Parse untrusted input into a UserId — the only way to make one.</span>
+<span class="k">pub fn</span> <span class="fn">parse_user_id</span>(raw: <span class="ty">String</span>) -&gt; <span class="ty">Result</span>(<span class="ty">UserId</span>, <span class="ty">IdError</span>) {
+  <span class="k">case</span> string.<span class="fn">trim</span>(raw) {
+    <span class="st">""</span> -&gt; <span class="ty">Error</span>(<span class="ty">Empty</span>)
+    trimmed -&gt;
+      <span class="k">case</span> int.<span class="fn">parse</span>(trimmed) {
+        <span class="ty">Error</span>(_) -&gt; <span class="ty">Error</span>(<span class="ty">NotANumber</span>(trimmed))
+        <span class="ty">Ok</span>(n) <span class="k">if</span> n &lt; 1 -&gt; <span class="ty">Error</span>(<span class="ty">OutOfRange</span>(n))
+        <span class="ty">Ok</span>(n) -&gt; <span class="ty">Ok</span>(<span class="ty">UserId</span>(n))
+      }
+  }
+}</pre>
+
+<p>Note what the signature says that <code>can_edit(user_id: String) -&gt; Bool</code> could not: the ways this can fail are <strong>enumerated in the return type</strong>, and the success case hands back a different type than it was given. Downstream code that holds a <code>UserId</code> holds evidence.</p>
+
+<h2>Step two: the permission check mints a proof</h2>
+
+<p>Now the same move, one level up. Instead of asking "may user 42 edit?" and getting a bit, ask the check to <em>parse the situation</em> — user plus role — into a value that exists only when the answer is yes. The privileged function then demands that value:</p>
+
+<div class="pane-label"><img src="../assets/gleam-lucy.svg" alt=""><span class="lang gleam">permissions.gleam, continued</span></div>
+<pre class="block"><span class="k">pub type</span> <span class="ty">Role</span> {
+  <span class="ty">Viewer</span>
+  <span class="ty">Editor</span>
+  <span class="ty">Owner</span>
+}
+
+<span class="k">pub opaque type</span> <span class="ty">CanEdit</span> {
+  <span class="ty">CanEdit</span>(<span class="ty">UserId</span>)
+}
+
+<span class="k">pub type</span> <span class="ty">Denied</span> {
+  <span class="ty">Denied</span>(who: <span class="ty">UserId</span>, needs: <span class="ty">Role</span>)
+}
+
+<span class="cm">/// Check once, at the boundary. Success mints the proof.</span>
+<span class="k">pub fn</span> <span class="fn">require_editor</span>(user: <span class="ty">UserId</span>, role: <span class="ty">Role</span>) -&gt; <span class="ty">Result</span>(<span class="ty">CanEdit</span>, <span class="ty">Denied</span>) {
+  <span class="k">case</span> role {
+    <span class="ty">Editor</span> -&gt; <span class="ty">Ok</span>(<span class="ty">CanEdit</span>(user))
+    <span class="ty">Owner</span>  -&gt; <span class="ty">Ok</span>(<span class="ty">CanEdit</span>(user))
+    <span class="ty">Viewer</span> -&gt; <span class="ty">Error</span>(<span class="ty">Denied</span>(user, <span class="ty">Editor</span>))
+  }
+}
+
+<span class="cm">/// Demands the proof. Unauthorized calls don't type-check.</span>
+<span class="k">pub fn</span> <span class="fn">rename_dashboard</span>(proof: <span class="ty">CanEdit</span>, name: <span class="ty">String</span>) -&gt; <span class="ty">String</span> {
+  <span class="k">let</span> <span class="ty">CanEdit</span>(<span class="ty">UserId</span>(id)) = proof
+  <span class="st">"user "</span> &lt;&gt; int.<span class="fn">to_string</span>(id) &lt;&gt; <span class="st">" renamed dashboard to "</span> &lt;&gt; name
+}</pre>
+
+<p>Three properties fall out, and none of them depend on discipline:</p>
+<ul class="clean">
+  <li><strong>The check can't be skipped.</strong> <code>rename_dashboard</code> takes a <code>CanEdit</code>, and only <code>require_editor</code> can construct one. A call site without a check has nothing to pass.</li>
+  <li><strong>The check can't drift from the use.</strong> The proof value <em>is</em> the connection; it travels through the code from check to use, visible in every intermediate signature.</li>
+  <li><strong>Denial is data, not absence.</strong> <code>Denied(who, needs)</code> carries who was refused and what they lacked — an audit log entry, not a silent <code>False</code>.</li>
+</ul>
+
+<h2>The compiler holds the door</h2>
+
+<p>Claims about "can't" deserve receipts. Try to use a bare <code>UserId</code> where the proof is required — the diagnostic below is the compiler's actual output, reproduced by this repo's build:</p>
+
+<div class="pane-label"><span class="lang err">gleam's type checker, verbatim</span></div>
+<pre class="block"><span class="er">error: Type mismatch</span>
+   ┌─ permissions.gleam:70:20
+   │
+70 │   rename_dashboard(user, <span class="st">"pwned"</span>)
+   │                    <span class="er">^^^^</span>
+
+Expected type:
+
+    <span class="ty">CanEdit</span>
+
+Found type:
+
+    <span class="ty">UserId</span></pre>
+
+<p>And forging the proof from outside the module fails at the import — <code>opaque</code> exports the type, not the constructor:</p>
+
+<div class="pane-label"><span class="lang err">from another module, verbatim</span></div>
+<pre class="block"><span class="er">error: Unknown module value</span>
+  ┌─ app.gleam:1:21
+  │
+1 │ <span class="k">import</span> permissions.{<span class="ty">CanEdit</span>, rename_dashboard}
+  │                     <span class="er">^^^^^^^</span> Did you mean `<span class="k">type</span> <span class="ty">CanEdit</span>`?
+
+`<span class="ty">CanEdit</span>` is only a type, it cannot be imported as a value.</pre>
+
+<p>The trusted surface of the whole scheme shrank to two short functions — <code>parse_user_id</code> and <code>require_editor</code>. Audit those, and every other call site is covered by the type checker.</p>
+
+<h2>What survives the compile to Clojure</h2>
+
+<p>This site documents a Gleam → Clojure compiler, so the natural question: what happens to a proof-carrying type when it lands on the JVM, where nothing stops a determined caller from conjuring records? Here is the compiled <code>rename_dashboard</code>, verbatim:</p>
+
+<div class="pane-label"><img src="../assets/clojure.svg" alt=""><span class="lang clj">permissions.clj — compiler output, excerpted but unedited</span></div>
+<pre class="block"><span class="cm">;; type CanEdit</span>
+(<span class="k">defprotocol</span> <span class="ty">ICanEdit</span>)
+(<span class="k">defrecord</span> <span class="ty">CanEdit</span> [value] <span class="ty">ICanEdit</span>)
+(<span class="k">defn</span> <span class="fn">CanEdit?</span> <span class="st">"True if `v` is a CanEdit value."</span> [v] (<span class="k">instance?</span> <span class="ty">CanEdit</span> v))
+
+(<span class="k">defn</span> <span class="fn">rename-dashboard</span>
+  <span class="st">"rename_dashboard(proof: CanEdit, name: String) -&gt; String
+
+   Demands the proof. Unauthorized calls don't type-check."</span>
+  {<span class="ty">:malli/schema</span> [:=&gt; [:cat [:fn <span class="fn">CanEdit?</span>] :string] :string]
+   <span class="ty">:gleam/src</span> <span class="st">"permissions.gleam:52"</span>}
+  ^java.lang.String [proof ^java.lang.String name]
+  (<span class="k">let</span> [{{id :value} :value} proof]
+    (<span class="k">str</span> (<span class="k">str</span> (<span class="k">str</span> <span class="st">"user "</span> (int/<span class="fn">to-string</span> id)) <span class="st">" renamed dashboard to "</span>) name)))</pre>
+
+<p>The static guarantee is Gleam's; Clojure callers are outside the type checker's reach. But the proof doesn't dissolve into a bare map — it compiles to <strong>checkable structure</strong>:</p>
+
+<ul class="clean">
+  <li><strong>The docstring carries the contract.</strong> <code>(doc rename-dashboard)</code> in any REPL shows the Gleam signature, and <code>:gleam/src</code> points at the line that defines it.</li>
+  <li><strong>The schema demands the proof at runtime.</strong> <code>[:fn CanEdit?]</code> is derived from the Gleam type. Turn on <a href="https://github.com/metosin/malli">malli</a> instrumentation and a Clojure call passing a raw id — <code>(rename-dashboard 42 "x")</code> — throws <code>:malli.core/invalid-input</code> at the boundary instead of misbehaving past it.</li>
+  <li><strong>The same schema feeds clj-kondo</strong>, so an obviously wrong call is a static lint error in the editor before anything runs.</li>
+</ul>
+
+<div class="note blue"><strong>Honest asterisk:</strong> on the Clojure side <code>(-&gt;CanEdit user)</code> is one expression away — records are open construction there. What the compile preserves is the <em>boundary discipline</em>: the proof type, its predicate, and an opt-in runtime check at exactly the functions that demand proof. Inside the Gleam world the guarantee is total; at the interop edge it degrades to an instrumented contract rather than nothing.</div>
+
+<h2>What this pattern does and doesn't buy</h2>
+
+<ul class="clean">
+  <li><strong>It buys:</strong> unskippable checks, error cases you must handle (<code>Result</code> forces the <code>Denied</code> branch), a two-function trusted core, and denial as loggable data.</li>
+  <li><strong>It doesn't buy:</strong> resource-level precision — this <code>CanEdit</code> proves edit rights generally, not rights to <em>a particular dashboard</em>. Want that? Same move, one more field: <code>CanEdit(UserId, DashboardId)</code>, minted by a check that takes both.</li>
+  <li><strong>It can't buy:</strong> freshness. A proof minted at request start can outlive a mid-request revocation, exactly like a session token. Scope proofs to a request; don't cache them.</li>
+</ul>
+
+<p>The pattern generalizes past permissions: non-empty lists, sanitized HTML, verified email addresses, positive amounts. Anywhere the code asks a yes/no question and then acts on the answer somewhere else, there is a type that could carry the yes — <strong>parse once, and let the checker chase the value so you don't have to chase the convention.</strong></p>
+
+<div class="note"><strong>Run it yourself:</strong> the full example lives in the repo as <code>gleam-src/permissions.gleam</code>, gated by CI like every other fixture. <code>clojure -M:repl</code>, then <code>(gl/require-gleam "gleam-src/permissions.gleam")</code>. Its <code>main</code> parses <code>"42"</code>, mints the proof, and prints <code>user 42 renamed dashboard to Q3 revenue</code> — on the JVM, byte-identical to what <code>gleam run</code> prints on the BEAM.</div>
+
+</article>
+
+<footer>
+  <div class="inner">
+    <p>gleam-clj — a Gleam → Clojure/JVM compiler. Not affiliated with the Gleam project.</p>
+    <span class="glyphs">
+      <img src="../assets/gleam-lucy.svg" alt="Gleam">
+      <img src="../assets/clojure.svg" alt="Clojure">
+    </span>
+  </div>
+</footer>
+
+</body>
+</html>
