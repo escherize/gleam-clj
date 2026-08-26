@@ -323,7 +323,7 @@
    decode.run(data, decoder)
    ```"
   {:malli/schema [:=> [:cat [:or ] [:fn Decoder?]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of :any [:sequential [:fn DecodeError?]])]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:371"}
   [data decoder]
   (let [[maybe-invalid-data errors] ((:function decoder) data)]
@@ -997,7 +997,7 @@
    false -> {error, 0}
    end.
    ```"
-  {:malli/schema [:=> [:cat :string [:=> [:cat [:or ]] [:or [:fn p/Ok?] [:fn p/Error?]]]]
+  {:malli/schema [:=> [:cat :string [:=> [:cat [:or ]] (p/result-of :any :any)]]
                       [:fn Decoder?]]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:1081"}
   [^java.lang.String name decoding-function]

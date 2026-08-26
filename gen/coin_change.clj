@@ -23,8 +23,7 @@
   "min_coins(coins: List(Int), amount: Int) -> Result(Int, Nil)
 
    Fewest coins summing to `amount`. Error(Nil) if unreachable."
-  {:malli/schema [:=> [:cat [:sequential :int] :int]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat [:sequential :int] :int] (p/result-of :int :nil)]
    :gleam/src "coin_change.gleam:6"}
   [coins amount]
   (cond
@@ -43,7 +42,7 @@
 
 (defn main
   "main() -> Result(Int, Nil)"
-  {:malli/schema [:=> [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat] (p/result-of :int :nil)]
    :gleam/src "coin_change.gleam:31"}
   []
   (p/let-assert (p/->Ok 0) (min-coins (list 1 5 10) 0))

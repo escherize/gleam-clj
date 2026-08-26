@@ -2345,7 +2345,8 @@
 
 (defn module
   "module(src: String) -> Result(Module, Error)"
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :string]
+                      (p/result-of [:fn Module?] [:fn (fn [v] (instance? glance.IError v))])]
    :gleam/src "project/build/packages/glance/src/glance.gleam:361"}
   [^java.lang.String src]
   (-> (glexer/new* src)

@@ -55,7 +55,8 @@
   "parse_user_id(raw: String) -> Result(UserId, IdError)
 
    Parse untrusted input into a UserId — the only way to make one."
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :string]
+                      (p/result-of [:fn UserId?] [:fn IdError?])]
    :gleam/src "permissions.gleam:16"}
   [^java.lang.String raw]
   (let [subject (string/trim raw)]
@@ -79,7 +80,7 @@
 
    Check once, at the boundary. Success mints the proof."
   {:malli/schema [:=> [:cat [:fn UserId?] [:fn Role?]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of [:fn CanEdit?] [:fn Denied?])]
    :gleam/src "permissions.gleam:43"}
   [user role]
   (cond
@@ -117,7 +118,7 @@
 
    Scoped proof: rights to one dashboard, not dashboards in general."
   {:malli/schema [:=> [:cat [:fn UserId?] [:fn Role?] [:fn DashboardId?]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of [:fn CanEditDashboard?] [:fn Denied?])]
    :gleam/src "permissions.gleam:78"}
   [user role dash]
   (cond

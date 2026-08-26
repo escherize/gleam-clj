@@ -35,7 +35,7 @@
    [gleam.order :as order]
    [gleam.prelude :as p]))
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]] :gleam/src "stdlib-src/src/gleam/float.gleam:49"} parse gleam-ffi/float-parse)
+(def ^{:malli/schema [:=> [:cat :string] (p/result-of :double :nil)] :gleam/src "stdlib-src/src/gleam/float.gleam:49"} parse gleam-ffi/float-parse)
 
 (def ^{:malli/schema [:=> [:cat :double] :string] :gleam/src "stdlib-src/src/gleam/float.gleam:61"} to-string gleam-ffi/float-to-string)
 
@@ -296,7 +296,7 @@
    ```gleam
    assert float.power(-1.0, 0.5) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat :double :double] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :double :double] (p/result-of :double :nil)]
    :gleam/src "stdlib-src/src/gleam/float.gleam:334"}
   [^double base ^double exponent]
   (let [fractional (> (- (ceiling exponent) exponent) 0.0) subject (or (and (< base 0.0) fractional) (and (= base 0.0) (< exponent 0.0)))]
@@ -316,7 +316,7 @@
    ```gleam
    assert float.square_root(-16.0) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat :double] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :double] (p/result-of :double :nil)]
    :gleam/src "stdlib-src/src/gleam/float.gleam:364"}
   [^double x]
   (power x 0.5))
@@ -398,7 +398,7 @@
    ```gleam
    assert float.modulo(-13.3, by: -3.3) == Ok(-0.1)
    ```"
-  {:malli/schema [:=> [:cat :double :double] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :double :double] (p/result-of :double :nil)]
    :gleam/src "stdlib-src/src/gleam/float.gleam:460"}
   [^double dividend ^double divisor]
   (if (= divisor 0.0)
@@ -419,7 +419,7 @@
    ```gleam
    assert float.divide(1.0, 0.0) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat :double :double] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :double :double] (p/result-of :double :nil)]
    :gleam/src "stdlib-src/src/gleam/float.gleam:479"}
   [^double a ^double b]
   (if (= b 0.0)
@@ -540,7 +540,7 @@
    ```gleam
    assert float.logarithm(-1.0) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat :double] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :double] (p/result-of :double :nil)]
    :gleam/src "stdlib-src/src/gleam/float.gleam:586"}
   [^double x]
   (let [subject (<= x 0.0)]

@@ -442,12 +442,12 @@
    fragment: Some(\"fragment\"),
    ))
    ```"
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :string] (p/result-of [:fn Uri?] :nil)]
    :gleam/src "stdlib-src/src/gleam/uri.gleam:78"}
   [^java.lang.String uri-string]
   (parse-scheme-loop uri-string uri-string empty 0))
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]] :gleam/src "stdlib-src/src/gleam/uri.gleam:533"} parse-query gleam-ffi/parse-query)
+(def ^{:malli/schema [:=> [:cat :string] (p/result-of [:sequential [:tuple :string :string]] :nil)] :gleam/src "stdlib-src/src/gleam/uri.gleam:533"} parse-query gleam-ffi/parse-query)
 
 (def ^{:malli/schema [:=> [:cat :string] :string] :gleam/src "stdlib-src/src/gleam/uri.gleam:570"} percent-encode gleam-ffi/percent-encode)
 
@@ -480,7 +480,7 @@
   ^java.lang.String [query]
   (-> query (list/map query-pair) (string/join "&")))
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]] :gleam/src "stdlib-src/src/gleam/uri.gleam:582"} percent-decode gleam-ffi/percent-decode)
+(def ^{:malli/schema [:=> [:cat :string] (p/result-of :string :nil)] :gleam/src "stdlib-src/src/gleam/uri.gleam:582"} percent-decode gleam-ffi/percent-decode)
 
 (defn- remove-dot-segments-loop
   "remove_dot_segments_loop(input: List(String), accumulator: List(String)) -> List(String)"
@@ -570,7 +570,7 @@
    let assert Ok(uri) = uri.parse(\"https://example.com/path?foo#bar\")
    assert uri.origin(uri) == Ok(\"https://example.com\")
    ```"
-  {:malli/schema [:=> [:cat [:fn Uri?]] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat [:fn Uri?]] (p/result-of :string :nil)]
    :gleam/src "stdlib-src/src/gleam/uri.gleam:695"}
   [uri]
   (let [{scheme :scheme host :host port :port} uri]
@@ -614,7 +614,7 @@
    The algorithm for merging URIs is described in
    [RFC 3986](https://tools.ietf.org/html/rfc3986#section-5.2)."
   {:malli/schema [:=> [:cat [:fn Uri?] [:fn Uri?]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of [:fn Uri?] :nil)]
    :gleam/src "stdlib-src/src/gleam/uri.gleam:716"}
   [base relative]
   (if (and (instance? Uri base) (instance? gleam.option.Some (:scheme base)) (instance? gleam.option.Some (:host base)))

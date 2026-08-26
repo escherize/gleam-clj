@@ -483,11 +483,19 @@ fn malli_type(ctx: &Emit, t: &gleam_core::type_::Type) -> String {
                     format!("[:sequential {inner}]")
                 }
                 ("gleam", "Result") => {
-                    format!(
-                        "[:or [:fn {}] [:fn {}]]",
-                        ctx.pred_ref("gleam", "Ok"),
-                        ctx.pred_ref("gleam", "Error")
-                    )
+                    // Typed payloads: (p/result-of ok err) builds the
+                    // variant-plus-:value schema in the prelude. The pred_ref
+                    // calls still run for their schema_requires side effect.
+                    let _ = ctx.pred_ref("gleam", "Ok");
+                    let ok = arguments
+                        .first()
+                        .map(|a| malli_type(ctx, a))
+                        .unwrap_or_else(|| ":any".into());
+                    let err = arguments
+                        .get(1)
+                        .map(|a| malli_type(ctx, a))
+                        .unwrap_or_else(|| ":any".into());
+                    format!("(p/result-of {ok} {err})")
                 }
                 ("gleam/dict", "Dict") => {
                     let k = arguments
@@ -514,6 +522,16 @@ fn malli_type(ctx: &Emit, t: &gleam_core::type_::Type) -> String {
                     let has_type_pred =
                         variants.len() > 1 && variants.iter().all(|v| v != n);
                     if has_type_pred {
+                        // A java.lang-colliding type name (e.g. glance's
+                        // Error) never gets a `Name?` type predicate; its
+                        // marker protocol interface always exists, so check
+                        // that class directly. pred_ref is still called for
+                        // its schema_requires side effect.
+                        if JAVA_LANG.contains(&n) {
+                            let _ = ctx.pred_ref(m, n);
+                            let class_ns = kebab(&m.replace('/', ".")).replace('-', "_");
+                            return format!("[:fn (fn [v] (instance? {class_ns}.I{n} v))]");
+                        }
                         return format!("[:fn {}]", ctx.pred_ref(m, n));
                     }
                     let checks: Vec<String> = variants

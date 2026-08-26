@@ -251,8 +251,7 @@
    ```gleam
    assert list.first([1, 2]) == Ok(1)
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat [:sequential :any]] (p/result-of :any :nil)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:211"}
   [list']
   (if (empty? list')
@@ -282,7 +281,7 @@
    assert list.rest([1, 2]) == Ok([2])
    ```"
   {:malli/schema [:=> [:cat [:sequential :any]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of [:sequential :any] :nil)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:237"}
   [list']
   (if (empty? list')
@@ -383,7 +382,7 @@
    ```gleam
    assert list.filter_map([2, 4, 6, 1], fn(x) { Ok(x + 1) }) == [3, 5, 7, 2]
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] (p/result-of :any :any)]]
                       [:sequential :any]]
    :gleam/src "stdlib-src/src/gleam/list.gleam:322"}
   [list' fun]
@@ -547,8 +546,8 @@
    ```gleam
    assert list.try_map([[1], [], [2]], list.first) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] (p/result-of :any :any)]]
+                      (p/result-of [:sequential :any] :any)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:491"}
   [list' fun]
   (try-map-loop list' fun (list)))
@@ -848,8 +847,8 @@
    })
    == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] (p/result-of :any :any)]]
+                      (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:783"}
   [list' initial fun]
   (if (empty? list')
@@ -917,7 +916,7 @@
    assert list.find([], fn(_) { True }) == Error(Nil)
    ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] :boolean]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of :any :nil)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:856"}
   [list' is-desired]
   (if (empty? list')
@@ -946,8 +945,8 @@
    ```gleam
    assert list.find_map([], list.first) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] (p/result-of :any :any)]]
+                      (p/result-of :any :nil)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:889"}
   [list' fun]
   (if (empty? list')
@@ -1100,7 +1099,7 @@
    assert list.strict_zip([1, 2], [3, 4]) == Ok([#(1, 3), #(2, 4)])
    ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:sequential :any]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of [:sequential [:tuple :any :any]] :nil)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:1022"}
   [list' other]
   (strict-zip-loop list' other (list)))
@@ -1514,7 +1513,7 @@
    assert list.key_find([#(\"a\", 0), #(\"b\", 1)], \"c\") == Error(Nil)
    ```"
   {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of :any :nil)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:1510"}
   [keyword-list desired-key]
   (find-map keyword-list
@@ -1588,7 +1587,7 @@
    assert list.key_pop([#(\"a\", 0), #(\"b\", 1)], \"c\") == Error(Nil)
    ```"
   {:malli/schema [:=> [:cat [:sequential [:tuple :any :any]] :any]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of [:tuple :any [:sequential [:tuple :any :any]]] :nil)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:1572"}
   [list' key]
   (key-pop-loop list' key (list)))
@@ -1672,8 +1671,8 @@
    assert list.try_each(over: [1, 2, 3], with: function_that_might_fail)
    == Ok(Nil)
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any] (p/result-of :any :any)]]
+                      (p/result-of :nil :any)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:1662"}
   [list' fun]
   (if (empty? list')
@@ -1944,7 +1943,7 @@
    assert [1, 2, 3, 4, 5] |> list.reduce(fn(acc, x) { acc + x }) == Ok(15)
    ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] :any]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of :any :nil)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:1952"}
   [list' fun]
   (if (empty? list')
@@ -1996,8 +1995,7 @@
    ```gleam
    assert list.last([1, 2, 3, 4, 5]) == Ok(5)
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat [:sequential :any]] (p/result-of :any :nil)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:2007"}
   [list']
   (cond
@@ -2199,7 +2197,7 @@
    assert [\"a\", \"c\", \"b\"] |> list.max(string.compare) == Ok(\"c\")
    ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:fn order/Order?]]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of :any :nil)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:2173"}
   [list' compare]
   (if (empty? list')

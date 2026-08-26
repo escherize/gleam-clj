@@ -66,7 +66,7 @@
    ```gleam
    assert int.power(-1, 0.5) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat :int :double] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :int :double] (p/result-of :double :nil)]
    :gleam/src "stdlib-src/src/gleam/int.gleam:60"}
   [base ^double exponent]
   (-> base to-float (float/power exponent)))
@@ -85,12 +85,12 @@
    ```gleam
    assert int.square_root(-16) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat :int] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :int] (p/result-of :double :nil)]
    :gleam/src "stdlib-src/src/gleam/int.gleam:78"}
   [x]
   (-> x to-float float/square-root))
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]] :gleam/src "stdlib-src/src/gleam/int.gleam:98"} parse gleam-ffi/int-parse)
+(def ^{:malli/schema [:=> [:cat :string] (p/result-of :int :nil)] :gleam/src "stdlib-src/src/gleam/int.gleam:98"} parse gleam-ffi/int-parse)
 
 (def ^{:gleam/src "stdlib-src/src/gleam/int.gleam:137"} do-base-parse gleam-ffi/int-base-parse)
 
@@ -124,7 +124,7 @@
    ```gleam
    assert int.base_parse(\"48\", 37) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat :string :int] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :string :int] (p/result-of :int :nil)]
    :gleam/src "stdlib-src/src/gleam/int.gleam:128"}
   [^java.lang.String string base]
   (let [subject (and (>= base 2) (<= base 36))]
@@ -162,7 +162,7 @@
    ```gleam
    assert int.to_base_string(48, 37) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat :int :int] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :int :int] (p/result-of :string :nil)]
    :gleam/src "stdlib-src/src/gleam/int.gleam:177"}
   [x base]
   (let [subject (and (>= base 2) (<= base 36))]
@@ -467,7 +467,7 @@
    ```gleam
    assert int.divide(-99, 2) == Ok(-49)
    ```"
-  {:malli/schema [:=> [:cat :int :int] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :int :int] (p/result-of :int :nil)]
    :gleam/src "stdlib-src/src/gleam/int.gleam:468"}
   [dividend divisor]
   (if (= divisor 0)
@@ -515,7 +515,7 @@
    ```gleam
    assert int.remainder(-13, by: -3) == Ok(-1)
    ```"
-  {:malli/schema [:=> [:cat :int :int] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :int :int] (p/result-of :int :nil)]
    :gleam/src "stdlib-src/src/gleam/int.gleam:513"}
   [dividend divisor]
   (if (= divisor 0)
@@ -559,7 +559,7 @@
    ```gleam
    assert int.modulo(13, by: -3) == Ok(-2)
    ```"
-  {:malli/schema [:=> [:cat :int :int] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :int :int] (p/result-of :int :nil)]
    :gleam/src "stdlib-src/src/gleam/int.gleam:554"}
   [dividend divisor]
   (if (= divisor 0)
@@ -596,7 +596,7 @@
    ```gleam
    assert int.floor_divide(-99, 2) == Ok(-50)
    ```"
-  {:malli/schema [:=> [:cat :int :int] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :int :int] (p/result-of :int :nil)]
    :gleam/src "stdlib-src/src/gleam/int.gleam:594"}
   [dividend divisor]
   (if (= divisor 0)

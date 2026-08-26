@@ -115,8 +115,7 @@
    ```gleam
    assert option.to_result(None, \"some_error\") == Error(\"some_error\")
    ```"
-  {:malli/schema [:=> [:cat [:fn Option?] :any]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat [:fn Option?] :any] (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/option.gleam:108"}
   [option e]
   (if (instance? Some option)
@@ -138,7 +137,7 @@
    ```gleam
    assert option.from_result(Error(\"some_error\")) == None
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]]] [:fn Option?]]
+  {:malli/schema [:=> [:cat (p/result-of :any :any)] [:fn Option?]]
    :gleam/src "stdlib-src/src/gleam/option.gleam:127"}
   [result]
   (if (instance? Ok result)

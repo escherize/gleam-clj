@@ -343,7 +343,7 @@
   <span class="st">"min_coins(coins: List(Int), amount: Int)
    -> Result(Int, Nil)"</span>
   {<span class="ty">:malli/schema</span> [:=> [:cat [:sequential :int] :int]
-                  [:or [:fn p/Ok?] [:fn p/Error?]]]}
+                  (p/<span class="fn">result-of</span> :int :nil)]}
   [coins amount]
   (<span class="k">cond</span>
     (= amount <span class="pn">0</span>)   (p/-&gt;<span class="ty">Ok</span> <span class="pn">0</span>)
@@ -583,8 +583,7 @@ clojure -M:repl</pre>
   <span class="st">"min_coins(coins: List(Int), amount: Int) -> Result(Int, Nil)
 
    Fewest coins summing to `amount`. Error(Nil) if unreachable."</span>
-  {<span class="ty">:malli/schema</span> [:=&gt; [:cat [:sequential :int] :int]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {<span class="ty">:malli/schema</span> [:=&gt; [:cat [:sequential :int] :int] (p/<span class="fn">result-of</span> :int :nil)]
    <span class="ty">:gleam/src</span> <span class="st">"coin_change.gleam:6"</span>}
   [coins amount]
   (<span class="k">cond</span>
@@ -603,7 +602,7 @@ clojure -M:repl</pre>
 
 (<span class="k">defn</span> <span class="fn">main</span>
   <span class="st">"main() -> Result(Int, Nil)"</span>
-  {<span class="ty">:malli/schema</span> [:=&gt; [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {<span class="ty">:malli/schema</span> [:=&gt; [:cat] (p/<span class="fn">result-of</span> :int :nil)]
    <span class="ty">:gleam/src</span> <span class="st">"coin_change.gleam:31"</span>}
   []
   (p/<span class="fn">let-assert</span> (p/-&gt;<span class="ty">Ok</span> 0) (<span class="fn">min-coins</span> (list 1 5 10) 0))
@@ -667,7 +666,7 @@ clojure -M:repl</pre>
    Parse untrusted input into a UserId —
    the only way to make one."</span>
   {<span class="ty">:malli/schema</span> [:=&gt; [:cat :string]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/<span class="fn">result-of</span> [:fn <span class="fn">UserId?</span>] [:fn <span class="fn">IdError?</span>])]
    <span class="ty">:gleam/src</span> <span class="st">"permissions.gleam:16"</span>}
   [^java.lang.String raw]
   (<span class="k">let</span> [subject (string/<span class="fn">trim</span> raw)]
@@ -688,7 +687,7 @@ clojure -M:repl</pre>
         </div>
       </div>
     </div>
-    <p style="margin-top:20px">The <code>^java.lang.String</code> hint comes from the checked argument type; the error variants each became a record you can dispatch on from Clojure. The full walkthrough — why the permission check should <em>mint a value</em> instead of returning a <code>Bool</code>, with the compiler's verbatim refusals — is its own post: <a href="blog/parse-dont-validate.html"><strong>Permission checks are parsers →</strong></a></p>
+    <p style="margin-top:20px">The <code>^java.lang.String</code> hint comes from the checked argument type; the error variants each became a record you can dispatch on from Clojure. Note the return schema: <code>(p/result-of …)</code> carries the <em>payload</em> types, so an instrumented boundary rejects an <code>Ok</code> wrapping the wrong thing — not just a non-Result. The full walkthrough — why the permission check should <em>mint a value</em> instead of returning a <code>Bool</code>, with the compiler's verbatim refusals — is its own post: <a href="blog/parse-dont-validate.html"><strong>Permission checks are parsers →</strong></a></p>
   </section>
 
   <section id="verify">

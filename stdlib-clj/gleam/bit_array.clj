@@ -36,7 +36,7 @@
   [first' second]
   (concat (list first' second)))
 
-(def ^{:malli/schema [:=> [:cat [:vector :int] :int :int] [:or [:fn p/Ok?] [:fn p/Error?]]] :gleam/src "stdlib-src/src/gleam/bit_array.gleam:66"} slice gleam-ffi/ba-slice)
+(def ^{:malli/schema [:=> [:cat [:vector :int] :int :int] (p/result-of [:vector :int] :nil)] :gleam/src "stdlib-src/src/gleam/bit_array.gleam:66"} slice gleam-ffi/ba-slice)
 
 (def ^{:malli/schema [:=> [:cat [:vector :int]] :boolean] :gleam/src "stdlib-src/src/gleam/bit_array.gleam:74"} is-utf8 gleam-ffi/ba-is-utf8)
 
@@ -48,7 +48,7 @@
    Converts a bit array to a string.
 
    Returns an error if the bit array is invalid UTF-8 data."
-  {:malli/schema [:=> [:cat [:vector :int]] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat [:vector :int]] (p/result-of :string :nil)]
    :gleam/src "stdlib-src/src/gleam/bit_array.gleam:100"}
   [bits]
   (let [subject (is-utf8 bits)]
@@ -62,7 +62,7 @@
   "base64_decode(encoded: String) -> Result(BitArray, Nil)
 
    Decodes a base 64 encoded string into a `BitArray`."
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :string] (p/result-of [:vector :int] :nil)]
    :gleam/src "stdlib-src/src/gleam/bit_array.gleam:137"}
   [^java.lang.String encoded]
   (let [padded (let [subject (rem (byte-size (from-string encoded)) 4)]
@@ -93,14 +93,14 @@
 
    Decodes a base 64 encoded string with URL and filename safe alphabet into a
    `BitArray`."
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :string] (p/result-of [:vector :int] :nil)]
    :gleam/src "stdlib-src/src/gleam/bit_array.gleam:165"}
   [^java.lang.String encoded]
   (-> encoded (string/replace "-" "+") (string/replace "_" "/") base64-decode))
 
 (def ^{:malli/schema [:=> [:cat [:vector :int]] :string] :gleam/src "stdlib-src/src/gleam/bit_array.gleam:179"} base16-encode gleam-ffi/ba-base16-encode)
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]] :gleam/src "stdlib-src/src/gleam/bit_array.gleam:185"} base16-decode gleam-ffi/ba-base16-decode)
+(def ^{:malli/schema [:=> [:cat :string] (p/result-of [:vector :int] :nil)] :gleam/src "stdlib-src/src/gleam/bit_array.gleam:185"} base16-decode gleam-ffi/ba-base16-decode)
 
 (def ^{:malli/schema [:=> [:cat [:vector :int]] :string] :gleam/src "stdlib-src/src/gleam/bit_array.gleam:202"} inspect gleam-ffi/ba-inspect)
 

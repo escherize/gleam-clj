@@ -12,6 +12,15 @@
 (defn Ok? [v] (instance? Ok v))
 (defn Error? [v] (instance? gleam.prelude.Error v))
 
+(defn result-of
+  "Malli schema for a Gleam Result(ok, err): the variant check plus the
+  payload schema on :value. Records validate as maps, so [:map ...] reaches
+  into the variant without unwrapping it."
+  [ok err]
+  [:or
+   [:and [:fn Ok?] [:map [:value ok]]]
+   [:and [:fn Error?] [:map [:value err]]]])
+
 (defn let-assert
   "Runtime check for Gleam's `let assert` with a literal pattern:
   throw unless actual equals expected; return actual."

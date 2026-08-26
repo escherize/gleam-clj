@@ -21,7 +21,7 @@
    ```gleam
    assert !result.is_ok(Error(Nil))
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]]] :boolean]
+  {:malli/schema [:=> [:cat (p/result-of :any :any)] :boolean]
    :gleam/src "stdlib-src/src/gleam/result.gleam:18"}
   [result]
   (if (instance? gleam.prelude.Error result) false true))
@@ -40,7 +40,7 @@
    ```gleam
    assert result.is_error(Error(Nil))
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]]] :boolean]
+  {:malli/schema [:=> [:cat (p/result-of :any :any)] :boolean]
    :gleam/src "stdlib-src/src/gleam/result.gleam:37"}
   [result]
   (if (instance? Ok result) false true))
@@ -63,8 +63,8 @@
    ```gleam
    assert result.map(over: Error(1), with: fn(x) { x + 1 }) == Error(1)
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat :any] :any]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat (p/result-of :any :any) [:=> [:cat :any] :any]]
+                      (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/result.gleam:60"}
   [result fun]
   (if (instance? Ok result)
@@ -91,8 +91,8 @@
    ```gleam
    assert result.map_error(over: Ok(1), with: fn(x) { x + 1 }) == Ok(1)
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat :any] :any]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat (p/result-of :any :any) [:=> [:cat :any] :any]]
+                      (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/result.gleam:83"}
   [result fun]
   (if (instance? Ok result)
@@ -119,8 +119,8 @@
    ```gleam
    assert result.flatten(Error(Nil)) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat (p/result-of (p/result-of :any :any) :any)]
+                      (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/result.gleam:109"}
   [result]
   (if (instance? Ok result)
@@ -158,8 +158,8 @@
    ```gleam
    assert result.try(Error(Nil), fn(x) { Ok(x + 1) }) == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat (p/result-of :any :any) [:=> [:cat :any] (p/result-of :any :any)]]
+                      (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/result.gleam:143"}
   [result fun]
   (if (instance? Ok result)
@@ -183,7 +183,7 @@
    ```gleam
    assert result.unwrap(Error(\"\"), 0) == 0
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] :any] :any]
+  {:malli/schema [:=> [:cat (p/result-of :any :any) :any] :any]
    :gleam/src "stdlib-src/src/gleam/result.gleam:166"}
   [result default]
   (if (instance? Ok result)
@@ -206,8 +206,7 @@
    ```gleam
    assert result.lazy_unwrap(Error(\"\"), fn() { 0 }) == 0
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat] :any]]
-                      :any]
+  {:malli/schema [:=> [:cat (p/result-of :any :any) [:=> [:cat] :any]] :any]
    :gleam/src "stdlib-src/src/gleam/result.gleam:186"}
   [result default]
   (if (instance? Ok result)
@@ -230,7 +229,7 @@
    ```gleam
    assert result.unwrap_error(Ok(\"\"), 0) == 0
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] :any] :any]
+  {:malli/schema [:=> [:cat (p/result-of :any :any) :any] :any]
    :gleam/src "stdlib-src/src/gleam/result.gleam:206"}
   [result default]
   (if (instance? Ok result)
@@ -260,8 +259,8 @@
    ```gleam
    assert result.or(Error(\"Error 1\"), Error(\"Error 2\")) == Error(\"Error 2\")
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:or [:fn p/Ok?] [:fn p/Error?]]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat (p/result-of :any :any) (p/result-of :any :any)]
+                      (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/result.gleam:233"}
   [first' second]
   (if (instance? Ok first') first' second))
@@ -291,8 +290,8 @@
    assert result.lazy_or(Error(\"Error 1\"), fn() { Error(\"Error 2\") })
    == Error(\"Error 2\")
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat (p/result-of :any :any) [:=> [:cat] (p/result-of :any :any)]]
+                      (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/result.gleam:263"}
   [first' second]
   (if (instance? Ok first') first' (second)))
@@ -313,8 +312,8 @@
    ```gleam
    assert result.all([Ok(1), Error(\"e\")]) == Error(\"e\")
    ```"
-  {:malli/schema [:=> [:cat [:sequential [:or [:fn p/Ok?] [:fn p/Error?]]]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat [:sequential (p/result-of :any :any)]]
+                      (p/result-of [:sequential :any] :any)]
    :gleam/src "stdlib-src/src/gleam/result.gleam:287"}
   [results]
   (list/try-map results (fn [result] result)))
@@ -349,7 +348,7 @@
    assert result.partition([Ok(1), Error(\"a\"), Error(\"b\"), Ok(2)])
    == #([2, 1], [\"b\", \"a\"])
    ```"
-  {:malli/schema [:=> [:cat [:sequential [:or [:fn p/Ok?] [:fn p/Error?]]]]
+  {:malli/schema [:=> [:cat [:sequential (p/result-of :any :any)]]
                       [:tuple [:sequential :any] [:sequential :any]]]
    :gleam/src "stdlib-src/src/gleam/result.gleam:303"}
   [results]
@@ -369,8 +368,8 @@
    ```gleam
    assert result.replace(Error(1), Nil) == Error(1)
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] :any]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat (p/result-of :any :any) :any]
+                      (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/result.gleam:327"}
   [result value]
   (if (instance? Ok result)
@@ -392,8 +391,8 @@
    ```gleam
    assert result.replace_error(Ok(1), Nil) == Ok(1)
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] :any]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat (p/result-of :any :any) :any]
+                      (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/result.gleam:346"}
   [result error]
   (if (instance? Ok result)
@@ -411,7 +410,7 @@
    ```gleam
    assert result.values([Ok(1), Error(\"a\"), Ok(3)]) == [1, 3]
    ```"
-  {:malli/schema [:=> [:cat [:sequential [:or [:fn p/Ok?] [:fn p/Error?]]]]
+  {:malli/schema [:=> [:cat [:sequential (p/result-of :any :any)]]
                       [:sequential :any]]
    :gleam/src "stdlib-src/src/gleam/result.gleam:361"}
   [results]
@@ -451,8 +450,8 @@
    |> result.try_recover(with: fn(error) { Error(\"failed to recover\") })
    == Error(\"failed to recover\")
    ```"
-  {:malli/schema [:=> [:cat [:or [:fn p/Ok?] [:fn p/Error?]] [:=> [:cat :any] [:or [:fn p/Ok?] [:fn p/Error?]]]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat (p/result-of :any :any) [:=> [:cat :any] (p/result-of :any :any)]]
+                      (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/result.gleam:397"}
   [result fun]
   (if (instance? Ok result)

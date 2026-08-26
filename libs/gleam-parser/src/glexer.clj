@@ -1788,7 +1788,7 @@
    unescape_string(\"\\\\x\")
    // --> Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :string] (p/result-of :string :nil)]
    :gleam/src "project/build/packages/glexer/src/glexer.gleam:800"}
   [^java.lang.String string]
   (unescape-loop string ""))

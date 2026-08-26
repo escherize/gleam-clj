@@ -422,7 +422,7 @@
    `:parse-error-type` option: when True an invalid clause is an `Error`;
    when False a terminated-but-invalid clause dissolves to nothing instead."
   {:malli/schema [:=> [:cat :string :boolean :boolean]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+                      (p/result-of [:sequential [:fn Fragment?]] [:fn ParseError?])]
    :gleam/src "project/src/mb_lib_parse.gleam:430"}
   [^java.lang.String s handle-sql-comments strict]
   (let [subject (tokenize s handle-sql-comments)]
@@ -446,7 +446,8 @@
 
    Self-check: asserts a representative set of parses on the BEAM, so
    `gleam run` proves the same semantics the compiled Clojure claims."
-  {:malli/schema [:=> [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat]
+                      (p/result-of [:sequential [:fn Fragment?]] [:fn ParseError?])]
    :gleam/src "project/src/mb_lib_parse.gleam:448"}
   []
   (p/let-assert (p/->Ok (list (->Literal "select 1")))

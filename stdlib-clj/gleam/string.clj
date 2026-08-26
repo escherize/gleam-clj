@@ -236,7 +236,7 @@
 
 (def ^{:malli/schema [:=> [:cat :string :string] :boolean] :gleam/src "stdlib-src/src/gleam/string.gleam:323"} ends-with gleam-ffi/ends-with)
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]] :gleam/src "stdlib-src/src/gleam/string.gleam:616"} pop-grapheme gleam-ffi/pop-grapheme)
+(def ^{:malli/schema [:=> [:cat :string] (p/result-of [:tuple :string :string] :nil)] :gleam/src "stdlib-src/src/gleam/string.gleam:616"} pop-grapheme gleam-ffi/pop-grapheme)
 
 (defn- to-graphemes-loop
   "to_graphemes_loop(string: String, acc: List(String)) -> List(String)"
@@ -302,7 +302,8 @@
    ```gleam
    assert string.split_once(\"home/gleam/desktop/\", on: \"?\") == Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat :string :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :string :string]
+                      (p/result-of [:tuple :string :string] :nil)]
    :gleam/src "stdlib-src/src/gleam/string.gleam:361"}
   [^java.lang.String string ^java.lang.String substring]
   (let [subject (erl-split string substring)]
@@ -541,7 +542,7 @@
    Converts an integer to a `UtfCodepoint`.
 
    Returns an `Error` if the integer does not represent a valid UTF codepoint."
-  {:malli/schema [:=> [:cat :int] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :int] (p/result-of :int :nil)]
    :gleam/src "stdlib-src/src/gleam/string.gleam:723"}
   [value]
   (cond
@@ -596,7 +597,7 @@
    ```gleam
    assert string.first(\"icecream\") == Ok(\"i\")
    ```"
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :string] (p/result-of :string :nil)]
    :gleam/src "stdlib-src/src/gleam/string.gleam:779"}
   [^java.lang.String string]
   (let [subject (pop-grapheme string)]
@@ -625,7 +626,7 @@
    ```gleam
    assert string.last(\"icecream\") == Ok(\"m\")
    ```"
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+  {:malli/schema [:=> [:cat :string] (p/result-of :string :nil)]
    :gleam/src "stdlib-src/src/gleam/string.gleam:803"}
   [^java.lang.String string]
   (let [subject (pop-grapheme string)]

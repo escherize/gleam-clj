@@ -155,7 +155,7 @@
   [dict key]
   (do-has-key key dict))
 
-(def ^{:malli/schema [:=> [:cat [:map-of :any :any] :any] [:or [:fn p/Ok?] [:fn p/Error?]]] :gleam/src "stdlib-src/src/gleam/dict.gleam:165"} get gleam-ffi/dict-get)
+(def ^{:malli/schema [:=> [:cat [:map-of :any :any] :any] (p/result-of :any :nil)] :gleam/src "stdlib-src/src/gleam/dict.gleam:165"} get gleam-ffi/dict-get)
 
 (def ^{:gleam/src "stdlib-src/src/gleam/dict.gleam:193"} do-insert gleam-ffi/dict-insert)
 
