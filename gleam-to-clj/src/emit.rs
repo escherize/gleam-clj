@@ -574,6 +574,15 @@ fn emit_custom_type(
     // it can only collide with a Gleam variant literally named `I<Type>`,
     // which is vanishingly unlikely for UpperCamel variant names.
     let proto = format!("I{type_name}");
+    // A variant literally named I<Type> would clobber the marker protocol
+    // (defrecord IX after defprotocol IX) and fail at load with an opaque
+    // Clojure error. Refuse at build time instead.
+    if t.constructors.iter().any(|c| c.name.as_str() == proto) {
+        panic!(
+            "module {module_path} type {type_name}: variant {proto} collides with the \
+             type's generated marker protocol {proto} — rename the variant"
+        );
+    }
     let variant_names_type = all_variant_names.contains(type_name);
     let _ = writeln!(out, "(defprotocol {proto})");
 
