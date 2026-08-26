@@ -128,7 +128,14 @@
   .post-sub { font-size: 1.18rem; color: var(--ink-dim); margin-top: 18px; line-height: 1.55; max-width: 58ch; }
   .post-meta { margin-top: 22px; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-faint); }
 
-  h2 { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.5rem, 3vw, 1.95rem); letter-spacing: -0.02em; line-height: 1.12; margin: 54px 0 14px; text-wrap: balance; }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.5rem, 3vw, 1.95rem); letter-spacing: -0.02em; line-height: 1.12; margin: 54px 0 14px; text-wrap: balance; scroll-margin-top: 80px; }
+  h2 .anchor {
+    font-family: var(--font-mono); font-size: 0.62em; font-weight: 500;
+    color: var(--ink-faint); margin-left: 10px; vertical-align: middle;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  h2:hover .anchor, h2 .anchor:focus-visible { opacity: 1; }
+  h2 .anchor:hover { color: var(--clj-blue); text-decoration: none; }
   article p { margin: 16px 0; color: var(--ink-dim); }
   article p strong { color: var(--ink); font-weight: 600; }
 
@@ -201,7 +208,7 @@
 
 <p>Authorization is the sharpest place to apply this, because the cost of the validator habit is a security bug, not a style complaint.</p>
 
-<h2>The validator version, and where it rots</h2>
+<h2 id="the-validator-version">The validator version, and where it rots <a class="anchor" href="#the-validator-version" aria-label="Link to this section">#</a></h2>
 
 <p>Here is the shape most codebases have. A boolean check, and privileged functions that trust their caller already performed it:</p>
 
@@ -220,7 +227,7 @@
   <li><strong>The id is still a string.</strong> Empty string, <code>"0"</code>, <code>"robert'); DROP"</code> — every function that touches a raw id re-inherits every doubt about it.</li>
 </ul>
 
-<h2>Step one: parse the id at the boundary</h2>
+<h2 id="parse-the-id">Step one: parse the id at the boundary <a class="anchor" href="#parse-the-id" aria-label="Link to this section">#</a></h2>
 
 <p>First, the id itself. An <code>opaque type</code> in Gleam exports the type but not its constructor — so the only way for the rest of the program to obtain a <code>UserId</code> is through the function that scrutinizes the raw string. The doubts are handled once, in one place, and the result is a value that can no longer be empty, negative, or unparsed:</p>
 
@@ -250,7 +257,7 @@
 
 <p>Note what the signature says that <code>can_edit(user_id: String) -&gt; Bool</code> could not: the ways this can fail are <strong>enumerated in the return type</strong>, and the success case hands back a different type than it was given. Downstream code that holds a <code>UserId</code> holds evidence.</p>
 
-<h2>Step two: the permission check mints a proof</h2>
+<h2 id="mint-a-proof">Step two: the permission check mints a proof <a class="anchor" href="#mint-a-proof" aria-label="Link to this section">#</a></h2>
 
 <p>Now the same move, one level up. Instead of asking "may user 42 edit?" and getting a bit, ask the check to <em>parse the situation</em> — user plus role — into a value that exists only when the answer is yes. The privileged function then demands that value:</p>
 
@@ -291,7 +298,7 @@
   <li><strong>Denial is data, not absence.</strong> <code>Denied(who, needs)</code> carries who was refused and what they lacked — an audit log entry, not a silent <code>False</code>.</li>
 </ul>
 
-<h2>The compiler holds the door</h2>
+<h2 id="compiler-holds-the-door">The compiler holds the door <a class="anchor" href="#compiler-holds-the-door" aria-label="Link to this section">#</a></h2>
 
 <p>Claims about "can't" deserve receipts. Try to use a bare <code>UserId</code> where the proof is required — the diagnostic below is the compiler's actual output, reproduced by this repo's build:</p>
 
@@ -323,7 +330,7 @@ Found type:
 
 <p>The trusted surface of the whole scheme shrank to two short functions — <code>parse_user_id</code> and <code>require_editor</code>. Audit those, and every other call site is covered by the type checker.</p>
 
-<h2>Scoping the proof to one dashboard</h2>
+<h2 id="scoped-proof">Scoping the proof to one dashboard <a class="anchor" href="#scoped-proof" aria-label="Link to this section">#</a></h2>
 
 <p><code>CanEdit</code> proves edit rights <em>generally</em>. That leaves a residual bug shaped like this: the privileged function still takes its target as a separate argument —</p>
 
@@ -371,7 +378,7 @@ Found type:
 
 <div class="note pink"><strong>Precision about what the types do here:</strong> two proofs for two different dashboards have the <em>same type</em> — this is not dependent typing, and the checker cannot tell dashboard 7's proof from dashboard 9's. What the shape eliminates is structural: the resource travels <em>inside</em> the credential instead of beside it, so no call site ever recombines the two. The cost is honest too: <code>require_editor_of</code> joins <code>parse_user_id</code> and <code>require_editor</code> in the trusted core — three short functions to audit now, still a bargain.</div>
 
-<h2>What survives the compile to Clojure</h2>
+<h2 id="compile-to-clojure">What survives the compile to Clojure <a class="anchor" href="#compile-to-clojure" aria-label="Link to this section">#</a></h2>
 
 <p>This site documents a Gleam → Clojure compiler, so the natural question: what happens to a proof-carrying type when it lands on the JVM, where nothing stops a determined caller from conjuring records? Here is the compiled <code>rename_dashboard</code>, verbatim:</p>
 
@@ -401,7 +408,7 @@ Found type:
 
 <div class="note blue"><strong>Honest asterisk:</strong> on the Clojure side <code>(-&gt;CanEdit user)</code> is one expression away — records are open construction there. What the compile preserves is the <em>boundary discipline</em>: the proof type, its predicate, and an opt-in runtime check at exactly the functions that demand proof. Inside the Gleam world the guarantee is total; at the interop edge it degrades to an instrumented contract rather than nothing.</div>
 
-<h2>What this pattern does and doesn't buy</h2>
+<h2 id="tradeoffs">What this pattern does and doesn't buy <a class="anchor" href="#tradeoffs" aria-label="Link to this section">#</a></h2>
 
 <ul class="clean">
   <li><strong>It buys:</strong> unskippable checks, error cases you must handle (<code>Result</code> forces the <code>Denied</code> branch), a two-function trusted core, and denial as loggable data.</li>
