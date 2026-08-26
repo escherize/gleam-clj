@@ -939,8 +939,11 @@ fn emit_let_assert(
         } else {
             emit_body(ctx, &stmts[1..], ind + 4, tail)
         };
+        // merged_let collapses a rest that is itself a let into this one's
+        // binding vector, instead of emitting a redundant nested let.
+        let inner_let = merged_let(&binds_str, rest, ind + 2);
         format!(
-            "(let [v {val}]\n{i2}(when-not {test}\n{i4}(throw (ex-info {msg} {{:value v}})))\n{i2}(let [{binds_str}]\n{i4}{rest}))",
+            "(let [v {val}]\n{i2}(when-not {test}\n{i4}(throw (ex-info {msg} {{:value v}})))\n{i2}{inner_let})",
             i2 = sp(ind + 2),
             i4 = sp(ind + 4),
         )
