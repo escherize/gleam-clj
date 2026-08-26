@@ -973,17 +973,36 @@ fn order_binds(binds: Vec<(String, String)>) -> Vec<(String, String)> {
 /// into ours instead of nesting (clj-kondo: redundant let).
 fn merged_let(binds_str: &str, inner: String, body_ind: usize) -> String {
     if let Some(rest) = inner.strip_prefix("(let [") {
-        // find the closing bracket of the inner binding vector
-        let mut depth = 1;
+        // Find the closing bracket of the inner binding vector. The scan is
+        // string-aware: brackets inside emitted string literals (with \"
+        // escapes) must not move the depth. Runs off the end → don't merge.
+        let mut depth = 1usize;
         let mut i = 0;
+        let mut in_str = false;
+        let mut esc = false;
         let bytes = rest.as_bytes();
-        while depth > 0 {
-            match bytes[i] {
-                b'[' => depth += 1,
-                b']' => depth -= 1,
-                _ => {}
+        while depth > 0 && i < bytes.len() {
+            let b = bytes[i];
+            if in_str {
+                if esc {
+                    esc = false;
+                } else if b == b'\\' {
+                    esc = true;
+                } else if b == b'"' {
+                    in_str = false;
+                }
+            } else {
+                match b {
+                    b'"' => in_str = true,
+                    b'[' => depth += 1,
+                    b']' => depth -= 1,
+                    _ => {}
+                }
             }
             i += 1;
+        }
+        if depth > 0 {
+            return format!("(let [{binds_str}]\n{}{inner})", sp(body_ind + 2));
         }
         let inner_binds = &rest[..i - 1];
         let mut body = rest[i..].trim_start_matches('\n').to_string();
@@ -1029,11 +1048,13 @@ fn destructure_binding(ctx: &Emit, pattern: &TypedPattern) -> Option<String> {
             Some(format!("[{}]", parts?.join(" ")))
         }
         Pattern::Constructor { arguments, constructor, .. } => {
-            let pc = known(constructor);
-            let fields = ctx.ctor_fields(pc.module.as_str(), pc.name.as_str());
+            // Zero-arity first: prelude constructors like Nil have no field
+            // table, and none is needed to bind nothing.
             if arguments.is_empty() {
                 return Some("_".into());
             }
+            let pc = known(constructor);
+            let fields = ctx.ctor_fields(pc.module.as_str(), pc.name.as_str());
             let mut parts = Vec::new();
             let mut pos = 0;
             for arg in arguments {
@@ -1168,6 +1189,11 @@ fn pattern_cond_inner(
                     }
                 }
             }
+        }
+        // The empty bit array <<>>: a plain emptiness test on the byte
+        // vector. Segmented bit-array patterns stay unsupported (loud panic).
+        Pattern::BitArray { segments, .. } if segments.is_empty() => {
+            tests.push(format!("(= [] {subj})"));
         }
         other => panic!("unsupported pattern: {other:?}"),
     }

@@ -169,7 +169,10 @@ fn gather_typed_sources(proj: &str, stdlib_dir: &str) -> Vec<analysis::SourceMod
         for def in active_defs(&parsed.module) {
             if let Definition::Import(import) = &def.definition {
                 let m = import.module.to_string();
-                if m == "gleam" || m.starts_with("gleam/") || seen.contains(&m) {
+                // No gleam/-prefix shortcut here: stdlib modules are already
+                // in `seen`, and hex packages like gleam_yielder/gleam_regexp
+                // ship modules under gleam/ that must resolve via dep roots.
+                if m == "gleam" || seen.contains(&m) {
                     continue;
                 }
                 let Some(dep_file) = dep_roots
