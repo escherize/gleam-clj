@@ -65,3 +65,36 @@ pub fn main() {
       }
   }
 }
+
+pub type DashboardId {
+  DashboardId(Int)
+}
+
+pub opaque type CanEditDashboard {
+  CanEditDashboard(user: UserId, dash: DashboardId)
+}
+
+/// Scoped proof: rights to one dashboard, not dashboards in general.
+pub fn require_editor_of(
+  user: UserId,
+  role: Role,
+  dash: DashboardId,
+) -> Result(CanEditDashboard, Denied) {
+  case role {
+    Editor -> Ok(CanEditDashboard(user, dash))
+    Owner -> Ok(CanEditDashboard(user, dash))
+    Viewer -> Error(Denied(user, Editor))
+  }
+}
+
+/// No dashboard argument: the proof names the target, so the check and
+/// the action cannot disagree about which dashboard is meant.
+pub fn rename_scoped(proof: CanEditDashboard, name: String) -> String {
+  let CanEditDashboard(UserId(id), DashboardId(d)) = proof
+  "user "
+  <> int.to_string(id)
+  <> " renamed dashboard "
+  <> int.to_string(d)
+  <> " to "
+  <> name
+}

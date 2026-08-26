@@ -41,6 +41,16 @@
 (defrecord Denied [who needs] IDenied)
 (defn Denied? "True if `v` is a Denied value." [v] (instance? Denied v))
 
+;; type DashboardId
+(defprotocol IDashboardId)
+(defrecord DashboardId [value] IDashboardId)
+(defn DashboardId? "True if `v` is a DashboardId value." [v] (instance? DashboardId v))
+
+;; type CanEditDashboard
+(defprotocol ICanEditDashboard)
+(defrecord CanEditDashboard [user dash] ICanEditDashboard)
+(defn CanEditDashboard? "True if `v` is a CanEditDashboard value." [v] (instance? CanEditDashboard v))
+
 (defn parse-user-id
   "parse_user_id(raw: String) -> Result(UserId, IdError)
 
@@ -101,6 +111,30 @@
             (io/println (rename-dashboard proof "Q3 revenue")))
           (let [needs (:needs (:value subject))]
             (io/println (str "denied: needs " (string/inspect needs)))))))))
+
+(defn require-editor-of
+  "require_editor_of(user: UserId, role: Role, dash: DashboardId) -> Result(CanEditDashboard, Denied)
+
+   Scoped proof: rights to one dashboard, not dashboards in general."
+  {:malli/schema [:=> [:cat [:fn UserId?] [:fn Role?] [:fn DashboardId?]]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+   :gleam/src "permissions.gleam:78"}
+  [user role dash]
+  (cond
+    (instance? Editor role) (p/->Ok (->CanEditDashboard user dash))
+    (instance? Owner role) (p/->Ok (->CanEditDashboard user dash))
+    (instance? Viewer role) (p/->Error (->Denied user (->Editor)))))
+
+(defn rename-scoped
+  "rename_scoped(proof: CanEditDashboard, name: String) -> String
+
+   No dashboard argument: the proof names the target, so the check and
+   the action cannot disagree about which dashboard is meant."
+  {:malli/schema [:=> [:cat [:fn CanEditDashboard?] :string] :string]
+   :gleam/src "permissions.gleam:92"}
+  ^java.lang.String [proof ^java.lang.String name]
+  (let [{{id :value} :user {d :value} :dash} proof]
+    (str (str (str (str (str "user " (int/to-string id)) " renamed dashboard ") (int/to-string d)) " to ") name)))
 
 (defn -main [& _]
   (main))

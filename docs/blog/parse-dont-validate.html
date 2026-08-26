@@ -297,10 +297,10 @@
 
 <div class="pane-label"><span class="lang err">gleam's type checker, verbatim</span></div>
 <pre class="block"><span class="er">error: Type mismatch</span>
-   ┌─ permissions.gleam:70:20
-   │
-70 │   rename_dashboard(user, <span class="st">"pwned"</span>)
-   │                    <span class="er">^^^^</span>
+    ┌─ permissions.gleam:103:20
+    │
+103 │   rename_dashboard(user, <span class="st">"pwned"</span>)
+    │                    <span class="er">^^^^</span>
 
 Expected type:
 
@@ -322,6 +322,54 @@ Found type:
 `<span class="ty">CanEdit</span>` is only a type, it cannot be imported as a value.</pre>
 
 <p>The trusted surface of the whole scheme shrank to two short functions — <code>parse_user_id</code> and <code>require_editor</code>. Audit those, and every other call site is covered by the type checker.</p>
+
+<h2>Scoping the proof to one dashboard</h2>
+
+<p><code>CanEdit</code> proves edit rights <em>generally</em>. That leaves a residual bug shaped like this: the privileged function still takes its target as a separate argument —</p>
+
+<pre class="block"><span class="k">pub fn</span> <span class="fn">rename</span>(proof: <span class="ty">CanEdit</span>, dash: <span class="ty">DashboardId</span>, name: <span class="ty">String</span>) -&gt; <span class="ty">String</span></pre>
+
+<p>— which means the request has <strong>two sources of truth</strong>. The proof was minted while looking at dashboard 7; the <code>dash</code> argument says 9. Nothing connects them. This is the classic confused-deputy gap: a genuine credential, applied to the wrong resource, and every call site is back to promising it kept the two in sync.</p>
+
+<p>Same move as before: whatever the check examined, <strong>put it in the value the check returns</strong>. The proof grows a field, and the mint function demands the dashboard up front:</p>
+
+<div class="pane-label"><img src="../assets/gleam-lucy.svg" alt=""><span class="lang gleam">permissions.gleam, continued</span></div>
+<pre class="block"><span class="k">pub type</span> <span class="ty">DashboardId</span> {
+  <span class="ty">DashboardId</span>(<span class="ty">Int</span>)
+}
+
+<span class="k">pub opaque type</span> <span class="ty">CanEditDashboard</span> {
+  <span class="ty">CanEditDashboard</span>(user: <span class="ty">UserId</span>, dash: <span class="ty">DashboardId</span>)
+}
+
+<span class="cm">/// Scoped proof: rights to one dashboard, not dashboards in general.</span>
+<span class="k">pub fn</span> <span class="fn">require_editor_of</span>(
+  user: <span class="ty">UserId</span>,
+  role: <span class="ty">Role</span>,
+  dash: <span class="ty">DashboardId</span>,
+) -&gt; <span class="ty">Result</span>(<span class="ty">CanEditDashboard</span>, <span class="ty">Denied</span>) {
+  <span class="k">case</span> role {
+    <span class="ty">Editor</span> -&gt; <span class="ty">Ok</span>(<span class="ty">CanEditDashboard</span>(user, dash))
+    <span class="ty">Owner</span>  -&gt; <span class="ty">Ok</span>(<span class="ty">CanEditDashboard</span>(user, dash))
+    <span class="ty">Viewer</span> -&gt; <span class="ty">Error</span>(<span class="ty">Denied</span>(user, <span class="ty">Editor</span>))
+  }
+}
+
+<span class="cm">/// No dashboard argument: the proof names the target, so the check and
+/// the action cannot disagree about which dashboard is meant.</span>
+<span class="k">pub fn</span> <span class="fn">rename_scoped</span>(proof: <span class="ty">CanEditDashboard</span>, name: <span class="ty">String</span>) -&gt; <span class="ty">String</span> {
+  <span class="k">let</span> <span class="ty">CanEditDashboard</span>(<span class="ty">UserId</span>(id), <span class="ty">DashboardId</span>(d)) = proof
+  <span class="st">"user "</span>
+  &lt;&gt; int.<span class="fn">to_string</span>(id)
+  &lt;&gt; <span class="st">" renamed dashboard "</span>
+  &lt;&gt; int.<span class="fn">to_string</span>(d)
+  &lt;&gt; <span class="st">" to "</span>
+  &lt;&gt; name
+}</pre>
+
+<p>Look at what disappeared: <code>rename_scoped</code> has <strong>no dashboard parameter</strong>. The target comes out of the proof, because it went into the proof at the moment it was checked. There is no second argument to drift, so "checked 7, renamed 9" is not a bug you can write — the disagreement has no place to live. The signature also reads as its own documentation: any function taking <code>CanEditDashboard</code> visibly operates on exactly the dashboard someone was authorized for.</p>
+
+<div class="note pink"><strong>Precision about what the types do here:</strong> two proofs for two different dashboards have the <em>same type</em> — this is not dependent typing, and the checker cannot tell dashboard 7's proof from dashboard 9's. What the shape eliminates is structural: the resource travels <em>inside</em> the credential instead of beside it, so no call site ever recombines the two. The cost is honest too: <code>require_editor_of</code> joins <code>parse_user_id</code> and <code>require_editor</code> in the trusted core — three short functions to audit now, still a bargain.</div>
 
 <h2>What survives the compile to Clojure</h2>
 
@@ -357,7 +405,7 @@ Found type:
 
 <ul class="clean">
   <li><strong>It buys:</strong> unskippable checks, error cases you must handle (<code>Result</code> forces the <code>Denied</code> branch), a two-function trusted core, and denial as loggable data.</li>
-  <li><strong>It doesn't buy:</strong> resource-level precision — this <code>CanEdit</code> proves edit rights generally, not rights to <em>a particular dashboard</em>. Want that? Same move, one more field: <code>CanEdit(UserId, DashboardId)</code>, minted by a check that takes both.</li>
+  <li><strong>It doesn't buy by default:</strong> resource-level precision — the first <code>CanEdit</code> proves edit rights generally. Binding the resource into the proof, as <code>CanEditDashboard</code> does above, closes the checked-7-renamed-9 gap; it costs one field and one more audited mint function.</li>
   <li><strong>It can't buy:</strong> freshness. A proof minted at request start can outlive a mid-request revocation, exactly like a session token. Scope proofs to a request; don't cache them.</li>
 </ul>
 
