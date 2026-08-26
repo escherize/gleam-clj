@@ -459,7 +459,7 @@
     (if (instance? Ok subject)
       (let [key (:value subject)]
         key)
-      (str (str "<" (dynamic/classify key)) ">"))))
+      (str "<" (dynamic/classify key) ">"))))
 
 (def ^{:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:1127"} cast gleam-ffi/identity1)
 

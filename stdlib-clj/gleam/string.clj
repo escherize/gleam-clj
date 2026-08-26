@@ -395,7 +395,7 @@
   (if (empty? strings)
     accumulator
     (let [string (first strings) strings (rest strings)]
-      (recur strings separator (str (str accumulator separator) string)))))
+      (recur strings separator (str accumulator separator string)))))
 
 (defn join
   "join(strings: List(String), with separator: String) -> String

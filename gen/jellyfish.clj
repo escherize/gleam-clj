@@ -17,7 +17,7 @@
   (cond
     (instance? Starfish fish)
     (let [name (:name fish) color (:favourite-color fish)]
-      (str (str name " likes the color ") color))
+      (str name " likes the color " color))
 
     (and (instance? Jellyfish fish) (:jiggly fish))
     (let [name (:name fish)]

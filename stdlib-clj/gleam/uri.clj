@@ -461,7 +461,7 @@
   "query_pair(pair: #(String, String)) -> String"
   {:gleam/src "stdlib-src/src/gleam/uri.gleam:551"}
   ^java.lang.String [pair]
-  (str (str (percent-encode-query (nth pair 0)) "=") (percent-encode-query (nth pair 1))))
+  (str (percent-encode-query (nth pair 0)) "=" (percent-encode-query (nth pair 1))))
 
 (defn query-to-string
   "query_to_string(query: List(#(String, String))) -> String
@@ -539,17 +539,17 @@
         out (let [subject (:host uri)]
               (if (instance? gleam.option.None subject)
                 (str out (:path uri))
-                (let [host (:value subject) out (str out "//") out (let [subject (:userinfo uri)] (if (instance? gleam.option.Some subject) (let [userinfo (:value subject)] (str (str out userinfo) "@")) out)) out (str out host) out (let [subject (:port uri)] (if (instance? gleam.option.Some subject) (let [port (:value subject)] (str (str out ":") (int/to-string port))) out)) out (let [subject (:path uri)] (cond (= subject "") out  (.startsWith ^String subject "/") (str out (:path uri))  :else (str (str out "/") (:path uri))))]
+                (let [host (:value subject) out (str out "//") out (let [subject (:userinfo uri)] (if (instance? gleam.option.Some subject) (let [userinfo (:value subject)] (str out userinfo "@")) out)) out (str out host) out (let [subject (:port uri)] (if (instance? gleam.option.Some subject) (let [port (:value subject)] (str out ":" (int/to-string port))) out)) out (let [subject (:path uri)] (cond (= subject "") out  (.startsWith ^String subject "/") (str out (:path uri))  :else (str out "/" (:path uri))))]
                   out)))
         out (let [subject (:query uri)]
               (if (instance? gleam.option.Some subject)
                 (let [query (:value subject)]
-                  (str (str out "?") query))
+                  (str out "?" query))
                 out))
         out (let [subject (:fragment uri)]
               (if (instance? gleam.option.Some subject)
                 (let [fragment (:value subject)]
-                  (str (str out "#") fragment))
+                  (str out "#" fragment))
                 out))]
     out))
 
@@ -587,8 +587,8 @@
       (let [h (:value host) s (:value scheme)]
         (if (instance? gleam.option.Some port)
           (let [p (:value port)]
-            (p/->Ok (str (str (str (str s "://") h) ":") (int/to-string p))))
-          (p/->Ok (str (str s "://") h))))
+            (p/->Ok (str s "://" h ":" (int/to-string p))))
+          (p/->Ok (str s "://" h))))
 
       :else
       (p/->Error nil))))

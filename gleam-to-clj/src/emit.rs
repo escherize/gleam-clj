@@ -1224,6 +1224,21 @@ fn pattern_literal(ctx: &Emit, pattern: &TypedPattern) -> Option<String> {
     }
 }
 
+/// Ops whose left-nested chains may flatten into one variadic call.
+fn flattenable(op: &BinOp) -> bool {
+    matches!(
+        op,
+        BinOp::Concatenate
+            | BinOp::AddInt
+            | BinOp::AddFloat
+            | BinOp::SubInt
+            | BinOp::SubFloat
+            | BinOp::MultInt
+            | BinOp::MultFloat
+            | BinOp::DivFloat
+    )
+}
+
 fn binop(op: &BinOp) -> &'static str {
     match op {
         BinOp::And => "and",
@@ -1325,12 +1340,29 @@ fn emit_expr(ctx: &Emit, e: &TypedExpr, ind: usize, tail: Option<&Tail>) -> Stri
             format!("(not {})", emit_expr(ctx, value, ind, None))
         }
         TypedExpr::BinOp { operator, left, right, .. } => {
-            format!(
-                "({} {} {})",
-                binop(operator),
-                emit_expr(ctx, left, ind, None),
-                emit_expr(ctx, right, ind, None)
-            )
+            // A left-nested chain of the same operator flattens into one
+            // variadic call: `a <> b <> c` emits (str a b c), not
+            // (str (str a b) c). This is an identity rewrite — Clojure's
+            // variadic ops reduce left, exactly matching Gleam's
+            // left-associative grammar — so it is safe even for float ops
+            // where true associativity fails. quot/rem stay binary: not
+            // variadic in Clojure.
+            let mut operands = vec![right.as_ref()];
+            let mut head = left.as_ref();
+            if flattenable(operator) {
+                while let TypedExpr::BinOp { operator: op2, left: l2, right: r2, .. } = head {
+                    if op2 != operator {
+                        break;
+                    }
+                    operands.push(r2.as_ref());
+                    head = l2.as_ref();
+                }
+            }
+            operands.push(head);
+            operands.reverse();
+            let parts: Vec<String> =
+                operands.iter().map(|e| emit_expr(ctx, e, ind, None)).collect();
+            format!("({} {})", binop(operator), parts.join(" "))
         }
         TypedExpr::Fn { arguments, body, .. } => {
             let args: Vec<String> = arguments.iter().map(arg_name).collect();

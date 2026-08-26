@@ -396,7 +396,7 @@ Found type:
    <span class="ty">:gleam/src</span> <span class="st">"permissions.gleam:52"</span>}
   ^java.lang.String [proof ^java.lang.String name]
   (<span class="k">let</span> [{{id :value} :value} proof]
-    (<span class="k">str</span> (<span class="k">str</span> (<span class="k">str</span> <span class="st">"user "</span> (int/<span class="fn">to-string</span> id)) <span class="st">" renamed dashboard to "</span>) name)))</pre>
+    (<span class="k">str</span> <span class="st">"user "</span> (int/<span class="fn">to-string</span> id) <span class="st">" renamed dashboard to "</span> name)))</pre>
 
 <p>The static guarantee is Gleam's; Clojure callers are outside the type checker's reach. But the proof doesn't dissolve into a bare map — it compiles to <strong>checkable structure</strong>:</p>
 

@@ -95,7 +95,7 @@
    :gleam/src "permissions.gleam:52"}
   ^java.lang.String [proof ^java.lang.String name]
   (let [{{id :value} :value} proof]
-    (str (str (str "user " (int/to-string id)) " renamed dashboard to ") name)))
+    (str "user " (int/to-string id) " renamed dashboard to " name)))
 
 (defn main
   "main() -> Nil"
@@ -134,7 +134,7 @@
    :gleam/src "permissions.gleam:92"}
   ^java.lang.String [proof ^java.lang.String name]
   (let [{{id :value} :user {d :value} :dash} proof]
-    (str (str (str (str (str "user " (int/to-string id)) " renamed dashboard ") (int/to-string d)) " to ") name)))
+    (str "user " (int/to-string id) " renamed dashboard " (int/to-string d) " to " name)))
 
 (defn -main [& _]
   (main))
