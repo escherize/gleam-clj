@@ -289,7 +289,7 @@
 
 ;; type DecodeError
 (defprotocol IDecodeError)
-(defrecord DecodeError [expected found path] IDecodeError)
+(defrecord DecodeError [^java.lang.String expected ^java.lang.String found path] IDecodeError)
 (defn DecodeError? "True if `v` is a DecodeError value." [v] (instance? DecodeError v))
 
 ;; type Decoder
@@ -297,35 +297,44 @@
 (defrecord Decoder [function] IDecoder)
 (defn Decoder? "True if `v` is a Decoder value." [v] (instance? Decoder v))
 
-(defn- decode-dynamic [data]
+(defn- decode-dynamic
+  "decode_dynamic(data: Dynamic) -> #(Dynamic, List(DecodeError))"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:757"}
+  [data]
   [data (list)])
 
 (def dynamic (->Decoder decode-dynamic))
 
 (defn run
-  "Run a decoder on a `Dynamic` value, decoding the value if it is of the
+  "run(data: Dynamic, decoder: Decoder(a)) -> Result(a, List(DecodeError))
+
+   Run a decoder on a `Dynamic` value, decoding the value if it is of the
    desired type, or returning errors.
-   
+
    ## Examples
-   
+
    ```gleam
    let decoder = {
    use name <- decode.field(\"name\", decode.string)
    use email <- decode.field(\"email\", decode.string)
    decode.success(SignUp(name: name, email: email))
    }
-   
+
    decode.run(data, decoder)
    ```"
   {:malli/schema [:=> [:cat [:or ] [:fn Decoder?]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:371"}
   [data decoder]
   (let [[maybe-invalid-data errors] ((:function decoder) data)]
     (if (empty? errors) (p/->Ok maybe-invalid-data) (p/->Error errors))))
 
-(def dynamic-float gleam-ffi/dynamic-float)
+(def ^{:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:744"} dynamic-float gleam-ffi/dynamic-float)
 
-(defn- run-dynamic-function [data name f]
+(defn- run-dynamic-function
+  "run_dynamic_function(data: Dynamic, name: String, f: fn(Dynamic) -> Result(a, a)) -> #(a, List(DecodeError))"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:632"}
+  [data ^java.lang.String name f]
   (let [subject (f data)]
     (if (instance? Ok subject)
       (let [data (:value subject)]
@@ -333,43 +342,58 @@
       (let [placeholder (:value subject)]
         [placeholder (list (->DecodeError name (dynamic/classify data) (list)))]))))
 
-(defn- decode-float [data]
+(defn- decode-float
+  "decode_float(data: Dynamic) -> #(Float, List(DecodeError))"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:738"}
+  [data]
   (run-dynamic-function data "Float" dynamic-float))
 
 (def float (->Decoder decode-float))
 
 (defn map
-  "Apply a transformation function to any value decoded by the decoder.
-   
+  "map(decoder: Decoder(a), transformer: fn(a) -> b) -> Decoder(b)
+
+   Apply a transformation function to any value decoded by the decoder.
+
    ## Examples
-   
+
    ```gleam
    let decoder = decode.int |> decode.map(int.to_string)
    let result = decode.run(dynamic.int(1000), decoder)
    assert result == Ok(\"1000\")
    ```"
   {:malli/schema [:=> [:cat [:fn Decoder?] [:=> [:cat :any] :any]]
-                      [:fn Decoder?]]}
+                      [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:917"}
   [decoder transformer]
   (->Decoder (fn [d]
                (let [[data errors] ((:function decoder) d)]
                  [(transformer data) errors]))))
 
-(def dynamic-int gleam-ffi/dynamic-int)
+(def ^{:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:718"} dynamic-int gleam-ffi/dynamic-int)
 
-(defn- decode-int [data]
+(defn- decode-int
+  "decode_int(data: Dynamic) -> #(Int, List(DecodeError))"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:712"}
+  [data]
   (run-dynamic-function data "Int" dynamic-int))
 
 (def int (->Decoder decode-int))
 
-(def dynamic-bit-array gleam-ffi/dynamic-bit-array)
+(def ^{:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:778"} dynamic-bit-array gleam-ffi/dynamic-bit-array)
 
-(defn- decode-bit-array [data]
+(defn- decode-bit-array
+  "decode_bit_array(data: Dynamic) -> #(BitArray, List(DecodeError))"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:772"}
+  [data]
   (run-dynamic-function data "BitArray" dynamic-bit-array))
 
 (def bit-array (->Decoder decode-bit-array))
 
-(defn- dynamic-string [data]
+(defn- dynamic-string
+  "dynamic_string(from data: Dynamic) -> Result(String, String)"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:661"}
+  [data]
   (let [subject (dynamic-bit-array data)]
     (if (instance? Ok subject)
       (let [data (:value subject) subject (bit_array/to-string data)]
@@ -379,27 +403,35 @@
           (p/->Error "")))
       (p/->Error ""))))
 
-(defn- decode-string [data]
+(defn- decode-string
+  "decode_string(data: Dynamic) -> #(String, List(DecodeError))"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:656"}
+  [data]
   (run-dynamic-function data "String" dynamic-string))
 
 (def string (->Decoder decode-string))
 
-(defn- run-decoders [data failure decoders]
+(defn- run-decoders
+  "run_decoders(data: Dynamic, failure: #(a, List(DecodeError)), decoders: List(Decoder(a))) -> #(a, List(DecodeError))"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:1007"}
+  [data failure decoders]
   (if (empty? decoders)
     failure
     (let [decoder (first decoders) decoders (rest decoders) [_ errors :as layer] ((:function decoder) data)]
       (if (empty? errors) layer (recur data failure decoders)))))
 
 (defn one-of
-  "Create a new decoder from several other decoders. Each of the inner
+  "one_of(first: Decoder(a), or alternatives: List(Decoder(a))) -> Decoder(a)
+
+   Create a new decoder from several other decoders. Each of the inner
    decoders is run in turn, and the value from the first to succeed is used.
-   
+
    If no decoder succeeds then the errors from the first decoder are used.
    If you wish for different errors then you may wish to use the
    `collapse_errors` or `map_errors` functions.
-   
+
    ## Examples
-   
+
    ```gleam
    let decoder =
    decode.one_of(decode.string, or: [
@@ -409,7 +441,8 @@
    assert decode.run(dynamic.int(1000), decoder) == Ok(\"1000\")
    ```"
   {:malli/schema [:=> [:cat [:fn Decoder?] [:sequential [:fn Decoder?]]]
-                      [:fn Decoder?]]}
+                      [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:994"}
   [first' alternatives]
   (->Decoder (fn [dynamic-data]
                (let [[_ errors :as layer] ((:function first') dynamic-data)]
@@ -417,21 +450,27 @@
                    layer
                    (run-decoders dynamic-data layer alternatives))))))
 
-(defn- path-segment-to-string [key]
+(defn- path-segment-to-string
+  "path_segment_to_string(key: Dynamic) -> String"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:468"}
+  ^java.lang.String [key]
   (let [decoder (one-of string
                         (list (-> int (map int/to-string)) (-> float (map float/to-string)))) subject (run key decoder)]
     (if (instance? Ok subject)
       (let [key (:value subject)]
         key)
-      (str (str "<" (dynamic/classify key)) ">"))))
+      (str "<" (dynamic/classify key) ">"))))
 
-(def cast gleam-ffi/identity1)
+(def ^{:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:1127"} cast gleam-ffi/identity1)
 
-(def decode-list gleam-ffi/decode-list)
+(def ^{:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:802"} decode-list gleam-ffi/decode-list)
 
 (declare push-path list')
 
-(defn- push-path [layer path]
+(defn- push-path
+  "push_path(layer: #(a, List(DecodeError)), path: List(b)) -> #(a, List(DecodeError))"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:456"}
+  [layer path]
   (let [path (list/map path (fn [key] (-> key cast path-segment-to-string)))
         errors (list/map (nth layer 1)
                          (fn [error]
@@ -439,11 +478,13 @@
     [(nth layer 0) errors]))
 
 (defn list'
-  "A decoder that decodes lists where all elements are decoded with a given
+  "list(of inner: Decoder(a)) -> Decoder(List(a))
+
+   A decoder that decodes lists where all elements are decoded with a given
    decoder.
-   
+
    ## Examples
-   
+
    ```gleam
    let result =
    [1, 2, 3]
@@ -452,7 +493,8 @@
    |> decode.run(decode.list(of: decode.int))
    assert result == Ok([1, 2, 3])
    ```"
-  {:malli/schema [:=> [:cat [:fn Decoder?]] [:fn Decoder?]]}
+  {:malli/schema [:=> [:cat [:fn Decoder?]] [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:794"}
   [inner]
   (->Decoder (fn [data]
                (decode-list data
@@ -461,9 +503,12 @@
                             0
                             (list)))))
 
-(def bare-index gleam-ffi/bare-index)
+(def ^{:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:454"} bare-index gleam-ffi/bare-index)
 
-(defn- index [path position inner data handle-miss]
+(defn- index
+  "index(path: List(a), position: List(a), inner: fn(Dynamic) -> #(b, List(DecodeError)), data: Dynamic, handle_miss: fn(Dynamic, List(a)) -> #(b, List(DecodeError))) -> #(b, List(DecodeError))"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:420"}
+  [path position inner data handle-miss]
   (if (empty? path)
     (-> data inner (push-path (list/reverse position)))
     (let [key (first path) path (rest path) subject (bare-index data key)]
@@ -481,15 +526,17 @@
               (push-path (list/reverse position))))))))
 
 (defn subfield
-  "The same as [`field`](#field), except taking a path to the value rather
+  "subfield(field_path: List(a), field_decoder: Decoder(b), next: fn(b) -> Decoder(c)) -> Decoder(c)
+
+   The same as [`field`](#field), except taking a path to the value rather
    than a field name.
-   
+
    This function will index into dictionaries with any key type, and if the key is
    an int then it'll also index into Erlang tuples and JavaScript arrays, and
    the first eight elements of Gleam lists.
-   
+
    ## Examples
-   
+
    ```gleam
    let data =
    dynamic.properties([
@@ -501,7 +548,7 @@
    ]),
    ),
    ])
-   
+
    let decoder = {
    use name <- decode.subfield([\"data\", \"name\"], decode.string)
    use email <- decode.subfield([\"data\", \"email\"], decode.string)
@@ -511,7 +558,8 @@
    assert result == Ok(SignUp(name: \"Lucy\", email: \"lucy@example.com\"))
    ```"
   {:malli/schema [:=> [:cat [:sequential :any] [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
-                      [:fn Decoder?]]}
+                      [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:339"}
   [field-path field-decoder next]
   (->Decoder (fn [data]
                (let [[out errors1] (index field-path
@@ -528,18 +576,20 @@
                  [out (list/append errors1 errors2)]))))
 
 (defn at
-  "A decoder that decodes a value that is nested within other values. For
+  "at(path: List(a), inner: Decoder(b)) -> Decoder(b)
+
+   A decoder that decodes a value that is nested within other values. For
    example, decoding a value that is within some deeply nested JSON objects.
-   
+
    This function will index into dictionaries with any key type, and if the key is
    an int then it'll also index into Erlang tuples and JavaScript arrays, and
    the first eight elements of Gleam lists.
-   
+
    ## Examples
-   
+
    ```gleam
    let decoder = decode.at([\"one\", \"two\"], decode.int)
-   
+
    let data =
    dynamic.properties([
    #(
@@ -549,17 +599,17 @@
    ]),
    ),
    ])
-   
+
    assert decode.run(data, decoder) == Ok(1000)
    ```
-   
+
    ```gleam
    assert dynamic.nil()
    |> decode.run(decode.optional(decode.int))
    == Ok(option.None)
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:fn Decoder?]]
-                      [:fn Decoder?]]}
+  {:malli/schema [:=> [:cat [:sequential :any] [:fn Decoder?]] [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:410"}
   [path inner]
   (->Decoder (fn [data]
                (index path
@@ -572,102 +622,114 @@
                               (push-path (list/reverse position)))))))))
 
 (defn success
-  "Finalise a decoder having successfully extracted a value.
-   
+  "success(data: a) -> Decoder(a)
+
+   Finalise a decoder having successfully extracted a value.
+
    ## Examples
-   
+
    ```gleam
    let data =
    dynamic.properties([
    #(dynamic.string(\"email\"), dynamic.string(\"lucy@example.com\")),
    #(dynamic.string(\"name\"), dynamic.string(\"Lucy\")),
    ])
-   
+
    let decoder = {
    use name <- decode.field(\"name\", string)
    use email <- decode.field(\"email\", string)
    decode.success(SignUp(name: name, email: email))
    }
-   
+
    let result = decode.run(data, decoder)
    assert result == Ok(SignUp(name: \"Lucy\", email: \"lucy@example.com\"))
    ```"
-  {:malli/schema [:=> [:cat :any] [:fn Decoder?]]}
+  {:malli/schema [:=> [:cat :any] [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:501"}
   [data]
   (->Decoder (fn [_] [data (list)])))
 
 (defn decode-error
-  "Construct a decode error for some unexpected dynamic data."
-  {:malli/schema [:=> [:cat :string [:or ]] [:sequential [:fn DecodeError?]]]}
-  [expected found]
+  "decode_error(expected expected: String, found found: Dynamic) -> List(DecodeError)
+
+   Construct a decode error for some unexpected dynamic data."
+  {:malli/schema [:=> [:cat :string [:or ]] [:sequential [:fn DecodeError?]]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:507"}
+  [^java.lang.String expected found]
   (list (->DecodeError expected (dynamic/classify found) (list))))
 
 (defn field
-  "Run a decoder on a field of a `Dynamic` value, decoding the value if it is
+  "field(field_name: a, field_decoder: Decoder(b), next: fn(b) -> Decoder(c)) -> Decoder(c)
+
+   Run a decoder on a field of a `Dynamic` value, decoding the value if it is
    of the desired type, or returning errors. An error is returned if there is
    no field for the specified key.
-   
+
    This function will index into dictionaries with any key type, and if the key is
    an int then it'll also index into Erlang tuples and JavaScript arrays, and
    the first eight elements of Gleam lists.
-   
+
    ## Examples
-   
+
    ```gleam
    let data =
    dynamic.properties([
    #(dynamic.string(\"email\"), dynamic.string(\"lucy@example.com\")),
    #(dynamic.string(\"name\"), dynamic.string(\"Lucy\")),
    ])
-   
+
    let decoder = {
    use name <- decode.field(\"name\", string)
    use email <- decode.field(\"email\", string)
    decode.success(SignUp(name: name, email: email))
    }
-   
+
    let result = decode.run(data, decoder)
    assert result == Ok(SignUp(name: \"Lucy\", email: \"lucy@example.com\"))
    ```
-   
+
    If you wish to decode a value that is more deeply nested within the dynamic
    data, see [`subfield`](#subfield) and [`at`](#at).
-   
+
    If you wish to return a default in the event that a field is not present,
    see [`optional_field`](#optional_field) and / [`optionally_at`](#optionally_at)."
   {:malli/schema [:=> [:cat :any [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
-                      [:fn Decoder?]]}
+                      [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:547"}
   [field-name field-decoder next]
   (subfield (list field-name) field-decoder next))
 
 (defn optional-field
-  "Run a decoder on a field of a `Dynamic` value, decoding the value if it is
+  "optional_field(key: a, default: b, field_decoder: Decoder(b), next: fn(b) -> Decoder(c)) -> Decoder(c)
+
+   Run a decoder on a field of a `Dynamic` value, decoding the value if it is
    of the desired type, or returning errors. The given default value is
    returned if there is no field for the specified key.
-   
+
    This function will index into dictionaries with any key type, and if the key is
    an int then it'll also index into Erlang tuples and JavaScript arrays, and
    the first eight elements of Gleam lists.
-   
+
    ## Examples
-   
+
    ```gleam
    let data =
    dynamic.properties([
    #(dynamic.string(\"name\"), dynamic.string(\"Lucy\")),
    ])
-   
+
    let decoder = {
    use name <- decode.field(\"name\", string)
    use email <- decode.optional_field(\"email\", \"n/a\", string)
    decode.success(SignUp(name: name, email: email))
    }
-   
+
    let result = decode.run(data, decoder)
    assert result == Ok(SignUp(name: \"Lucy\", email: \"n/a\"))
    ```"
   {:malli/schema [:=> [:cat :any :any [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
-                      [:fn Decoder?]]}
+                      [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:581"}
   [key default field-decoder next]
   (->Decoder (fn [data]
                (let [[out errors1] (-> (let [subject (bare-index data key)]
@@ -689,27 +751,30 @@
                  [out (list/append errors1 errors2)]))))
 
 (defn optionally-at
-  "A decoder that decodes a value that is nested within other values. For
+  "optionally_at(path: List(a), default: b, inner: Decoder(b)) -> Decoder(b)
+
+   A decoder that decodes a value that is nested within other values. For
    example, decoding a value that is within some deeply nested JSON objects.
-   
+
    This function will index into dictionaries with any key type, and if the key is
    an int then it'll also index into Erlang tuples and JavaScript arrays, and
    the first eight elements of Gleam lists.
-   
+
    ## Examples
-   
+
    ```gleam
    let decoder = decode.optionally_at([\"one\", \"two\"], 100, decode.int)
-   
+
    let data =
    dynamic.properties([
    #(dynamic.string(\"one\"), dynamic.properties([])),
    ])
-   
+
    assert decode.run(data, decoder) == Ok(100)
    ```"
   {:malli/schema [:=> [:cat [:sequential :any] :any [:fn Decoder?]]
-                      [:fn Decoder?]]}
+                      [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:622"}
   [path default inner]
   (->Decoder (fn [data]
                (index path
@@ -718,18 +783,24 @@
                       data
                       (fn [_ _] [default (list)])))))
 
-(defn- decode-bool [data]
+(defn- decode-bool
+  "decode_bool(data: Dynamic) -> #(Bool, List(DecodeError))"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:683"}
+  [data]
   (let [subject (= (cast true) data)]
     (if subject
       [true (list)]
       (let [subject (= (cast false) data)]
         (if subject [false (list)] [false (decode-error "Bool" data)])))))
 
-(def decode-dict gleam-ffi/decode-dict)
+(def ^{:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:874"} decode-dict gleam-ffi/decode-dict)
 
 (declare fold-dict dict)
 
-(defn- fold-dict [acc key value key-decoder value-decoder]
+(defn- fold-dict
+  "fold_dict(acc: #(Dict(a, b), List(DecodeError)), key: Dynamic, value: Dynamic, key_decoder: fn(Dynamic) -> #(a, List(DecodeError)), value_decoder: fn(Dynamic) -> #(b, List(DecodeError))) -> #(Dict(a, b), List(DecodeError))"
+  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:846"}
+  [acc key value key-decoder value-decoder]
   (let [subject (key-decoder key)]
     (if (empty? (nth subject 1))
       (let [key-decoded (nth subject 0) subject (value-decoder value)]
@@ -742,22 +813,25 @@
         (push-path [(dict/new*) errors] (list "keys"))))))
 
 (defn dict
-  "A decoder that decodes dicts where all keys and values are decoded with
+  "dict(key: Decoder(a), value: Decoder(b)) -> Decoder(Dict(a, b))
+
+   A decoder that decodes dicts where all keys and values are decoded with
    given decoders.
-   
+
    ## Examples
-   
+
    ```gleam
    let values =
    dynamic.properties([
    #(dynamic.string(\"one\"), dynamic.int(1)),
    #(dynamic.string(\"two\"), dynamic.int(2)),
    ])
-   
+
    let result = decode.run(values, decode.dict(decode.string, decode.int))
    assert result == Ok(values)
    ```"
-  {:malli/schema [:=> [:cat [:fn Decoder?] [:fn Decoder?]] [:fn Decoder?]]}
+  {:malli/schema [:=> [:cat [:fn Decoder?] [:fn Decoder?]] [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:826"}
   [key value]
   (->Decoder (fn [data]
                (let [subject (decode-dict data)]
@@ -776,28 +850,31 @@
                                                  (:function value))
                                       a))))))))))
 
-(def is-null gleam-ffi/is-null)
+(def ^{:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:1131"} is-null gleam-ffi/is-null)
 
 (defn optional
-  "A decoder that decodes nullable values of a type decoded by with a given
+  "optional(inner: Decoder(a)) -> Decoder(Option(a))
+
+   A decoder that decodes nullable values of a type decoded by with a given
    decoder.
-   
+
    This function can handle common representations of null on all runtimes, such as
    `nil`, `null`, and `undefined` on Erlang, and `undefined` and `null` on
    JavaScript.
-   
+
    ## Examples
-   
+
    ```gleam
    let result = decode.run(dynamic.int(100), decode.optional(decode.int))
    assert result == Ok(option.Some(100))
    ```
-   
+
    ```gleam
    let result = decode.run(dynamic.nil(), decode.optional(decode.int))
    assert result == Ok(option.None)
    ```"
-  {:malli/schema [:=> [:cat [:fn Decoder?]] [:fn Decoder?]]}
+  {:malli/schema [:=> [:cat [:fn Decoder?]] [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:895"}
   [inner]
   (->Decoder (fn [data]
                (let [subject (is-null data)]
@@ -807,30 +884,36 @@
                      [(option/->Some data) errors]))))))
 
 (defn map-errors
-  "Apply a transformation function to any errors returned by the decoder."
+  "map_errors(decoder: Decoder(a), transformer: fn(List(DecodeError)) -> List(DecodeError)) -> Decoder(a)
+
+   Apply a transformation function to any errors returned by the decoder."
   {:malli/schema [:=> [:cat [:fn Decoder?] [:=> [:cat [:sequential [:fn DecodeError?]]] [:sequential [:fn DecodeError?]]]]
-                      [:fn Decoder?]]}
+                      [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:926"}
   [decoder transformer]
   (->Decoder (fn [d]
                (let [[data errors] ((:function decoder) d)]
                  [data (transformer errors)]))))
 
 (defn collapse-errors
-  "Replace all errors produced by a decoder with one single error for a named
+  "collapse_errors(decoder: Decoder(a), name: String) -> Decoder(a)
+
+   Replace all errors produced by a decoder with one single error for a named
    expected type.
-   
+
    This function may be useful if you wish to simplify errors before
    presenting them to a user, particularly when using the `one_of` function.
-   
+
    ## Examples
-   
+
    ```gleam
    let decoder = decode.string |> decode.collapse_errors(\"MyThing\")
    let result = decode.run(dynamic.int(1000), decoder)
    assert result == Error([DecodeError(\"MyThing\", \"Int\", [])])
    ```"
-  {:malli/schema [:=> [:cat [:fn Decoder?] :string] [:fn Decoder?]]}
-  [decoder name]
+  {:malli/schema [:=> [:cat [:fn Decoder?] :string] [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:950"}
+  [decoder ^java.lang.String name]
   (->Decoder (fn [dynamic-data]
                (let [[data errors :as layer] ((:function decoder) dynamic-data)]
                  (if (empty? errors)
@@ -838,11 +921,14 @@
                    [data (decode-error name dynamic-data)])))))
 
 (defn then
-  "Create a new decoder based upon the value of a previous decoder.
-   
+  "then(decoder: Decoder(a), next: fn(a) -> Decoder(b)) -> Decoder(b)
+
+   Create a new decoder based upon the value of a previous decoder.
+
    This may be useful to run one previous decoder to use in further decoding."
   {:malli/schema [:=> [:cat [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
-                      [:fn Decoder?]]}
+                      [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:964"}
   [decoder next]
   (->Decoder (fn [dynamic-data]
                (let [[data errors] ((:function decoder) dynamic-data)
@@ -851,30 +937,35 @@
                  (if (empty? errors) layer [data errors])))))
 
 (defn failure
-  "Define a decoder that always fails.
-   
+  "failure(placeholder: a, expected name: String) -> Decoder(a)
+
+   Define a decoder that always fails.
+
    The first parameter is a \"placeholder\" value, which is some default value that the
    decoder uses internally in place of the value that would have been produced
    if the decoder was successful. It doesn't matter what this value is, it is
    never returned by the decoder or shown to the user, so pick some arbitrary
    value. If it is an int you might pick `0`, if it is a list you might pick
    `[]`.
-   
+
    The second parameter is the name of the type that has failed to decode.
-   
+
    ```gleam
    decode.failure(User(name: \"\", score: 0, tags: []), expected: \"User\")
    ```"
-  {:malli/schema [:=> [:cat :any :string] [:fn Decoder?]]}
-  [placeholder name]
+  {:malli/schema [:=> [:cat :any :string] [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:1040"}
+  [placeholder ^java.lang.String name]
   (->Decoder (fn [d] [placeholder (decode-error name d)])))
 
 (defn new-primitive-decoder
-  "Create a decoder for a new data type from a decoding function.
-   
+  "new_primitive_decoder(name: String, decoding_function: fn(Dynamic) -> Result(a, a)) -> Decoder(a)
+
+   Create a decoder for a new data type from a decoding function.
+
    This function is used for new primitive types. For example, you might
    define a decoder for Erlang's pid type.
-   
+
    A default \"placeholder\" value is also required to make a decoder. When this
    decoder is used as part of a larger decoder this placeholder value is used
    so that the rest of the decoder can continue to run and
@@ -882,24 +973,24 @@
    never returned by the decoder or shown to the user, so pick some arbitrary
    value. If it is an int you might pick `0`, if it is a list you might pick
    `[]`.
-   
+
    If you were to make a decoder for the `Int` type (rather than using the
    built-in `Int` decoder) you would define it like so:
-   
+
    ```gleam
    pub fn int_decoder() -> decode.Decoder(Int) {
    let default = \"\"
    decode.new_primitive_decoder(\"Int\", int_from_dynamic)
    }
-   
+
    @external(erlang, \"my_module\", \"int_from_dynamic\")
    fn int_from_dynamic(data: Int) -> Result(Int, Int)
    ```
-   
+
    ```erlang
    -module(my_module).
    -export([int_from_dynamic/1]).
-   
+
    int_from_dynamic(Data) ->
    case is_integer(Data) of
    true -> {ok, Data};
@@ -907,8 +998,9 @@
    end.
    ```"
   {:malli/schema [:=> [:cat :string [:=> [:cat [:or ]] [:or [:fn p/Ok?] [:fn p/Error?]]]]
-                      [:fn Decoder?]]}
-  [name decoding-function]
+                      [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:1081"}
+  [^java.lang.String name decoding-function]
   (->Decoder (fn [d]
                (let [subject (decoding-function d)]
                  (if (instance? Ok subject)
@@ -918,21 +1010,23 @@
                      [placeholder (list (->DecodeError name (dynamic/classify d) (list)))]))))))
 
 (defn recursive
-  "Create a decoder that can refer to itself, useful for decoding deeply
+  "recursive(inner: fn() -> Decoder(a)) -> Decoder(a)
+
+   Create a decoder that can refer to itself, useful for decoding deeply
    nested data.
-   
+
    Attempting to create a recursive decoder without this function could result
    in an infinite loop. If you are using `field` or other `use`able functions
    then you may not need to use this function.
-   
+
    ## Examples
-   
+
    ```gleam
    type Nested {
    Nested(List(Nested))
    Value(String)
    }
-   
+
    fn nested_decoder() -> decode.Decoder(Nested) {
    use <- decode.recursive
    decode.one_of(decode.string |> decode.map(Value), [
@@ -940,7 +1034,8 @@
    ])
    }
    ```"
-  {:malli/schema [:=> [:cat [:=> [:cat] [:fn Decoder?]]] [:fn Decoder?]]}
+  {:malli/schema [:=> [:cat [:=> [:cat] [:fn Decoder?]]] [:fn Decoder?]]
+   :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:1118"}
   [inner]
   (->Decoder (fn [data]
                (let [decoder (inner)]

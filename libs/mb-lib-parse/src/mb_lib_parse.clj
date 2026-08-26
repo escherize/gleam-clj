@@ -43,17 +43,17 @@
 
 ;; type Piece
 (defprotocol IPiece)
-(defrecord Str [value] IPiece)
+(defrecord Str [^java.lang.String value] IPiece)
 (defn Str? "True if `v` is a Str value." [v] (instance? Str v))
-(defrecord Tok [f0 f1] IPiece)
+(defrecord Tok [f0 ^java.lang.String f1] IPiece)
 (defn Tok? "True if `v` is a Tok value." [v] (instance? Tok v))
 (defn Piece? "True if `v` is any Piece value." [v] (instance? mb_lib_parse.IPiece v))
 
 ;; type Fragment
 (defprotocol IFragment)
-(defrecord Literal [value] IFragment)
+(defrecord Literal [^java.lang.String value] IFragment)
 (defn Literal? "True if `v` is a Literal value." [v] (instance? Literal v))
-(defrecord Param [value] IFragment)
+(defrecord Param [^java.lang.String value] IFragment)
 (defn Param? "True if `v` is a Param value." [v] (instance? Param v))
 (defrecord Optional [value] IFragment)
 (defn Optional? "True if `v` is a Optional value." [v] (instance? Optional v))
@@ -73,7 +73,7 @@
 
 ;; type Pattern
 (defprotocol IPattern)
-(defrecord Lit [f0 f1] IPattern)
+(defrecord Lit [^java.lang.String f0 f1] IPattern)
 (defn Lit? "True if `v` is a Lit value." [v] (instance? Lit v))
 (defrecord ParamBeginPattern [] IPattern)
 (defn ParamBeginPattern? "True if `v` is a ParamBeginPattern value." [v] (instance? ParamBeginPattern v))
@@ -94,14 +94,23 @@
 (defrecord State [optional-level param-level in-string mode] IState)
 (defn State? "True if `v` is a State value." [v] (instance? State v))
 
-(defn- base-patterns []
+(defn- base-patterns
+  "base_patterns() -> List(Pattern)"
+  {:gleam/src "project/src/mb_lib_parse.gleam:64"}
+  []
   (list (->Lit "[[" (->OptionalBegin)) (->Lit "]]" (->OptionalEnd)) (->ParamBeginPattern) (->Lit "}}" (->ParamEnd)) (->Lit "'" (->SingleQuote))))
 
-(defn- sql-patterns []
+(defn- sql-patterns
+  "sql_patterns() -> List(Pattern)"
+  {:gleam/src "project/src/mb_lib_parse.gleam:74"}
+  []
   (list/append (list (->Lit "/*" (->BlockCommentBegin)) (->Lit "*/" (->BlockCommentEnd)) (->Lit "--" (->LineCommentBegin)) (->Lit "\n" (->Newline)))
                (base-patterns)))
 
-(defn- split-literal [s pat token acc]
+(defn- split-literal
+  "split_literal(s: String, pat: String, token: Token, acc: List(Piece)) -> List(Piece)"
+  {:gleam/src "project/src/mb_lib_parse.gleam:86"}
+  [^java.lang.String s ^java.lang.String pat token acc]
   (let [subject (string/split-once s pat)]
     (if (and (instance? gleam.prelude.Error subject) (nil? (:value subject)))
       (list/reverse (list* (->Str s) acc))
@@ -109,25 +118,34 @@
         (recur after pat token (list* (->Tok token pat) (->Str before) acc))))))
 
 (defn- find-param-begin
-  "Find the first `{{` that is not followed by a third `{`; returns the text
+  "find_param_begin(s: String, before_acc: String) -> Result(#(String, String), Nil)
+
+   Find the first `{{` that is not followed by a third `{`; returns the text
    before it and the text after it."
-  [s before-acc]
+  {:gleam/src "project/src/mb_lib_parse.gleam:96"}
+  [^java.lang.String s ^java.lang.String before-acc]
   (let [subject (string/split-once s "{{")]
     (if (and (instance? gleam.prelude.Error subject) (nil? (:value subject)))
       (p/->Error nil)
       (let [before (nth (:value subject) 0) after (nth (:value subject) 1) subject (string/starts-with after "{")]
         (if (not subject)
           (p/->Ok [(str before-acc before) after])
-          (recur (str "{" after) (str (str before-acc before) "{")))))))
+          (recur (str "{" after) (str before-acc before "{")))))))
 
-(defn- split-param-begin [s acc]
+(defn- split-param-begin
+  "split_param_begin(s: String, acc: List(Piece)) -> List(Piece)"
+  {:gleam/src "project/src/mb_lib_parse.gleam:107"}
+  [^java.lang.String s acc]
   (let [subject (find-param-begin s "")]
     (if (and (instance? gleam.prelude.Error subject) (nil? (:value subject)))
       (list/reverse (list* (->Str s) acc))
       (let [before (nth (:value subject) 0) after (nth (:value subject) 1)]
         (recur after (list* (->Tok (->ParamBegin) "{{") (->Str before) acc))))))
 
-(defn- apply-pattern [pieces pattern]
+(defn- apply-pattern
+  "apply_pattern(pieces: List(Piece), pattern: Pattern) -> List(Piece)"
+  {:gleam/src "project/src/mb_lib_parse.gleam:115"}
+  [pieces pattern]
   (-> pieces
       (list/flat-map (fn [piece]
                        (if (instance? Tok piece)
@@ -143,17 +161,23 @@
                        true)))))
 
 (defn tokenize
-  "Split raw query text into an interleaved list of string fragments and
+  "tokenize(s: String, handle_sql_comments: Bool) -> List(Piece)
+
+   Split raw query text into an interleaved list of string fragments and
    tokens. Patterns are applied in sequence (pass by pass), so an earlier
    pattern's matches shadow later ones over the same span — this ordering,
    not a single left-to-right scan, is what the original Clojure does. When
    `handle_sql_comments` is False, comment tokens are not recognized."
-  {:malli/schema [:=> [:cat :string :boolean] [:sequential [:fn Piece?]]]}
-  [s handle-sql-comments]
+  {:malli/schema [:=> [:cat :string :boolean] [:sequential [:fn Piece?]]]
+   :gleam/src "project/src/mb_lib_parse.gleam:140"}
+  [^java.lang.String s handle-sql-comments]
   (let [patterns (if handle-sql-comments (sql-patterns) (base-patterns))]
     (list/fold patterns (list (->Str s)) apply-pattern)))
 
-(defn- combine-adjacent [frags]
+(defn- combine-adjacent
+  "combine_adjacent(frags: List(Fragment)) -> List(Fragment)"
+  {:gleam/src "project/src/mb_lib_parse.gleam:157"}
+  [frags]
   (cond
     (and (<= 2 (count frags)) (instance? Literal (first frags)) (instance? Literal (nth frags 1)))
     (let [a (:value (first frags)) b (:value (nth frags 1)) rest' (nthrest frags 2)]
@@ -166,10 +190,16 @@
     (empty? frags)
     (list)))
 
-(defn- invalid [strict error]
+(defn- invalid
+  "invalid(strict: Bool, error: ParseError) -> Result(List(Fragment), ParseError)"
+  {:gleam/src "project/src/mb_lib_parse.gleam:165"}
+  [strict error]
   (if strict (p/->Error error) (p/->Ok (list))))
 
-(defn- make-param [strict contents]
+(defn- make-param
+  "make_param(strict: Bool, contents: List(Fragment)) -> Result(List(Fragment), ParseError)"
+  {:gleam/src "project/src/mb_lib_parse.gleam:172"}
+  [strict contents]
   (let [subject (combine-adjacent contents)]
     (if (and (= (count subject) 1) (instance? Literal (first subject)))
       (let [k (:value (first subject)) subject (string/is-empty (string/trim k))]
@@ -178,23 +208,35 @@
           (p/->Ok (list (->Param k)))))
       (invalid strict (->InvalidParamName)))))
 
-(defn- make-optional [strict contents]
+(defn- make-optional
+  "make_optional(strict: Bool, contents: List(Fragment)) -> Result(List(Fragment), ParseError)"
+  {:gleam/src "project/src/mb_lib_parse.gleam:183"}
+  [strict contents]
   (let [has-param (list/any contents
                             (fn [f] (if (instance? Param f) true false)))]
     (if has-param
       (p/->Ok (list (->Optional (combine-adjacent contents))))
       (invalid strict (->OptionalWithoutParam)))))
 
-(defn- prepend-reversed [frags acc]
+(defn- prepend-reversed
+  "prepend_reversed(frags: List(Fragment), acc: List(Fragment)) -> List(Fragment)"
+  {:gleam/src "project/src/mb_lib_parse.gleam:197"}
+  [frags acc]
   (list/fold frags acc (fn [a f] (list* f a))))
 
-(defn- tokens-state [optional-level param-level in-string mode]
+(defn- tokens-state
+  "tokens_state(optional_level: Int, param_level: Int, in_string: Bool, mode: Mode) -> State"
+  {:gleam/src "project/src/mb_lib_parse.gleam:341"}
+  [optional-level param-level in-string mode]
   (->State optional-level param-level in-string mode))
 
 (declare enter-comment enter-clause parse-tokens)
 
-(defn- enter-comment [strict comment-mode text more optional-level param-level in-string mode acc]
-  (let [in-clause (or (> optional-level 0) (> param-level 0)) subject (or (or (not= mode (->NoComment)) in-clause) in-string)]
+(defn- enter-comment
+  "enter_comment(strict: Bool, comment_mode: Mode, text: String, more: List(Piece), optional_level: Int, param_level: Int, in_string: Bool, mode: Mode, acc: List(Fragment)) -> Result(#(List(Fragment), List(Piece)), ParseError)"
+  {:gleam/src "project/src/mb_lib_parse.gleam:390"}
+  [strict comment-mode ^java.lang.String text more optional-level param-level in-string mode acc]
+  (let [in-clause (or (> optional-level 0) (> param-level 0)) subject (or (not= mode (->NoComment)) in-clause in-string)]
     (if subject
       (parse-tokens strict
                     more
@@ -224,10 +266,13 @@
             (p/->Error e)))))))
 
 (defn- enter-clause
-  "Shared body of the OptionalBegin/ParamBegin cases: run the sub-parse,
+  "enter_clause(strict: Bool, sub: Result(#(List(Fragment), List(Piece)), ParseError), validate: fn(Bool, List(Fragment)) -> Result(List(Fragment), ParseError), text: String, more: List(Piece), strict2: Bool, state: State, acc: List(Fragment)) -> Result(#(List(Fragment), List(Piece)), ParseError)
+
+   Shared body of the OptionalBegin/ParamBegin cases: run the sub-parse,
    validate it, and either splice the result in or — when inside a string
    literal — backtrack the failed clause to literal text."
-  [strict sub validate text more strict2 state acc]
+  {:gleam/src "project/src/mb_lib_parse.gleam:348"}
+  [strict sub validate ^java.lang.String text more strict2 state acc]
   (let [{optional-level :optional-level param-level :param-level in-string :in-string mode :mode} state
         validated (if (instance? Ok sub)
                     (let [inner (nth (:value sub) 0) rest' (nth (:value sub) 1) subject (validate strict2 inner)]
@@ -259,8 +304,11 @@
           (p/->Error e))))))
 
 (defn- parse-tokens
-  "The state machine. `acc` is built in reverse. Returns the fragments of
+  "parse_tokens(strict: Bool, tokens: List(Piece), optional_level: Int, param_level: Int, in_string: Bool, mode: Mode, acc: List(Fragment)) -> Result(#(List(Fragment), List(Piece)), ParseError)
+
+   The state machine. `acc` is built in reverse. Returns the fragments of
    the current scope plus the unconsumed tokens."
+  {:gleam/src "project/src/mb_lib_parse.gleam:203"}
   [strict tokens optional-level param-level in-string mode acc]
   (cond
     (empty? tokens)
@@ -366,14 +414,17 @@
         (recur strict more optional-level param-level (not in-string) mode (list* (->Literal text) acc))))))
 
 (defn parse
-  "Parse parameters in `s`, returning literal text fragments interleaved
+  "parse(s: String, handle_sql_comments: Bool, strict: Bool) -> Result(List(Fragment), ParseError)
+
+   Parse parameters in `s`, returning literal text fragments interleaved
    with `Param` and `Optional` fragments. `handle_sql_comments` skips params
    inside `--` and `/* */` comments when True. `strict` mirrors the original
    `:parse-error-type` option: when True an invalid clause is an `Error`;
    when False a terminated-but-invalid clause dissolves to nothing instead."
   {:malli/schema [:=> [:cat :string :boolean :boolean]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
-  [s handle-sql-comments strict]
+                      [:or [:fn p/Ok?] [:fn p/Error?]]]
+   :gleam/src "project/src/mb_lib_parse.gleam:430"}
+  [^java.lang.String s handle-sql-comments strict]
   (let [subject (tokenize s handle-sql-comments)]
     (cond
       (empty? subject)
@@ -391,9 +442,12 @@
             (p/->Error e)))))))
 
 (defn main
-  "Self-check: asserts a representative set of parses on the BEAM, so
+  "main() -> Result(List(Fragment), ParseError)
+
+   Self-check: asserts a representative set of parses on the BEAM, so
    `gleam run` proves the same semantics the compiled Clojure claims."
-  {:malli/schema [:=> [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]}
+  {:malli/schema [:=> [:cat] [:or [:fn p/Ok?] [:fn p/Error?]]]
+   :gleam/src "project/src/mb_lib_parse.gleam:448"}
   []
   (p/let-assert (p/->Ok (list (->Literal "select 1")))
                 (parse "select 1" true true))

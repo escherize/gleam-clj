@@ -4,6 +4,8 @@
    [gleam.prelude :as p]))
 
 (defn parse
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}
-  [src]
+  "parse(src: String) -> Result(Module, Error)"
+  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+   :gleam/src "project/src/glance_host.gleam:5"}
+  [^java.lang.String src]
   (glance/module src))

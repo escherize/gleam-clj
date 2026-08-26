@@ -14,7 +14,7 @@
 
 ;; type Lexer
 (defprotocol ILexer)
-(defrecord Lexer [original-source source byte-offset preserve-whitespace preserve-comments mode newlines] ILexer)
+(defrecord Lexer [^java.lang.String original-source ^java.lang.String source byte-offset preserve-whitespace preserve-comments mode newlines] ILexer)
 (defn Lexer? "True if `v` is a Lexer value." [v] (instance? Lexer v))
 
 ;; type LexerMode
@@ -53,8 +53,10 @@
 (defn LexNumberMode? "True if `v` is any LexNumberMode value." [v] (instance? glexer.ILexNumberMode v))
 
 (defn new*
-  {:malli/schema [:=> [:cat :string] [:fn Lexer?]]}
-  [source]
+  "new(source: String) -> Lexer"
+  {:malli/schema [:=> [:cat :string] [:fn Lexer?]]
+   :gleam/src "project/build/packages/glexer/src/glexer.gleam:40"}
+  [^java.lang.String source]
   (->Lexer source
            source
            0
@@ -64,36 +66,58 @@
            (splitter/new* (list "\r\n" "\n"))))
 
 (defn discard-whitespace
-  {:malli/schema [:=> [:cat [:fn Lexer?]] [:fn Lexer?]]}
+  "discard_whitespace(lexer: Lexer) -> Lexer"
+  {:malli/schema [:=> [:cat [:fn Lexer?]] [:fn Lexer?]]
+   :gleam/src "project/build/packages/glexer/src/glexer.gleam:52"}
   [lexer]
   (->Lexer (:original-source lexer) (:source lexer) (:byte-offset lexer) false (:preserve-comments lexer) (:mode lexer) (:newlines lexer)))
 
 (defn discard-comments
-  {:malli/schema [:=> [:cat [:fn Lexer?]] [:fn Lexer?]]}
+  "discard_comments(lexer: Lexer) -> Lexer"
+  {:malli/schema [:=> [:cat [:fn Lexer?]] [:fn Lexer?]]
+   :gleam/src "project/build/packages/glexer/src/glexer.gleam:56"}
   [lexer]
   (->Lexer (:original-source lexer) (:source lexer) (:byte-offset lexer) (:preserve-whitespace lexer) false (:mode lexer) (:newlines lexer)))
 
-(defn- length [string]
+(defn- length
+  "length(string: String) -> Int"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:881"}
+  [^java.lang.String string]
   (string/byte-size string))
 
-(defn- some-token [result]
+(defn- some-token
+  "some_token(result: #(Lexer, #(Token, Position))) -> #(Lexer, Option(#(Token, Position)))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:581"}
+  [result]
   (let [[lexer token] result]
     [lexer (option/->Some token)]))
 
-(defn- advance [lexer source offset]
+(defn- advance
+  "advance(lexer: Lexer, source: String, offset: Int) -> Lexer"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:852"}
+  [lexer ^java.lang.String source offset]
   (->Lexer (:original-source lexer) source (+' (:byte-offset lexer) offset) (:preserve-whitespace lexer) (:preserve-comments lexer) (:mode lexer) (:newlines lexer)))
 
-(defn- advanced [token lexer source offset]
+(defn- advanced
+  "advanced(token: #(Token, Position), lexer: Lexer, source: String, offset: Int) -> #(Lexer, #(Token, Position))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:856"}
+  [token lexer ^java.lang.String source offset]
   [(advance lexer source offset) token])
 
-(defn- token [lexer token source offset]
+(defn- token
+  "token(lexer: Lexer, token: Token, source: String, offset: Int) -> #(Lexer, Option(#(Token, Position)))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:865"}
+  [lexer token ^java.lang.String source offset]
   (-> [token (->Position (:byte-offset lexer))]
       (advanced lexer source offset)
       some-token))
 
-(def slice-bytes glexer-ffi/slice-bytes)
+(def ^{:gleam/src "project/build/packages/glexer/src/glexer.gleam:892"} slice-bytes glexer-ffi/slice-bytes)
 
-(defn- lex-uppercase-name [lexer start slice-size]
+(defn- lex-uppercase-name
+  "lex_uppercase_name(lexer: Lexer, start: Int, slice_size: Int) -> #(Lexer, String)"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:457"}
+  [lexer start slice-size]
   (let [subject (:source lexer)]
     (cond
       (.startsWith ^String subject "a")
@@ -410,7 +434,10 @@
       (let [name (slice-bytes (:original-source lexer) start slice-size)]
         [lexer name]))))
 
-(defn- lex-lowercase-name [lexer start slice-size]
+(defn- lex-lowercase-name
+  "lex_lowercase_name(lexer: Lexer, start: Int, slice_size: Int) -> #(Lexer, String)"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:405"}
+  [lexer start slice-size]
   (let [subject (:source lexer)]
     (cond
       (.startsWith ^String subject "a")
@@ -602,9 +629,12 @@
       (let [name (slice-bytes (:original-source lexer) start slice-size)]
         [lexer name]))))
 
-(def drop-byte glexer-ffi/drop-byte)
+(def ^{:gleam/src "project/build/packages/glexer/src/glexer.gleam:902"} drop-byte glexer-ffi/drop-byte)
 
-(defn- lex-string [lexer start slice-size]
+(defn- lex-string
+  "lex_string(lexer: Lexer, start: Int, slice_size: Int) -> #(Lexer, Option(#(Token, Position)))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:745"}
+  [lexer start slice-size]
   (let [subject (:source lexer)]
     (cond
       (.startsWith ^String subject "\"")
@@ -631,7 +661,10 @@
       (-> (advance lexer (drop-byte (:source lexer)) 1)
           (lex-string start (+' slice-size 1))))))
 
-(defn- lex-number [lexer mode start slice-size]
+(defn- lex-number
+  "lex_number(lexer: Lexer, mode: LexNumberMode, start: Int, slice_size: Int) -> #(Lexer, Option(#(Token, Position)))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:694"}
+  [lexer mode start slice-size]
   (let [s0 (:source lexer)]
     (cond
       (.startsWith ^String s0 "_")
@@ -714,7 +747,10 @@
             content (slice-bytes (:original-source lexer) start slice-size)]
         [lexer (option/->Some [(token/->Float content) (->Position start)])]))))
 
-(defn- lex-hexadecimal [lexer start slice-size]
+(defn- lex-hexadecimal
+  "lex_hexadecimal(lexer: Lexer, start: Int, slice_size: Int) -> #(Lexer, Option(#(Token, Position)))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:649"}
+  [lexer start slice-size]
   (let [subject (:source lexer)]
     (cond
       (.startsWith ^String subject "_")
@@ -836,7 +872,10 @@
       (let [content (slice-bytes (:original-source lexer) start slice-size)]
         [lexer (option/->Some [(token/->Int content) (->Position start)])]))))
 
-(defn- lex-octal [lexer start slice-size]
+(defn- lex-octal
+  "lex_octal(lexer: Lexer, start: Int, slice_size: Int) -> #(Lexer, Option(#(Token, Position)))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:624"}
+  [lexer start slice-size]
   (let [subject (:source lexer)]
     (cond
       (.startsWith ^String subject "_")
@@ -879,7 +918,10 @@
       (let [content (slice-bytes (:original-source lexer) start slice-size)]
         [lexer (option/->Some [(token/->Int content) (->Position start)])]))))
 
-(defn- lex-binary [lexer start slice-size]
+(defn- lex-binary
+  "lex_binary(lexer: Lexer, start: Int, slice_size: Int) -> #(Lexer, Option(#(Token, Position)))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:607"}
+  [lexer start slice-size]
   (let [subject (:source lexer)]
     (cond
       (.startsWith ^String subject "_")
@@ -898,7 +940,10 @@
       (let [content (slice-bytes (:original-source lexer) start slice-size)]
         [lexer (option/->Some [(token/->Int content) (->Position start)])]))))
 
-(defn- comment [lexer kind start]
+(defn- comment
+  "comment(lexer: Lexer, kind: CommentKind, start: Int) -> #(Lexer, Option(#(Token, Position)))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:588"}
+  [lexer kind start]
   (let [[prefix suffix] (splitter/split-before (:newlines lexer)
                                                (:source lexer))
         eaten (length prefix)
@@ -910,8 +955,11 @@
     [lexer (option/->Some [token (->Position start)])]))
 
 (defn- skip-comment
-  "Ignores the rest of the line until it finds a newline, and signals the
+  "skip_comment(lexer: Lexer) -> #(Lexer, Option(#(Token, Position)))
+
+   Ignores the rest of the line until it finds a newline, and signals the
    caller to continue lexing."
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:572"}
   [lexer]
   (let [[prefix suffix] (splitter/split-before (:newlines lexer)
                                                (:source lexer))
@@ -919,7 +967,10 @@
         lexer (advance lexer suffix eaten)]
     [lexer (option/->None)]))
 
-(defn- whitespace [lexer start slice-size]
+(defn- whitespace
+  "whitespace(lexer: Lexer, start: Int, slice_size: Int) -> #(Lexer, Option(#(Token, Position)))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:548"}
+  [lexer start slice-size]
   (let [subject (:source lexer)]
     (cond
       (.startsWith ^String subject " ")
@@ -947,7 +998,10 @@
                                      slice-size)]
             [lexer (option/->Some [(token/->Space content) (->Position start)])]))))))
 
-(defn- lex-digits [lexer start slice-size]
+(defn- lex-digits
+  "lex_digits(lexer: Lexer, start: Int, slice_size: Int) -> #(Lexer, String)"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:383"}
+  [lexer start slice-size]
   (let [subject (:source lexer)]
     (cond
       (.startsWith ^String subject "_")
@@ -998,14 +1052,20 @@
       (let [digits (slice-bytes (:original-source lexer) start slice-size)]
         [lexer digits]))))
 
-(defn- check-for-minus [lexer]
+(defn- check-for-minus
+  "check_for_minus(lexer: Lexer) -> Result(#(Lexer, Option(#(Token, Position))), Nil)"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:534"}
+  [lexer]
   (let [subject (:source lexer)]
     (if (.startsWith ^String subject "-")
       (let [source (subs subject 1) [lexer token] (token lexer (token/->Minus) source 1)]
         (p/->Ok [(->Lexer (:original-source lexer) (:source lexer) (:byte-offset lexer) (:preserve-whitespace lexer) (:preserve-comments lexer) (->Normal) (:newlines lexer)) token]))
       (p/->Error nil))))
 
-(defn- next [lexer]
+(defn- next
+  "next(lexer: Lexer) -> #(Lexer, Option(#(Token, Position)))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:79"}
+  [lexer]
   (let [subject (:mode lexer)]
     (cond
       (instance? CheckForMinus subject)
@@ -1621,7 +1681,10 @@
                        source
                        (length grapheme))))))))))
 
-(defn- do-lex [lexer tokens]
+(defn- do-lex
+  "do_lex(lexer: Lexer, tokens: List(#(Token, Position))) -> List(#(Token, Position))"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:65"}
+  [lexer tokens]
   (let [subject (next lexer)]
     (cond
       (instance? gleam.option.None (nth subject 1))
@@ -1636,14 +1699,19 @@
         (recur lexer (list* token tokens))))))
 
 (defn lex
+  "lex(lexer: Lexer) -> List(#(Token, Position))"
   {:malli/schema [:=> [:cat [:fn Lexer?]]
-                      [:sequential [:tuple [:fn token/Token?] [:fn Position?]]]]}
+                      [:sequential [:tuple [:fn token/Token?] [:fn Position?]]]]
+   :gleam/src "project/build/packages/glexer/src/glexer.gleam:60"}
   [lexer]
   (-> (do-lex lexer (list)) list/reverse))
 
 (declare unescape-codepoint unescape-loop)
 
-(defn- unescape-codepoint [escaped unescaped codepoint]
+(defn- unescape-codepoint
+  "unescape_codepoint(escaped: String, unescaped: String, codepoint: String) -> Result(String, Nil)"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:823"}
+  [^java.lang.String escaped ^java.lang.String unescaped ^java.lang.String codepoint]
   (let [subject (string/pop-grapheme escaped)]
     (cond
       (and (instance? Ok subject) (= (nth (:value subject) 0) "}"))
@@ -1660,7 +1728,10 @@
       (and (instance? gleam.prelude.Error subject) (nil? (:value subject)))
       (p/->Error nil))))
 
-(defn- unescape-loop [escaped unescaped]
+(defn- unescape-loop
+  "unescape_loop(escaped: String, unescaped: String) -> Result(String, Nil)"
+  {:gleam/src "project/build/packages/glexer/src/glexer.gleam:804"}
+  [^java.lang.String escaped ^java.lang.String unescaped]
   (cond
     (.startsWith ^String escaped "\\\"")
     (let [escaped (subs escaped 2)]
@@ -1701,29 +1772,35 @@
           (recur escaped (str unescaped grapheme)))))))
 
 (defn unescape-string
-  "Convert the value of a string token to the string it represents.
-   
+  "unescape_string(string: String) -> Result(String, Nil)
+
+   Convert the value of a string token to the string it represents.
+
    This function can fail if the original string contains invalid escape sequences.
-   
+
    ```gleam
    unescape_string(\"\\\\\\\"X\\\\\\\" marks the spot\")
    // --> Ok(\"\\\"X\\\" marks the spot\")
-   
+
    unescape_string(\"\\\\u{1F600}\")
    // --> Ok(\"😀\")
-   
+
    unescape_string(\"\\\\x\")
    // --> Error(Nil)
    ```"
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}
-  [string]
+  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+   :gleam/src "project/build/packages/glexer/src/glexer.gleam:800"}
+  [^java.lang.String string]
   (unescape-loop string ""))
 
 (defn to-source
-  "Turn a sequence of tokens back to their Gleam source code representation."
+  "to_source(tokens: List(#(Token, Position))) -> String
+
+   Turn a sequence of tokens back to their Gleam source code representation."
   {:malli/schema [:=> [:cat [:sequential [:tuple [:fn token/Token?] [:fn Position?]]]]
-                      :string]}
-  [tokens]
+                      :string]
+   :gleam/src "project/build/packages/glexer/src/glexer.gleam:843"}
+  ^java.lang.String [tokens]
   (p/with-use [[source _use1] (list/fold tokens "")]
     (let [[tok _] _use1]
       (str source (token/to-source tok)))))

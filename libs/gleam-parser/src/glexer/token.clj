@@ -2,25 +2,25 @@
 
 ;; type Token
 (defprotocol IToken)
-(defrecord Name [value] IToken)
+(defrecord Name [^java.lang.String value] IToken)
 (defn Name? "True if `v` is a Name value." [v] (instance? Name v))
-(defrecord UpperName [value] IToken)
+(defrecord UpperName [^java.lang.String value] IToken)
 (defn UpperName? "True if `v` is a UpperName value." [v] (instance? UpperName v))
-(defrecord DiscardName [value] IToken)
+(defrecord DiscardName [^java.lang.String value] IToken)
 (defn DiscardName? "True if `v` is a DiscardName value." [v] (instance? DiscardName v))
-(defrecord Int [value] IToken)
+(defrecord Int [^java.lang.String value] IToken)
 (defn Int? "True if `v` is a Int value." [v] (instance? Int v))
 (ns-unmap *ns* 'Float)
-(defrecord Float [value] IToken)
+(defrecord Float [^java.lang.String value] IToken)
 (defn Float? "True if `v` is a Float value." [v] (instance? Float v))
 (ns-unmap *ns* 'String)
-(defrecord String [value] IToken)
+(defrecord String [^java.lang.String value] IToken)
 (defn String? "True if `v` is a String value." [v] (instance? String v))
-(defrecord CommentDoc [value] IToken)
+(defrecord CommentDoc [^java.lang.String value] IToken)
 (defn CommentDoc? "True if `v` is a CommentDoc value." [v] (instance? CommentDoc v))
-(defrecord CommentNormal [value] IToken)
+(defrecord CommentNormal [^java.lang.String value] IToken)
 (defn CommentNormal? "True if `v` is a CommentNormal value." [v] (instance? CommentNormal v))
-(defrecord CommentModule [value] IToken)
+(defrecord CommentModule [^java.lang.String value] IToken)
 (defn CommentModule? "True if `v` is a CommentModule value." [v] (instance? CommentModule v))
 (defrecord As [] IToken)
 (defn As? "True if `v` is a As value." [v] (instance? As v))
@@ -152,18 +152,21 @@
 (defn RightArrow? "True if `v` is a RightArrow value." [v] (instance? RightArrow v))
 (defrecord EndOfFile [] IToken)
 (defn EndOfFile? "True if `v` is a EndOfFile value." [v] (instance? EndOfFile v))
-(defrecord Space [value] IToken)
+(defrecord Space [^java.lang.String value] IToken)
 (defn Space? "True if `v` is a Space value." [v] (instance? Space v))
-(defrecord UnterminatedString [value] IToken)
+(defrecord UnterminatedString [^java.lang.String value] IToken)
 (defn UnterminatedString? "True if `v` is a UnterminatedString value." [v] (instance? UnterminatedString v))
-(defrecord UnexpectedGrapheme [value] IToken)
+(defrecord UnexpectedGrapheme [^java.lang.String value] IToken)
 (defn UnexpectedGrapheme? "True if `v` is a UnexpectedGrapheme value." [v] (instance? UnexpectedGrapheme v))
 (defn Token? "True if `v` is any Token value." [v] (instance? glexer.token.IToken v))
 
 (defn to-source
-  "Turn a token back into its Gleam source representation."
-  {:malli/schema [:=> [:cat [:fn Token?]] :string]}
-  [tok]
+  "to_source(tok: Token) -> String
+
+   Turn a token back into its Gleam source representation."
+  {:malli/schema [:=> [:cat [:fn Token?]] :string]
+   :gleam/src "project/build/packages/glexer/src/glexer/token.gleam:100"}
+  ^java.lang.String [tok]
   (cond
     (instance? Name tok)
     (let [str' (:value tok)]
@@ -187,7 +190,7 @@
 
     (instance? String tok)
     (let [str' (:value tok)]
-      (str (str "\"" str') "\""))
+      (str "\"" str' "\""))
 
     (instance? CommentDoc tok)
     (let [str' (:value tok)]

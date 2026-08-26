@@ -18,7 +18,7 @@
 
 ;; type Attribute
 (defprotocol IAttribute)
-(defrecord Attribute [name arguments] IAttribute)
+(defrecord Attribute [^java.lang.String name arguments] IAttribute)
 (defn Attribute? "True if `v` is a Attribute value." [v] (instance? Attribute v))
 
 ;; type Module
@@ -28,7 +28,7 @@
 
 ;; type Function
 (defprotocol IFunction)
-(defrecord Function [location name publicity parameters return body] IFunction)
+(defrecord Function [location ^java.lang.String name publicity parameters return body] IFunction)
 (defn Function? "True if `v` is a Function value." [v] (instance? Function v))
 
 ;; type Span
@@ -63,41 +63,41 @@
 
 ;; type Pattern
 (defprotocol IPattern)
-(defrecord PatternInt [location value] IPattern)
+(defrecord PatternInt [location ^java.lang.String value] IPattern)
 (defn PatternInt? "True if `v` is a PatternInt value." [v] (instance? PatternInt v))
-(defrecord PatternFloat [location value] IPattern)
+(defrecord PatternFloat [location ^java.lang.String value] IPattern)
 (defn PatternFloat? "True if `v` is a PatternFloat value." [v] (instance? PatternFloat v))
-(defrecord PatternString [location value] IPattern)
+(defrecord PatternString [location ^java.lang.String value] IPattern)
 (defn PatternString? "True if `v` is a PatternString value." [v] (instance? PatternString v))
-(defrecord PatternDiscard [location name] IPattern)
+(defrecord PatternDiscard [location ^java.lang.String name] IPattern)
 (defn PatternDiscard? "True if `v` is a PatternDiscard value." [v] (instance? PatternDiscard v))
-(defrecord PatternVariable [location name] IPattern)
+(defrecord PatternVariable [location ^java.lang.String name] IPattern)
 (defn PatternVariable? "True if `v` is a PatternVariable value." [v] (instance? PatternVariable v))
 (defrecord PatternTuple [location elements] IPattern)
 (defn PatternTuple? "True if `v` is a PatternTuple value." [v] (instance? PatternTuple v))
 (defrecord PatternList [location elements tail] IPattern)
 (defn PatternList? "True if `v` is a PatternList value." [v] (instance? PatternList v))
-(defrecord PatternAssignment [location pattern name] IPattern)
+(defrecord PatternAssignment [location pattern ^java.lang.String name] IPattern)
 (defn PatternAssignment? "True if `v` is a PatternAssignment value." [v] (instance? PatternAssignment v))
-(defrecord PatternConcatenate [location prefix prefix-name rest-name] IPattern)
+(defrecord PatternConcatenate [location ^java.lang.String prefix prefix-name rest-name] IPattern)
 (defn PatternConcatenate? "True if `v` is a PatternConcatenate value." [v] (instance? PatternConcatenate v))
 (defrecord PatternBitString [location segments] IPattern)
 (defn PatternBitString? "True if `v` is a PatternBitString value." [v] (instance? PatternBitString v))
-(defrecord PatternVariant [location module constructor arguments with-spread] IPattern)
+(defrecord PatternVariant [location module ^java.lang.String constructor arguments with-spread] IPattern)
 (defn PatternVariant? "True if `v` is a PatternVariant value." [v] (instance? PatternVariant v))
 (defn Pattern? "True if `v` is any Pattern value." [v] (instance? glance.IPattern v))
 
 ;; type Expression
 (defprotocol IExpression)
-(defrecord Int [location value] IExpression)
+(defrecord Int [location ^java.lang.String value] IExpression)
 (defn Int? "True if `v` is a Int value." [v] (instance? Int v))
 (ns-unmap *ns* 'Float)
-(defrecord Float [location value] IExpression)
+(defrecord Float [location ^java.lang.String value] IExpression)
 (defn Float? "True if `v` is a Float value." [v] (instance? Float v))
 (ns-unmap *ns* 'String)
-(defrecord String [location value] IExpression)
+(defrecord String [location ^java.lang.String value] IExpression)
 (defn String? "True if `v` is a String value." [v] (instance? String v))
-(defrecord Variable [location name] IExpression)
+(defrecord Variable [location ^java.lang.String name] IExpression)
 (defn Variable? "True if `v` is a Variable value." [v] (instance? Variable v))
 (defrecord NegateInt [location value] IExpression)
 (defn NegateInt? "True if `v` is a NegateInt value." [v] (instance? NegateInt v))
@@ -115,9 +115,9 @@
 (defn List? "True if `v` is a List value." [v] (instance? List v))
 (defrecord Fn [location arguments return-annotation body] IExpression)
 (defn Fn? "True if `v` is a Fn value." [v] (instance? Fn v))
-(defrecord RecordUpdate [location module constructor record fields] IExpression)
+(defrecord RecordUpdate [location module ^java.lang.String constructor record fields] IExpression)
 (defn RecordUpdate? "True if `v` is a RecordUpdate value." [v] (instance? RecordUpdate v))
-(defrecord FieldAccess [location container label] IExpression)
+(defrecord FieldAccess [location container ^java.lang.String label] IExpression)
 (defn FieldAccess? "True if `v` is a FieldAccess value." [v] (instance? FieldAccess v))
 (defrecord Call [location function arguments] IExpression)
 (defn Call? "True if `v` is a Call value." [v] (instance? Call v))
@@ -181,9 +181,9 @@
 
 ;; type BitArraySize
 (defprotocol IBitArraySize)
-(defrecord BitArraySizeInt [location value] IBitArraySize)
+(defrecord BitArraySizeInt [location ^java.lang.String value] IBitArraySize)
 (defn BitArraySizeInt? "True if `v` is a BitArraySizeInt value." [v] (instance? BitArraySizeInt v))
-(defrecord BitArraySizeVariable [location name] IBitArraySize)
+(defrecord BitArraySizeVariable [location ^java.lang.String name] IBitArraySize)
 (defn BitArraySizeVariable? "True if `v` is a BitArraySizeVariable value." [v] (instance? BitArraySizeVariable v))
 (defrecord BitArraySizeBinaryOperator [location operator left right] IBitArraySize)
 (defn BitArraySizeBinaryOperator? "True if `v` is a BitArraySizeBinaryOperator value." [v] (instance? BitArraySizeBinaryOperator v))
@@ -266,25 +266,25 @@
 
 ;; type AssignmentName
 (defprotocol IAssignmentName)
-(defrecord Named [value] IAssignmentName)
+(defrecord Named [^java.lang.String value] IAssignmentName)
 (defn Named? "True if `v` is a Named value." [v] (instance? Named v))
-(defrecord Discarded [value] IAssignmentName)
+(defrecord Discarded [^java.lang.String value] IAssignmentName)
 (defn Discarded? "True if `v` is a Discarded value." [v] (instance? Discarded v))
 (defn AssignmentName? "True if `v` is any AssignmentName value." [v] (instance? glance.IAssignmentName v))
 
 ;; type Import
 (defprotocol IImport)
-(defrecord Import [location module alias unqualified-types unqualified-values] IImport)
+(defrecord Import [location ^java.lang.String module alias unqualified-types unqualified-values] IImport)
 (defn Import? "True if `v` is a Import value." [v] (instance? Import v))
 
 ;; type Constant
 (defprotocol IConstant)
-(defrecord Constant [location name publicity annotation value] IConstant)
+(defrecord Constant [location ^java.lang.String name publicity annotation value] IConstant)
 (defn Constant? "True if `v` is a Constant value." [v] (instance? Constant v))
 
 ;; type UnqualifiedImport
 (defprotocol IUnqualifiedImport)
-(defrecord UnqualifiedImport [name alias] IUnqualifiedImport)
+(defrecord UnqualifiedImport [^java.lang.String name alias] IUnqualifiedImport)
 (defn UnqualifiedImport? "True if `v` is a UnqualifiedImport value." [v] (instance? UnqualifiedImport v))
 
 ;; type Publicity
@@ -297,27 +297,27 @@
 
 ;; type TypeAlias
 (defprotocol ITypeAlias)
-(defrecord TypeAlias [location name publicity parameters aliased] ITypeAlias)
+(defrecord TypeAlias [location ^java.lang.String name publicity parameters aliased] ITypeAlias)
 (defn TypeAlias? "True if `v` is a TypeAlias value." [v] (instance? TypeAlias v))
 
 ;; type CustomType
 (defprotocol ICustomType)
-(defrecord CustomType [location name publicity opaque- parameters variants] ICustomType)
+(defrecord CustomType [location ^java.lang.String name publicity opaque- parameters variants] ICustomType)
 (defn CustomType? "True if `v` is a CustomType value." [v] (instance? CustomType v))
 
 ;; type Variant
 (defprotocol IVariant)
-(defrecord Variant [name fields attributes] IVariant)
+(defrecord Variant [^java.lang.String name fields attributes] IVariant)
 (defn Variant? "True if `v` is a Variant value." [v] (instance? Variant v))
 
 ;; type RecordUpdateField
 (defprotocol IRecordUpdateField)
-(defrecord RecordUpdateField [label item] IRecordUpdateField)
+(defrecord RecordUpdateField [^java.lang.String label item] IRecordUpdateField)
 (defn RecordUpdateField? "True if `v` is a RecordUpdateField value." [v] (instance? RecordUpdateField v))
 
 ;; type VariantField
 (defprotocol IVariantField)
-(defrecord LabelledVariantField [item label] IVariantField)
+(defrecord LabelledVariantField [item ^java.lang.String label] IVariantField)
 (defn LabelledVariantField? "True if `v` is a LabelledVariantField value." [v] (instance? LabelledVariantField v))
 (defrecord UnlabelledVariantField [item] IVariantField)
 (defn UnlabelledVariantField? "True if `v` is a UnlabelledVariantField value." [v] (instance? UnlabelledVariantField v))
@@ -325,9 +325,9 @@
 
 ;; type Field
 (defprotocol IField)
-(defrecord LabelledField [label label-location item] IField)
+(defrecord LabelledField [^java.lang.String label label-location item] IField)
 (defn LabelledField? "True if `v` is a LabelledField value." [v] (instance? LabelledField v))
-(defrecord ShorthandField [label location] IField)
+(defrecord ShorthandField [^java.lang.String label location] IField)
 (defn ShorthandField? "True if `v` is a ShorthandField value." [v] (instance? ShorthandField v))
 (defrecord UnlabelledField [item] IField)
 (defn UnlabelledField? "True if `v` is a UnlabelledField value." [v] (instance? UnlabelledField v))
@@ -335,15 +335,15 @@
 
 ;; type Type
 (defprotocol IType)
-(defrecord NamedType [location name module parameters] IType)
+(defrecord NamedType [location ^java.lang.String name module parameters] IType)
 (defn NamedType? "True if `v` is a NamedType value." [v] (instance? NamedType v))
 (defrecord TupleType [location elements] IType)
 (defn TupleType? "True if `v` is a TupleType value." [v] (instance? TupleType v))
 (defrecord FunctionType [location parameters return] IType)
 (defn FunctionType? "True if `v` is a FunctionType value." [v] (instance? FunctionType v))
-(defrecord VariableType [location name] IType)
+(defrecord VariableType [location ^java.lang.String name] IType)
 (defn VariableType? "True if `v` is a VariableType value." [v] (instance? VariableType v))
-(defrecord HoleType [location name] IType)
+(defrecord HoleType [location ^java.lang.String name] IType)
 (defn HoleType? "True if `v` is a HoleType value." [v] (instance? HoleType v))
 (defn Type? "True if `v` is any Type value." [v] (instance? glance.IType v))
 
@@ -378,7 +378,9 @@
 (defn ParsedList? "True if `v` is a ParsedList value." [v] (instance? ParsedList v))
 
 (defn precedence
-  {:malli/schema [:=> [:cat [:fn BinaryOperator?]] :int]}
+  "precedence(operator: BinaryOperator) -> Int"
+  {:malli/schema [:=> [:cat [:fn BinaryOperator?]] :int]
+   :gleam/src "project/build/packages/glance/src/glance.gleam:236"}
   [operator]
   (cond
     (instance? Or operator)
@@ -405,13 +407,19 @@
     (or (instance? MultInt operator) (instance? MultFloat operator) (instance? DivInt operator) (instance? DivFloat operator) (instance? RemainderInt operator))
     8))
 
-(defn- unexpected-error [tokens]
+(defn- unexpected-error
+  "unexpected_error(tokens: List(#(Token, Position))) -> Result(a, Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1093"}
+  [tokens]
   (if (seq tokens)
     (let [token (nth (first tokens) 0) position (nth (first tokens) 1)]
       (p/->Error (->UnexpectedToken token position)))
     (p/->Error (->UnexpectedEndOfInput))))
 
-(defn- expect [expected tokens next]
+(defn- expect
+  "expect(expected: Token, tokens: List(#(Token, Position)), next: fn(Position, List(#(Token, Position))) -> Result(a, Error)) -> Result(a, Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:419"}
+  [expected tokens next]
   (cond
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))
@@ -424,7 +432,10 @@
     (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
       (p/->Error (->UnexpectedToken other position)))))
 
-(defn- list' [parser discard acc tokens]
+(defn- list'
+  "list(parser: fn(List(#(Token, Position))) -> Result(#(a, List(#(Token, Position))), Error), discard: Option(fn(Span) -> a), acc: List(a), tokens: List(#(Token, Position))) -> Result(ParsedList(a), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1885"}
+  [parser discard acc tokens]
   (cond
     (and (seq tokens) (instance? glexer.token.RightSquare (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
     (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
@@ -506,11 +517,17 @@
           (empty? tokens)
           (p/->Error (->UnexpectedEndOfInput)))))))
 
-(defn- push-function [module attributes function]
+(defn- push-function
+  "push_function(module: Module, attributes: List(Attribute), function: Function) -> Module"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:380"}
+  [module attributes function]
   (->Module (:imports module) (:custom-types module) (:type-aliases module) (:constants module) (list* (->Definition (list/reverse attributes) function) (:functions module))))
 
 (defn- handle-operator
-  "Simple-Precedence-Parser, handle seeing an operator or end"
+  "handle_operator(next: Option(BinaryOperator), operators: List(BinaryOperator), values: List(Expression)) -> #(Option(Expression), List(BinaryOperator), List(Expression))
+
+   Simple-Precedence-Parser, handle seeing an operator or end"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1173"}
   [next operators values]
   (cond
     (and (instance? gleam.option.Some next) (empty? operators))
@@ -540,7 +557,10 @@
     :else
     (throw (ex-info "parser bug, expression not full reduced" {:gleam/panic true}))))
 
-(defn- binary-operator [token]
+(defn- binary-operator
+  "binary_operator(token: Token) -> Result(BinaryOperator, Nil)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1100"}
+  [token]
   (cond
     (instance? glexer.token.AmperAmper token) (p/->Ok (->And))
     (instance? glexer.token.EqualEqual token) (p/->Ok (->Eq))
@@ -567,14 +587,20 @@
     (instance? glexer.token.StarDot token) (p/->Ok (->MultFloat))
     :else (p/->Error nil)))
 
-(defn- pop-binary-operator [tokens]
+(defn- pop-binary-operator
+  "pop_binary_operator(tokens: List(#(Token, Position))) -> Result(#(BinaryOperator, List(#(Token, Position))), Nil)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1129"}
+  [tokens]
   (if (seq tokens)
     (let [token (nth (first tokens) 0) tokens (rest tokens)]
       (p/with-use [[op] (result/map (binary-operator token))]
         [op tokens]))
     (p/->Error nil)))
 
-(defn- field [tokens parser]
+(defn- field
+  "field(tokens: List(#(Token, Position)), of parser: fn(List(#(Token, Position))) -> Result(#(a, List(#(Token, Position))), Error)) -> Result(#(Field(a), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2284"}
+  [tokens parser]
   (if (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)))
     (let [name (:value (nth (first tokens) 0)) start (nth (first tokens) 1) end (nth (nth tokens 1) 1) tokens (nthrest tokens 2)]
       (if (or (and (seq tokens) (instance? glexer.token.Comma (nth (first tokens) 0))) (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0))))
@@ -591,13 +617,22 @@
       (let [[t tokens] _use0]
         (p/->Ok [(->UnlabelledField t) tokens])))))
 
-(defn- string-offset [start string]
+(defn- string-offset
+  "string_offset(start: Int, string: String) -> Int"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1582"}
+  [start ^java.lang.String string]
   (+' start (string/byte-size string)))
 
-(defn- span-from-string [start string]
+(defn- span-from-string
+  "span_from_string(start: Int, string: String) -> Span"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1214"}
+  [start ^java.lang.String string]
   (->Span start (+' start (string/byte-size string))))
 
-(defn- comma-delimited [items tokens parser final]
+(defn- comma-delimited
+  "comma_delimited(items: List(a), tokens: List(#(Token, Position)), parse parser: fn(List(#(Token, Position))) -> Result(#(a, List(#(Token, Position))), Error), until final: Token) -> Result(#(List(a), Int, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2038"}
+  [items tokens parser final]
   (cond
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))
@@ -625,7 +660,10 @@
           (empty? tokens)
           (p/->Error (->UnexpectedEndOfInput)))))))
 
-(defn- bit-string-segment-options [size-parser options tokens]
+(defn- bit-string-segment-options
+  "bit_string_segment_options(size_parser: fn(List(#(Token, Position))) -> Result(#(a, List(#(Token, Position))), Error), options: List(BitStringSegmentOption(a)), tokens: List(#(Token, Position))) -> Result(#(List(BitStringSegmentOption(a)), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1395"}
+  [size-parser options tokens]
   (p/with-use [[_use0] (result/try* (cond
                                       (and (seq tokens) (instance? glexer.token.Int (nth (first tokens) 0)))
                                       (let [i (:value (nth (first tokens) 0)) position (nth (first tokens) 1) tokens (rest tokens) subject (int/parse i)]
@@ -733,13 +771,19 @@
           (bit-string-segment-options size-parser options tokens))
         (p/->Ok [(list/reverse options) tokens])))))
 
-(defn- optional-bit-string-segment-options [size-parser tokens]
+(defn- optional-bit-string-segment-options
+  "optional_bit_string_segment_options(size_parser: fn(List(#(Token, Position))) -> Result(#(a, List(#(Token, Position))), Error), tokens: List(#(Token, Position))) -> Result(#(List(BitStringSegmentOption(a)), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1384"}
+  [size-parser tokens]
   (if (and (seq tokens) (instance? glexer.token.Colon (nth (first tokens) 0)))
     (let [tokens (rest tokens)]
       (bit-string-segment-options size-parser (list) tokens))
     (p/->Ok [(list) tokens])))
 
-(defn- bit-string-segment [parser size-parser tokens]
+(defn- bit-string-segment
+  "bit_string_segment(parser: fn(List(#(Token, Position))) -> Result(#(a, List(#(Token, Position))), Error), size_parser: fn(List(#(Token, Position))) -> Result(#(b, List(#(Token, Position))), Error), tokens: List(#(Token, Position))) -> Result(#(#(a, List(BitStringSegmentOption(b))), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1373"}
+  [parser size-parser tokens]
   (p/with-use [[_use0] (result/try* (parser tokens))]
     (let [[value tokens] _use0
           result (optional-bit-string-segment-options size-parser tokens)]
@@ -747,7 +791,10 @@
         (let [[options tokens] _use0]
           (p/->Ok [[value options] tokens]))))))
 
-(defn- delimited [acc tokens parser delimeter]
+(defn- delimited
+  "delimited(acc: List(a), tokens: List(#(Token, Position)), parser: fn(List(#(Token, Position))) -> Result(#(a, List(#(Token, Position))), Error), delimeter: Token) -> Result(#(List(a), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1842"}
+  [acc tokens parser delimeter]
   (p/with-use [[_use0] (result/try* (parser tokens))]
     (let [[t tokens] _use0
           acc (list* t acc)]
@@ -756,12 +803,18 @@
           (delimited acc tokens parser delimeter))
         (p/->Ok [(list/reverse acc) tokens])))))
 
-(defn- bit-array-size-precedence [operator]
+(defn- bit-array-size-precedence
+  "bit_array_size_precedence(operator: BitArraySizeOperator) -> Int"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1522"}
+  [operator]
   (if (or (instance? BitArraySizeAdd operator) (instance? BitArraySizeSubtract operator))
     7
     8))
 
-(defn- handle-bit-array-size-operator [next operators values]
+(defn- handle-bit-array-size-operator
+  "handle_bit_array_size_operator(next: Option(BitArraySizeOperator), operators: List(BitArraySizeOperator), values: List(BitArraySize)) -> #(Option(BitArraySize), List(BitArraySizeOperator), List(BitArraySize))"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1541"}
+  [next operators values]
   (cond
     (and (instance? gleam.option.Some next) (empty? operators))
     (let [operator (:value next)]
@@ -790,7 +843,10 @@
     :else
     (throw (ex-info "parser bug, bit array size not fully reduced" {:gleam/panic true}))))
 
-(defn- bit-array-size-operator [token]
+(defn- bit-array-size-operator
+  "bit_array_size_operator(token: Token) -> Result(BitArraySizeOperator, Nil)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1511"}
+  [token]
   (cond
     (instance? glexer.token.Plus token) (p/->Ok (->BitArraySizeAdd))
     (instance? glexer.token.Minus token) (p/->Ok (->BitArraySizeSubtract))
@@ -799,7 +855,10 @@
     (instance? glexer.token.Percent token) (p/->Ok (->BitArraySizeRemainder))
     :else (p/->Error nil)))
 
-(defn- pop-bit-array-size-operator [tokens]
+(defn- pop-bit-array-size-operator
+  "pop_bit_array_size_operator(tokens: List(#(Token, Position))) -> Result(#(BitArraySizeOperator, List(#(Token, Position))), Nil)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1529"}
+  [tokens]
   (if (seq tokens)
     (let [token (nth (first tokens) 0) tokens (rest tokens)]
       (p/with-use [[operator] (result/map (bit-array-size-operator token))]
@@ -808,7 +867,10 @@
 
 (declare bit-array-size-unit bit-array-size-loop bit-array-size)
 
-(defn- bit-array-size-unit [tokens]
+(defn- bit-array-size-unit
+  "bit_array_size_unit(tokens: List(#(Token, Position))) -> Result(#(BitArraySize, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1492"}
+  [tokens]
   (cond
     (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
     (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
@@ -833,7 +895,10 @@
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))))
 
-(defn- bit-array-size-loop [tokens operators values]
+(defn- bit-array-size-loop
+  "bit_array_size_loop(tokens: List(#(Token, Position)), operators: List(BitArraySizeOperator), values: List(BitArraySize)) -> Result(#(BitArraySize, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1468"}
+  [tokens operators values]
   (p/with-use [[_use0] (result/try* (bit-array-size-unit tokens))]
     (let [[size tokens] _use0
           values (list* size values) subject (pop-bit-array-size-operator tokens)]
@@ -850,12 +915,18 @@
             (let [size (:value subject)]
               (p/->Ok [size tokens]))))))))
 
-(defn- bit-array-size [tokens]
+(defn- bit-array-size
+  "bit_array_size(tokens: List(#(Token, Position))) -> Result(#(BitArraySize, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1464"}
+  [tokens]
   (bit-array-size-loop tokens (list) (list)))
 
 (declare pattern-constructor-arguments pattern-constructor pattern)
 
-(defn- pattern-constructor-arguments [arguments tokens]
+(defn- pattern-constructor-arguments
+  "pattern_constructor_arguments(arguments: List(Field(Pattern)), tokens: List(#(Token, Position))) -> Result(PatternConstructorArguments, Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:938"}
+  [arguments tokens]
   (cond
     (and (seq tokens) (instance? glexer.token.RightParen (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
     (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
@@ -903,7 +974,10 @@
             (empty? tokens)
             (p/->Error (->UnexpectedEndOfInput))))))))
 
-(defn- pattern-constructor [module constructor tokens start name-start]
+(defn- pattern-constructor
+  "pattern_constructor(module: Option(String), constructor: String, tokens: List(#(Token, Position)), start: Int, name_start: Int) -> Result(#(Pattern, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:903"}
+  [module ^java.lang.String constructor tokens start name-start]
   (if (and (seq tokens) (instance? glexer.token.LeftParen (nth (first tokens) 0)))
     (let [tokens (rest tokens) result (pattern-constructor-arguments (list) tokens)]
       (p/with-use [[_use0] (result/try* result)]
@@ -919,7 +993,10 @@
           pattern (->PatternVariant span module constructor (list) false)]
       (p/->Ok [pattern tokens]))))
 
-(defn- pattern [tokens]
+(defn- pattern
+  "pattern(tokens: List(#(Token, Position))) -> Result(#(Pattern, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:971"}
+  [tokens]
   (p/with-use [[_use0] (result/try* (cond
                                       (and (seq tokens) (instance? glexer.token.UpperName (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
                                       (let [name (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
@@ -1029,7 +1106,10 @@
 
 (declare named-type tuple-type fn-type type-)
 
-(defn- named-type [name module tokens start name-start]
+(defn- named-type
+  "named_type(name: String, module: Option(String), tokens: List(#(Token, Position)), start: Int, name_start: Int) -> Result(#(Type, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2173"}
+  [^java.lang.String name module tokens start name-start]
   (p/with-use [[_use0] (result/try* (if (and (seq tokens) (instance? glexer.token.LeftParen (nth (first tokens) 0)))
                                       (let [tokens (rest tokens)]
                                         (comma-delimited (list)
@@ -1042,14 +1122,20 @@
           t (->NamedType (->Span start end) name module parameters)]
       (p/->Ok [t tokens]))))
 
-(defn- tuple-type [start tokens]
+(defn- tuple-type
+  "tuple_type(start: Int, tokens: List(#(Token, Position))) -> Result(#(Type, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2202"}
+  [start tokens]
   (let [result (comma-delimited (list) tokens type- (t/->RightParen))]
     (p/with-use [[_use0] (result/try* result)]
       (let [[types end tokens] _use0
             span (->Span start end)]
         (p/->Ok [(->TupleType span types) tokens])))))
 
-(defn- fn-type [start tokens]
+(defn- fn-type
+  "fn_type(start: Int, tokens: List(#(Token, Position))) -> Result(#(Type, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2193"}
+  [start tokens]
   (let [result (comma-delimited (list) tokens type- (t/->RightParen))]
     (p/with-use [[_use0] (result/try* result)]
       (let [[parameters _ tokens] _use0]
@@ -1059,7 +1145,10 @@
                 span (->Span start (:end (:location return)))]
             (p/->Ok [(->FunctionType span parameters return) tokens])))))))
 
-(defn- type- [tokens]
+(defn- type-
+  "type_(tokens: List(#(Token, Position))) -> Result(#(Type, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2139"}
+  [tokens]
   (cond
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))
@@ -1092,7 +1181,10 @@
     (let [token (nth (first tokens) 0) position (nth (first tokens) 1)]
       (p/->Error (->UnexpectedToken token position)))))
 
-(defn- optional-return-annotation [end tokens]
+(defn- optional-return-annotation
+  "optional_return_annotation(end: Int, tokens: List(#(Token, Position))) -> Result(#(Option(Type), Int, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:802"}
+  [end tokens]
   (if (and (seq tokens) (instance? glexer.token.RightArrow (nth (first tokens) 0)))
     (let [tokens (rest tokens)]
       (p/with-use [[_use0] (result/try* (type- tokens))]
@@ -1100,7 +1192,10 @@
           (p/->Ok [(option/->Some return-type) (:end (:location return-type)) tokens]))))
     (p/->Ok [(option/->None) end tokens])))
 
-(defn- optional-type-annotation [tokens]
+(defn- optional-type-annotation
+  "optional_type_annotation(tokens: List(#(Token, Position))) -> Result(#(Option(Type), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2026"}
+  [tokens]
   (if (and (seq tokens) (instance? glexer.token.Colon (nth (first tokens) 0)))
     (let [tokens (rest tokens)]
       (p/with-use [[_use0] (result/map (type- tokens))]
@@ -1108,7 +1203,10 @@
           [(option/->Some annotation) tokens])))
     (p/->Ok [(option/->None) tokens])))
 
-(defn- fn-parameter [tokens]
+(defn- fn-parameter
+  "fn_parameter(tokens: List(#(Token, Position))) -> Result(#(FnParameter, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1954"}
+  [tokens]
   (p/with-use [[_use0] (result/try* (cond
                                       (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)))
                                       (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
@@ -1130,7 +1228,10 @@
         (let [[type- tokens] _use0]
           (p/->Ok [(->FnParameter name type-) tokens]))))))
 
-(defn- use-pattern [tokens]
+(defn- use-pattern
+  "use_pattern(tokens: List(#(Token, Position))) -> Result(#(UsePattern, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:873"}
+  [tokens]
   (p/with-use [[_use0] (result/try* (pattern tokens))]
     (let [[pattern tokens] _use0]
       (p/with-use [[_use0] (result/try* (optional-type-annotation tokens))]
@@ -1139,7 +1240,10 @@
 
 (declare fn-capture call after-expression todo-panic optional-clause-guard case-clause case-clauses case-subjects case- fn- record-update-field record-update expression-unit expression-loop expression assert- use- assignment statement statements)
 
-(defn- fn-capture [label function before after tokens]
+(defn- fn-capture
+  "fn_capture(label: Option(String), function: Expression, before: List(Field(Expression)), after: List(Field(Expression)), tokens: List(#(Token, Position))) -> Result(#(Expression, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1700"}
+  [label function before after tokens]
   (cond
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))
@@ -1168,7 +1272,10 @@
           (empty? tokens)
           (p/->Error (->UnexpectedEndOfInput)))))))
 
-(defn- call [arguments function tokens]
+(defn- call
+  "call(arguments: List(Field(Expression)), function: Expression, tokens: List(#(Token, Position))) -> Result(#(Expression, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1621"}
+  [arguments function tokens]
   (cond
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))
@@ -1245,7 +1352,10 @@
           (empty? tokens)
           (p/->Error (->UnexpectedEndOfInput)))))))
 
-(defn- after-expression [parsed tokens]
+(defn- after-expression
+  "after_expression(parsed: Expression, tokens: List(#(Token, Position))) -> Result(#(Expression, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1586"}
+  [parsed tokens]
   (cond
     (and (<= 2 (count tokens)) (instance? glexer.token.Dot (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
     (let [label (:value (nth (nth tokens 1) 0)) label-start (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2) span (->Span (:start (:location parsed)) (string-offset label-start label)) expression (->FieldAccess span parsed label)]
@@ -1269,7 +1379,10 @@
     :else
     (p/->Ok [parsed tokens])))
 
-(defn- todo-panic [tokens constructor start keyword-name]
+(defn- todo-panic
+  "todo_panic(tokens: List(#(Token, Position)), constructor: fn(Span, Option(Expression)) -> Expression, start: Int, keyword_name: String) -> Result(#(Option(Expression), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1352"}
+  [tokens constructor start ^java.lang.String keyword-name]
   (if (and (seq tokens) (instance? glexer.token.As (nth (first tokens) 0)))
     (let [tokens (rest tokens)]
       (p/with-use [[_use0] (result/try* (expression tokens))]
@@ -1281,7 +1394,10 @@
           expression (constructor span (option/->None))]
       (p/->Ok [(option/->Some expression) tokens]))))
 
-(defn- optional-clause-guard [tokens]
+(defn- optional-clause-guard
+  "optional_clause_guard(tokens: List(#(Token, Position))) -> Result(#(Option(Expression), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1830"}
+  [tokens]
   (if (and (seq tokens) (instance? glexer.token.If (nth (first tokens) 0)))
     (let [tokens (rest tokens)]
       (p/with-use [[_use0] (result/try* (expression tokens))]
@@ -1289,7 +1405,10 @@
           (p/->Ok [(option/->Some expression) tokens]))))
     (p/->Ok [(option/->None) tokens])))
 
-(defn- case-clause [tokens]
+(defn- case-clause
+  "case_clause(tokens: List(#(Token, Position))) -> Result(#(Clause, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1820"}
+  [tokens]
   (let [multipatterns (fn [_capture]
                         (delimited (list) _capture pattern (t/->Comma)))
         result (delimited (list) tokens multipatterns (t/->VBar))]
@@ -1302,7 +1421,10 @@
               (let [[expression tokens] _use0]
                 [(->Clause patterns guard expression) tokens]))))))))
 
-(defn- case-clauses [clauses tokens]
+(defn- case-clauses
+  "case_clauses(clauses: List(Clause), tokens: List(#(Token, Position))) -> Result(#(List(Clause), List(#(Token, Position)), Int), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1807"}
+  [clauses tokens]
   (p/with-use [[_use0] (result/try* (case-clause tokens))]
     (let [[clause tokens] _use0
           clauses (list* clause clauses)]
@@ -1311,7 +1433,10 @@
           (p/->Ok [(list/reverse clauses) tokens (+' end 1)]))
         (case-clauses clauses tokens)))))
 
-(defn- case-subjects [subjects tokens]
+(defn- case-subjects
+  "case_subjects(subjects: List(Expression), tokens: List(#(Token, Position))) -> Result(#(List(Expression), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1795"}
+  [subjects tokens]
   (p/with-use [[_use0] (result/try* (expression tokens))]
     (let [[subject tokens] _use0
           subjects (list* subject subjects)]
@@ -1320,7 +1445,10 @@
           (case-subjects subjects tokens))
         (p/->Ok [(list/reverse subjects) tokens])))))
 
-(defn- case- [tokens start]
+(defn- case-
+  "case_(tokens: List(#(Token, Position)), start: Int) -> Result(#(Option(Expression), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1785"}
+  [tokens start]
   (p/with-use [[_use0] (result/try* (case-subjects (list) tokens))]
     (let [[subjects tokens] _use0]
       (p/with-use [[_ tokens] (expect (t/->LeftBrace) tokens)
@@ -1328,7 +1456,10 @@
         (let [[clauses tokens end] _use0]
           (p/->Ok [(option/->Some (->Case (->Span start end) subjects clauses)) tokens]))))))
 
-(defn- fn- [tokens start]
+(defn- fn-
+  "fn_(tokens: List(#(Token, Position)), start: Int) -> Result(#(Option(Expression), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1857"}
+  [tokens start]
   (p/with-use [[_ tokens] (expect (t/->LeftParen) tokens)]
     (let [result (comma-delimited (list) tokens fn-parameter (t/->RightParen))]
       (p/with-use [[_use0] (result/try* result)]
@@ -1344,7 +1475,10 @@
                                                 return
                                                 body)) tokens]))))))))))
 
-(defn- record-update-field [tokens]
+(defn- record-update-field
+  "record_update_field(tokens: List(#(Token, Position))) -> Result(#(RecordUpdateField(Expression), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1765"}
+  [tokens]
   (cond
     (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)))
     (let [name (:value (nth (first tokens) 0)) tokens (nthrest tokens 2)]
@@ -1361,7 +1495,10 @@
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))))
 
-(defn- record-update [module constructor tokens start]
+(defn- record-update
+  "record_update(module: Option(String), constructor: String, tokens: List(#(Token, Position)), start: Int) -> Result(#(Option(Expression), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1739"}
+  [module ^java.lang.String constructor tokens start]
   (p/with-use [[_use0] (result/try* (expression tokens))]
     (let [[record tokens] _use0]
       (cond
@@ -1384,7 +1521,10 @@
         :else
         (p/->Ok [(option/->None) tokens])))))
 
-(defn- expression-unit [tokens context]
+(defn- expression-unit
+  "expression_unit(tokens: List(#(Token, Position)), context: ParseExpressionUnitContext) -> Result(#(Option(Expression), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1218"}
+  [tokens context]
   (p/with-use [[_use0] (result/try* (cond
                                       (and (<= 5 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Dot (nth (nth tokens 1) 0)) (instance? glexer.token.UpperName (nth (nth tokens 2) 0)) (instance? glexer.token.LeftParen (nth (nth tokens 3) 0)) (instance? glexer.token.DotDot (nth (nth tokens 4) 0)))
                                       (let [module (:value (nth (first tokens) 0)) start (:byte-offset (nth (first tokens) 1)) constructor (:value (nth (nth tokens 2) 0)) tokens (nthrest tokens 5)]
@@ -1531,7 +1671,10 @@
               (p/->Error error))))
         (p/->Ok [(option/->None) tokens])))))
 
-(defn- expression-loop [tokens operators values context]
+(defn- expression-loop
+  "expression_loop(tokens: List(#(Token, Position)), operators: List(BinaryOperator), values: List(Expression), context: ParseExpressionUnitContext) -> Result(#(Expression, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1139"}
+  [tokens operators values context]
   (p/with-use [[_use0] (result/try* (expression-unit tokens context))]
     (let [[expression tokens] _use0]
       (if (instance? gleam.option.None expression)
@@ -1555,10 +1698,16 @@
                 (let [expression (:value subject)]
                   (p/->Ok [expression tokens]))))))))))
 
-(defn- expression [tokens]
+(defn- expression
+  "expression(tokens: List(#(Token, Position))) -> Result(#(Expression, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1089"}
+  [tokens]
   (expression-loop tokens (list) (list) (->RegularExpressionUnit)))
 
-(defn- assert- [tokens start]
+(defn- assert-
+  "assert_(tokens: List(#(Token, Position)), start: Int) -> Result(#(Statement, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:843"}
+  [tokens start]
   (p/with-use [[_use0] (result/try* (expression tokens))]
     (let [[subject tokens] _use0]
       (if (and (seq tokens) (instance? glexer.token.As (nth (first tokens) 0)))
@@ -1573,7 +1722,10 @@
                                   (option/->None))]
           (p/->Ok [statement tokens]))))))
 
-(defn- use- [tokens start]
+(defn- use-
+  "use_(tokens: List(#(Token, Position)), start: Int) -> Result(#(Statement, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:862"}
+  [tokens start]
   (p/with-use [[_use0] (result/try* (if (and (seq tokens) (instance? glexer.token.LeftArrow (nth (first tokens) 0)))
                                       (p/->Ok [(list) tokens])
                                       (delimited (list)
@@ -1588,7 +1740,10 @@
                           patterns
                           function) tokens]))))))
 
-(defn- assignment [kind tokens start]
+(defn- assignment
+  "assignment(kind: AssignmentKind, tokens: List(#(Token, Position)), start: Int) -> Result(#(Statement, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:881"}
+  [kind tokens start]
   (p/with-use [[_use0] (result/try* (pattern tokens))]
     (let [[pattern tokens] _use0]
       (p/with-use [[_use0] (result/try* (optional-type-annotation tokens))]
@@ -1610,7 +1765,10 @@
                                               value)]
                   (p/->Ok [statement tokens]))))))))))
 
-(defn- statement [tokens]
+(defn- statement
+  "statement(tokens: List(#(Token, Position))) -> Result(#(Statement, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:829"}
+  [tokens]
   (cond
     (and (<= 2 (count tokens)) (instance? glexer.token.Let (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (instance? glexer.token.Assert (nth (nth tokens 1) 0)))
     (let [start (:byte-offset (nth (first tokens) 1)) tokens (nthrest tokens 2)]
@@ -1634,7 +1792,10 @@
         (let [[expression tokens] _use0]
           (p/->Ok [(->Expression expression) tokens]))))))
 
-(defn- statements [acc tokens]
+(defn- statements
+  "statements(acc: List(Statement), tokens: List(#(Token, Position))) -> Result(#(List(Statement), Int, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:815"}
+  [acc tokens]
   (if (and (seq tokens) (instance? glexer.token.RightBrace (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)))
     (let [end (:byte-offset (nth (first tokens) 1)) tokens (rest tokens)]
       (p/->Ok [(list/reverse acc) (+' end 1) tokens]))
@@ -1642,7 +1803,10 @@
       (let [[statement tokens] _use0]
         (statements (list* statement acc) tokens)))))
 
-(defn- function-parameter [tokens]
+(defn- function-parameter
+  "function_parameter(tokens: List(#(Token, Position))) -> Result(#(FunctionParameter, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1970"}
+  [tokens]
   (p/with-use [[_use0] (result/try* (cond
                                       (empty? tokens)
                                       (p/->Error (->UnexpectedEndOfInput))
@@ -1672,7 +1836,10 @@
         (let [[type- tokens] _use0]
           (p/->Ok [(->FunctionParameter label parameter type-) tokens]))))))
 
-(defn- function-definition [module attributes publicity name start tokens]
+(defn- function-definition
+  "function_definition(module: Module, attributes: List(Attribute), publicity: Publicity, name: String, start: Int, tokens: List(#(Token, Position))) -> Result(#(Module, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:771"}
+  [module attributes publicity ^java.lang.String name start tokens]
   (p/with-use [[_ tokens] (expect (t/->LeftParen) tokens)]
     (let [result (comma-delimited (list)
                                   tokens
@@ -1698,10 +1865,16 @@
                       module (push-function module attributes function)]
                   (p/->Ok [module tokens]))))))))))
 
-(defn- push-constant [module attributes constant]
+(defn- push-constant
+  "push_constant(module: Module, attributes: List(Attribute), constant: Constant) -> Module"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:369"}
+  [module attributes constant]
   (->Module (:imports module) (:custom-types module) (:type-aliases module) (list* (->Definition (list/reverse attributes) constant) (:constants module)) (:functions module)))
 
-(defn- expect-name [tokens next]
+(defn- expect-name
+  "expect_name(tokens: List(#(Token, Position)), next: fn(String, List(#(Token, Position))) -> Result(a, Error)) -> Result(a, Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:443"}
+  [tokens next]
   (cond
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))
@@ -1714,7 +1887,10 @@
     (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
       (p/->Error (->UnexpectedToken other position)))))
 
-(defn- const-definition [module attributes publicity tokens start]
+(defn- const-definition
+  "const_definition(module: Module, attributes: List(Attribute), publicity: Publicity, tokens: List(#(Token, Position)), start: Int) -> Result(#(Module, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:1996"}
+  [module attributes publicity tokens start]
   (p/with-use [[name tokens] (expect-name tokens)
                [_use0] (result/try* (optional-type-annotation tokens))]
     (let [[annotation tokens] _use0]
@@ -1730,14 +1906,23 @@
               module (push-constant module attributes constant)]
           (p/->Ok [module tokens]))))))
 
-(defn- push-custom-type [module attributes custom-type]
+(defn- push-custom-type
+  "push_custom_type(module: Module, attributes: List(Attribute), custom_type: CustomType) -> Module"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:391"}
+  [module attributes custom-type]
   (let [custom-type (->CustomType (:location custom-type) (:name custom-type) (:publicity custom-type) (:opaque- custom-type) (:parameters custom-type) (list/reverse (:variants custom-type)))]
     (->Module (:imports module) (list* (->Definition (list/reverse attributes) custom-type) (:custom-types module)) (:type-aliases module) (:constants module) (:functions module))))
 
-(defn- push-variant [custom-type variant]
+(defn- push-variant
+  "push_variant(custom_type: CustomType, variant: Variant) -> CustomType"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:415"}
+  [custom-type variant]
   (->CustomType (:location custom-type) (:name custom-type) (:publicity custom-type) (:opaque- custom-type) (:parameters custom-type) (list* variant (:variants custom-type))))
 
-(defn- variant-field [tokens]
+(defn- variant-field
+  "variant_field(tokens: List(#(Token, Position))) -> Result(#(VariantField, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2271"}
+  [tokens]
   (if (and (<= 2 (count tokens)) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.token.Colon (nth (nth tokens 1) 0)))
     (let [name (:value (nth (first tokens) 0)) tokens (nthrest tokens 2)]
       (p/with-use [[_use0] (result/try* (type- tokens))]
@@ -1748,7 +1933,10 @@
         (let [[type- tokens] _use0]
           (p/->Ok [(->UnlabelledVariantField type-) tokens]))))))
 
-(defn- expect-upper-name [tokens next]
+(defn- expect-upper-name
+  "expect_upper_name(tokens: List(#(Token, Position)), next: fn(String, Int, List(#(Token, Position))) -> Result(a, Error)) -> Result(a, Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:432"}
+  [tokens next]
   (cond
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))
@@ -1761,7 +1949,10 @@
     (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
       (p/->Error (->UnexpectedToken other position)))))
 
-(defn- attribute [tokens]
+(defn- attribute
+  "attribute(tokens: List(#(Token, Position))) -> Result(#(Attribute, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:473"}
+  [tokens]
   (p/with-use [[_use0] (result/try* (cond
                                       (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)))
                                       (let [name (:value (nth (first tokens) 0)) tokens (rest tokens)]
@@ -1782,7 +1973,10 @@
               (p/->Ok [(->Attribute name parameters) tokens]))))
         (p/->Ok [(->Attribute name (list)) tokens])))))
 
-(defn- attributes [accumulated-attributes tokens]
+(defn- attributes
+  "attributes(accumulated_attributes: List(Attribute), tokens: List(#(Token, Position))) -> Result(#(List(Attribute), List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2255"}
+  [accumulated-attributes tokens]
   (if (and (seq tokens) (instance? glexer.token.At (nth (first tokens) 0)))
     (let [tokens (rest tokens) subject (attribute tokens)]
       (if (instance? gleam.prelude.Error subject)
@@ -1792,7 +1986,10 @@
           (recur (list* attribute accumulated-attributes) tokens))))
     (p/->Ok [(list/reverse accumulated-attributes) tokens])))
 
-(defn- until [limit acc tokens callback]
+(defn- until
+  "until(limit: Token, acc: a, tokens: List(#(Token, Position)), callback: fn(a, List(#(Token, Position))) -> Result(#(a, List(#(Token, Position))), Error)) -> Result(#(a, Int, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:454"}
+  [limit acc tokens callback]
   (cond
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))
@@ -1809,7 +2006,10 @@
         (let [error (:value subject)]
           (p/->Error error))))))
 
-(defn- variants [ct tokens]
+(defn- variants
+  "variants(ct: CustomType, tokens: List(#(Token, Position))) -> Result(#(CustomType, Int, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2237"}
+  [ct tokens]
   (p/with-use [[ct tokens] (until (t/->RightBrace) ct tokens)
                [_use0] (result/try* (attributes (list) tokens))]
     (let [[attributes tokens] _use0]
@@ -1832,7 +2032,10 @@
               ct (push-variant ct (->Variant name fields attributes))]
           (p/->Ok [ct tokens]))))))
 
-(defn- custom-type [module attributes name parameters publicity opaque- tokens start]
+(defn- custom-type
+  "custom_type(module: Module, attributes: List(Attribute), name: String, parameters: List(String), publicity: Publicity, opaque_: Bool, tokens: List(#(Token, Position)), start: Int) -> Result(#(Module, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2209"}
+  [module attributes ^java.lang.String name parameters publicity opaque- tokens start]
   (let [ct (->CustomType (->Span 0 0)
                          name
                          publicity
@@ -1845,10 +2048,16 @@
             module (push-custom-type module attributes ct)]
         (p/->Ok [module tokens])))))
 
-(defn- push-type-alias [module attributes type-alias]
+(defn- push-type-alias
+  "push_type_alias(module: Module, attributes: List(Attribute), type_alias: TypeAlias) -> Module"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:404"}
+  [module attributes type-alias]
   (->Module (:imports module) (:custom-types module) (list* (->Definition (list/reverse attributes) type-alias) (:type-aliases module)) (:constants module) (:functions module)))
 
-(defn- type-alias [module attributes name parameters publicity start tokens]
+(defn- type-alias
+  "type_alias(module: Module, attributes: List(Attribute), name: String, parameters: List(String), publicity: Publicity, start: Int, tokens: List(#(Token, Position))) -> Result(#(Module, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2123"}
+  [module attributes ^java.lang.String name parameters publicity start tokens]
   (p/with-use [[_use0] (result/try* (type- tokens))]
     (let [[type- tokens] _use0
           span (->Span start (:end (:location type-)))
@@ -1856,7 +2065,10 @@
           module (push-type-alias module attributes alias)]
       (p/->Ok [module tokens]))))
 
-(defn- name [tokens]
+(defn- name
+  "name(tokens: List(#(Token, Position))) -> Result(#(String, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2229"}
+  [tokens]
   (cond
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))
@@ -1869,7 +2081,10 @@
     (let [token (nth (first tokens) 0) position (nth (first tokens) 1)]
       (p/->Error (->UnexpectedToken token position)))))
 
-(defn- type-definition [module attributes publicity opaque- tokens start]
+(defn- type-definition
+  "type_definition(module: Module, attributes: List(Attribute), publicity: Publicity, opaque_: Bool, tokens: List(#(Token, Position)), start: Int) -> Result(#(Module, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:2074"}
+  [module attributes publicity opaque- tokens start]
   (p/with-use [[name-value name-start tokens] (expect-upper-name tokens)
                [_use0] (result/try* (if (and (seq tokens) (instance? glexer.token.LeftParen (nth (first tokens) 0)))
                                       (let [tokens (rest tokens)]
@@ -1913,7 +2128,10 @@
               module (push-custom-type module attributes ct)]
           (p/->Ok [module tokens]))))))
 
-(defn- optional-module-alias [tokens end]
+(defn- optional-module-alias
+  "optional_module_alias(tokens: List(#(Token, Position)), end: Int) -> #(Option(AssignmentName), Int, List(#(Token, Position)))"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:603"}
+  [tokens end]
   (cond
     (and (<= 2 (count tokens)) (instance? glexer.token.As (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)))
     (let [alias (:value (nth (nth tokens 1) 0)) alias-start (:byte-offset (nth (nth tokens 1) 1)) tokens (nthrest tokens 2)]
@@ -1926,7 +2144,10 @@
     :else
     [(option/->None) end tokens]))
 
-(defn- unqualified-imports [types values tokens]
+(defn- unqualified-imports
+  "unqualified_imports(types: List(UnqualifiedImport), values: List(UnqualifiedImport), tokens: List(#(Token, Position))) -> Result(UnqualifiedImports, Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:642"}
+  [types values tokens]
   (cond
     (empty? tokens)
     (p/->Error (->UnexpectedEndOfInput))
@@ -2008,17 +2229,23 @@
     (let [other (nth (first tokens) 0) position (nth (first tokens) 1)]
       (p/->Error (->UnexpectedToken other position)))))
 
-(defn- optional-unqualified-imports [tokens end]
+(defn- optional-unqualified-imports
+  "optional_unqualified_imports(tokens: List(#(Token, Position)), end: Int) -> Result(UnqualifiedImports, Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:631"}
+  [tokens end]
   (if (and (<= 2 (count tokens)) (instance? glexer.token.Dot (nth (first tokens) 0)) (instance? glexer.token.LeftBrace (nth (nth tokens 1) 0)))
     (let [tokens (nthrest tokens 2)]
       (unqualified-imports (list) (list) tokens))
     (p/->Ok (->UnqualifiedImports (list) (list) end tokens))))
 
-(defn- module-name [name end tokens]
+(defn- module-name
+  "module_name(name: String, end: Int, tokens: List(#(Token, Position))) -> Result(#(String, Int, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:580"}
+  [^java.lang.String name end tokens]
   (cond
     (and (<= 2 (count tokens)) (instance? glexer.token.Slash (nth (first tokens) 0)) (instance? glexer.token.Name (nth (nth tokens 1) 0)) (instance? glexer.Position (nth (nth tokens 1) 1)) (not= name ""))
     (let [i (:byte-offset (nth (nth tokens 1) 1)) s (:value (nth (nth tokens 1) 0)) tokens (nthrest tokens 2) end (+' i (string/byte-size s))]
-      (recur (str (str name "/") s) end tokens))
+      (recur (str name "/" s) end tokens))
 
     (and (seq tokens) (instance? glexer.token.Name (nth (first tokens) 0)) (instance? glexer.Position (nth (first tokens) 1)) (= name ""))
     (let [i (:byte-offset (nth (first tokens) 1)) s (:value (nth (first tokens) 0)) tokens (rest tokens) end (+' i (string/byte-size s))]
@@ -2034,7 +2261,10 @@
     :else
     (p/->Ok [name end tokens])))
 
-(defn- import-statement [module attributes tokens start]
+(defn- import-statement
+  "import_statement(module: Module, attributes: List(Attribute), tokens: List(#(Token, Position)), start: Int) -> Result(#(Module, List(#(Token, Position))), Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:562"}
+  [module attributes tokens start]
   (p/with-use [[_use0] (result/try* (module-name "" 0 tokens))]
     (let [[module-name end tokens] _use0]
       (p/with-use [[_use0] (result/try* (optional-unqualified-imports tokens
@@ -2047,7 +2277,10 @@
               module (->Module (list* definition (:imports module)) (:custom-types module) (:type-aliases module) (:constants module) (:functions module))]
           (p/->Ok [module tokens]))))))
 
-(defn- slurp [module attributes tokens]
+(defn- slurp
+  "slurp(module: Module, attributes: List(Attribute), tokens: List(#(Token, Position))) -> Result(Module, Error)"
+  {:gleam/src "project/build/packages/glance/src/glance.gleam:491"}
+  [module attributes tokens]
   (cond
     (and (seq tokens) (instance? glexer.token.At (nth (first tokens) 0)))
     (let [tokens (rest tokens)]
@@ -2111,8 +2344,10 @@
       (unexpected-error tokens))))
 
 (defn module
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}
-  [src]
+  "module(src: String) -> Result(Module, Error)"
+  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]
+   :gleam/src "project/build/packages/glance/src/glance.gleam:361"}
+  [^java.lang.String src]
   (-> (glexer/new* src)
       glexer/discard-comments
       glexer/discard-whitespace
