@@ -1,0 +1,2 @@
+{:config-paths ["metosin/malli-types-clj"]
+ :hooks {:analyze-call {gleam.prelude/with-use hooks.with-use/with-use}}}

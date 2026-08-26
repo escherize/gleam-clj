@@ -9,7 +9,7 @@ rosetta/work/
 tour/work/
 tour/expected/
 tour/gen/
-/.clj-kondo/
+/.clj-kondo/.cache/
 libs/gleam-parser/project/build/
 libs/mb-lib-parse/project/build/
 .lsp/
