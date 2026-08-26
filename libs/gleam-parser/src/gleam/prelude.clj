@@ -44,6 +44,18 @@
   [& segments]
   (vec (apply concat segments)))
 
+(defn ba-uint
+  "Big-endian unsigned int from `n` bytes of `v` starting at `off`."
+  [v off n]
+  (reduce (fn [acc i] (+' (*' acc 256) (nth v (+ off i)))) 0 (range n)))
+
+(defn ba-seg=
+  "True if the bytes of `v` at `off` equal the byte vector `lit`."
+  [v off lit]
+  (let [end (+ off (count lit))]
+    (and (<= end (count v))
+         (= (subvec v off end) lit))))
+
 (defmacro with-use
   "Gleam `use` sugar, flattened. Binding pairs are params-vector + call;
   everything after a pair runs as a callback appended to that call:

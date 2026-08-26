@@ -354,8 +354,8 @@ fn int_lit(value: &str) -> String {
 /// Translate a Gleam string literal body (raw source text, escapes included)
 /// into a Clojure string literal body. Gleam and Clojure share \\n \\r \\t
 /// \\\\ \\\"; Gleam adds \\e, \\f and \\u{...} which Clojure spells differently.
-fn clj_string(value: &str) -> String {
-    // Unescape Gleam syntax to real chars.
+/// Unescape a Gleam string literal's source text into its real characters.
+fn gleam_str_unescape(value: &str) -> String {
     let mut chars = value.chars().peekable();
     let mut real = String::new();
     while let Some(c) = chars.next() {
@@ -384,6 +384,16 @@ fn clj_string(value: &str) -> String {
             other => panic!("unknown string escape: \\{other:?}"),
         }
     }
+    real
+}
+
+/// UTF-8 byte length of a Gleam string literal (for bit-array segments).
+fn gleam_str_byte_len(value: &str) -> usize {
+    gleam_str_unescape(value).len()
+}
+
+fn clj_string(value: &str) -> String {
+    let real = gleam_str_unescape(value);
     // Re-escape for Clojure.
     let mut out = String::new();
     for c in real.chars() {

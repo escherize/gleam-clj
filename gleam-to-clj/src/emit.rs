@@ -1217,13 +1217,238 @@ fn pattern_cond_inner(
                 }
             }
         }
-        // The empty bit array <<>>: a plain emptiness test on the byte
-        // vector. Segmented bit-array patterns stay unsupported (loud panic).
-        Pattern::BitArray { segments, .. } if segments.is_empty() => {
-            tests.push(format!("(= [] {subj})"));
+        Pattern::BitArray { segments, .. } => {
+            bit_array_pattern(ctx, segments, subj, tests, binds);
         }
         other => panic!("unsupported pattern: {other:?}"),
     }
+}
+
+enum SizeVal {
+    Const(usize),
+    Dyn(String),
+}
+
+/// Resolve a bit-array pattern size expression. Variables bound earlier in
+/// the same pattern resolve through `local` to their accessor expressions.
+fn ba_size_val(
+    bs: &gleam_core::ast::TypedBitArraySize,
+    local: &HashMap<String, String>,
+) -> SizeVal {
+    use gleam_core::ast::BitArraySize as BS;
+    match bs {
+        BS::Int { value, .. } => SizeVal::Const(
+            value
+                .replace("_", "")
+                .parse()
+                .unwrap_or_else(|_| panic!("bit-array size literal {value}")),
+        ),
+        BS::Variable { name, .. } => {
+            let n = user_var(&kebab(name.as_str()));
+            SizeVal::Dyn(local.get(&n).cloned().unwrap_or(n))
+        }
+        BS::Block { inner, .. } => ba_size_val(inner, local),
+        BS::BinaryOperator { operator, left, right, .. } => {
+            let part = |v: SizeVal| match v {
+                SizeVal::Const(n) => n.to_string(),
+                SizeVal::Dyn(e) => e,
+            };
+            SizeVal::Dyn(format!(
+                "({} {} {})",
+                binop(&operator.to_bin_op()),
+                part(ba_size_val(left, local)),
+                part(ba_size_val(right, local))
+            ))
+        }
+    }
+}
+
+/// Compile a bit-array pattern over the byte-vector runtime representation.
+///
+/// Supports byte-aligned segments: utf8 string literals, unsigned big-endian
+/// ints of constant bit size (multiple of 8), byte slices with constant or
+/// runtime sizes (`x:size(n)-bytes`), and a trailing `rest:bytes`/`bits`.
+/// Everything else (floats, signed, little-endian, utf16/32, codepoints,
+/// non-byte-aligned or dynamic bit sizes) panics loudly.
+fn bit_array_pattern(
+    ctx: &Emit,
+    segments: &[gleam_core::ast::TypedPatternBitArraySegment],
+    subj: &str,
+    tests: &mut Vec<String>,
+    binds: &mut Vec<(String, String)>,
+) {
+    use gleam_core::ast::BitArrayOption as Opt;
+
+    // Running offset in bytes: a constant part plus runtime expressions.
+    let mut const_off: usize = 0;
+    let mut dyn_off: Vec<String> = Vec::new();
+    let mut has_rest = false;
+    let mut seg_tests: Vec<String> = Vec::new();
+    let mut seg_binds: Vec<(String, String)> = Vec::new();
+    // Bindings made by earlier segments of THIS pattern: tests and offsets
+    // run before the pattern's let, so size(var) references to them must
+    // inline the accessor expression rather than the name.
+    let mut local: HashMap<String, String> = HashMap::new();
+
+    fn off_expr(c: usize, d: &[String]) -> String {
+        match (c, d.len()) {
+            (c, 0) => c.to_string(),
+            (0, 1) => d[0].clone(),
+            (0, _) => format!("(+ {})", d.join(" ")),
+            _ => format!("(+ {c} {})", d.join(" ")),
+        }
+    }
+
+    for (i, seg) in segments.iter().enumerate() {
+        let mut size: Option<&TypedPattern> = None;
+        let mut bytes_unit = false; // -bytes, or -unit(8)
+        let mut is_rest_marker = false; // :bytes / :bits without a size
+        for o in &seg.options {
+            match o {
+                Opt::Size { value, .. } => size = Some(value),
+                Opt::Bytes { .. } | Opt::Bits { .. } => {
+                    if seg.options.iter().any(|o| matches!(o, Opt::Size { .. })) {
+                        bytes_unit = true;
+                    } else {
+                        is_rest_marker = true;
+                    }
+                }
+                Opt::Unit { value: 8, .. } => bytes_unit = true,
+                // Utf8 rides along on string-literal segments; the value
+                // match rejects it on anything else.
+                Opt::Utf8 { .. } | Opt::Int { .. } | Opt::Unsigned { .. } | Opt::Big { .. } => {}
+                other => panic!(
+                    "unsupported bit-array pattern option in {}: {other:?}",
+                    ctx.module_path
+                ),
+            }
+        }
+
+        // Segment width in bytes: constant, runtime expression, or rest.
+        enum Width {
+            Const(usize),
+            Dyn(String),
+            Rest,
+        }
+        let width = if is_rest_marker {
+            if i != segments.len() - 1 {
+                panic!(
+                    "bit-array pattern in {}: unsized :bytes/:bits segment must be last",
+                    ctx.module_path
+                );
+            }
+            Width::Rest
+        } else {
+            match size {
+                None => Width::Const(1), // default int segment: 8 bits
+                Some(Pattern::BitArraySize(bs)) => match ba_size_val(bs, &local) {
+                    SizeVal::Const(n) => {
+                        if bytes_unit {
+                            Width::Const(n)
+                        } else if n % 8 == 0 {
+                            Width::Const(n / 8)
+                        } else {
+                            panic!(
+                                "bit-array pattern in {}: size {n} bits is not byte-aligned",
+                                ctx.module_path
+                            );
+                        }
+                    }
+                    SizeVal::Dyn(expr) => {
+                        if !bytes_unit {
+                            panic!(
+                                "bit-array pattern in {}: runtime size(..) needs the -bytes unit",
+                                ctx.module_path
+                            );
+                        }
+                        // A negative runtime size is a match failure, not a crash.
+                        seg_tests.push(format!("(<= 0 {expr})"));
+                        Width::Dyn(expr)
+                    }
+                },
+                Some(other) => panic!(
+                    "unsupported bit-array size pattern in {}: {other:?}",
+                    ctx.module_path
+                ),
+            }
+        };
+
+        let off = off_expr(const_off, &dyn_off);
+        match &*seg.value {
+            Pattern::String { value, .. } if size.is_none() => {
+                let lit = clj_string(value.as_str());
+                seg_tests.push(format!("(p/ba-seg= {subj} {off} (p/ba-utf8 \"{lit}\"))"));
+                const_off += crate::gleam_str_byte_len(value.as_str());
+            }
+            Pattern::Int { value, .. } => match width {
+                Width::Const(1) if !bytes_unit => {
+                    seg_tests.push(format!("(= {} (nth {subj} {off}))", int_lit(value)));
+                    const_off += 1;
+                }
+                Width::Const(n) if !bytes_unit => {
+                    seg_tests
+                        .push(format!("(= {} (p/ba-uint {subj} {off} {n}))", int_lit(value)));
+                    const_off += n;
+                }
+                _ => panic!(
+                    "unsupported int bit-array segment in {}: sized -bytes or rest",
+                    ctx.module_path
+                ),
+            },
+            Pattern::Discard { .. } => match width {
+                Width::Rest => has_rest = true,
+                Width::Const(n) => const_off += n,
+                Width::Dyn(n) => dyn_off.push(n),
+            },
+            Pattern::Variable { name, .. } => {
+                let var = user_var(&kebab(name.as_str()));
+                let expr = match width {
+                    Width::Rest => {
+                        has_rest = true;
+                        format!("(subvec {subj} {off})")
+                    }
+                    Width::Const(n) if bytes_unit => {
+                        let end = off_expr(const_off + n, &dyn_off);
+                        const_off += n;
+                        format!("(subvec {subj} {off} {end})")
+                    }
+                    Width::Const(1) => {
+                        const_off += 1;
+                        format!("(nth {subj} {off})")
+                    }
+                    Width::Const(n) => {
+                        const_off += n;
+                        format!("(p/ba-uint {subj} {off} {n})")
+                    }
+                    Width::Dyn(n) => {
+                        let mut parts = dyn_off.clone();
+                        parts.push(n.clone());
+                        let end = off_expr(const_off, &parts);
+                        dyn_off.push(n);
+                        format!("(subvec {subj} {off} {end})")
+                    }
+                };
+                let _ = local.insert(var.clone(), expr.clone());
+                seg_binds.push((var, expr));
+            }
+            other => panic!(
+                "unsupported bit-array segment pattern in {}: {other:?}",
+                ctx.module_path
+            ),
+        }
+    }
+
+    // Length test first: it guards every nth/subvec the segment tests and
+    // binds perform.
+    let total = off_expr(const_off, &dyn_off);
+    let cmp = if has_rest { ">=" } else { "=" };
+    if has_rest && total == "0" {
+        // any bit array matches <<rest:bits>>
+    } else {
+        tests.push(format!("({cmp} (count {subj}) {total})"));
+    }
+    tests.append(&mut seg_tests);
+    binds.append(&mut seg_binds);
 }
 
 fn pattern_literal(ctx: &Emit, pattern: &TypedPattern) -> Option<String> {

@@ -25,7 +25,7 @@
   {:malli/schema [:=> [:cat [:vector :int]] :string]
    :gleam/src "regressions.gleam:14"}
   ^java.lang.String [b]
-  (if (= [] b) "empty" "bytes"))
+  (if (= (count b) 0) "empty" "bytes"))
 
 (defn bracket-label
   "bracket_label(n: Int) -> String
