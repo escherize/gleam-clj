@@ -12,7 +12,7 @@ pub type IdError {
   OutOfRange(Int)
 }
 
-/// Parse untrusted input into a UserId — the only way to make one.
+/// Parse untrusted input into a UserId: the only way to make one.
 pub fn parse_user_id(raw: String) -> Result(UserId, IdError) {
   case string.trim(raw) {
     "" -> Error(Empty)

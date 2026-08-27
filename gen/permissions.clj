@@ -90,7 +90,7 @@
 (defn parse-user-id
   "parse_user_id(raw: String) -> Result(UserId, IdError)
 
-   Parse untrusted input into a UserId — the only way to make one."
+   Parse untrusted input into a UserId: the only way to make one."
   {:malli/schema [:=> [:cat :string]
                       (p/result-of (UserId-schema) (IdError-schema))]
    :gleam/src "permissions.gleam:16"}

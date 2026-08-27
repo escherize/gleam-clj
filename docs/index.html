@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>gleam-clj — Gleam on the JVM, compiled to readable Clojure</title>
+<title>gleam-clj · Gleam on the JVM, compiled to readable Clojure</title>
 <meta name="description" content="A compiler that turns Gleam source into readable Clojure that runs on the JVM. Compiles from Gleam's own typed AST, self-hosts the standard library, and verifies every claim against the official Gleam compiler.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -314,7 +314,7 @@
 <div class="shell">
 <div class="hero">
   <h1 class="hero-title">Write <span class="pink">Gleam</span>. Ship readable <span class="grn">Clojure</span>.</h1>
-  <p class="hero-sub">gleam-clj compiles Gleam — a small, statically typed functional language — into idiomatic Clojure that runs on the JVM. The type checker guards your logic; the output reads like a person wrote it.</p>
+  <p class="hero-sub">gleam-clj compiles Gleam, a small statically typed functional language, into idiomatic Clojure that runs on the JVM. The type checker guards your logic; the output reads like a person wrote it.</p>
   <div class="hero-cta">
     <a class="btn btn-primary" href="#start">Get started →</a>
     <a class="btn btn-ghost" href="#verify">How it's verified</a>
@@ -361,7 +361,7 @@
 
   <div class="receipts">
     <div class="receipt"><div class="n">114/114</div><div class="l">corpus programs produce byte-identical output to the official Gleam compiler</div></div>
-    <div class="receipt"><div class="n">20,000</div><div class="l">differential-fuzz comparisons against a real Clojure implementation — zero divergence</div></div>
+    <div class="receipt"><div class="n">20,000</div><div class="l">differential-fuzz comparisons against a real Clojure implementation, zero divergence</div></div>
     <div class="receipt"><div class="n">197</div><div class="l">Metabase tests passing on a compiled-Gleam parser, in Metabase's own suite</div></div>
     <div class="receipt"><div class="n">368/468</div><div class="l">standard-library functions run Gleam's own implementations, compiled by this compiler</div></div>
   </div>
@@ -384,12 +384,12 @@ git clone https://github.com/escherize/gleam-clj
 
 <span class="cmt"># or compile a whole project (src/, test/, and vendored hex deps)</span>
 ./target/debug/gleam-to-clj build ./my-project ./out</pre>
-    <p>The output namespace requires a small runtime — the prelude, an FFI core, and the compiled standard library — packaged as a git-dep so consuming code needs <strong>no Rust or Gleam toolchain</strong>. Run the result like any Clojure:</p>
+    <p>The output namespace requires a small runtime (the prelude, an FFI core, and the compiled standard library) packaged as a git-dep so consuming code needs <strong>no Rust or Gleam toolchain</strong>. Run the result like any Clojure:</p>
 <pre class="block"><span class="pr">clojure</span> -M -m my-module
 <span class="cmt">;; => your program, on the JVM</span></pre>
-    <div class="note blue">The compiler <strong>fails loud</strong>. Anything it can't compile panics at build time with the feature named — nothing is silently dropped or mistranslated. That property is what makes the verification below meaningful.</div>
+    <div class="note blue">The compiler <strong>fails loud</strong>. Anything it can't compile panics at build time with the feature named; nothing is silently dropped or mistranslated. That property is what makes the verification below meaningful.</div>
 
-    <h3>Or skip the shuffle — call Gleam straight from Clojure</h3>
+    <h3>Or skip the shuffle: call Gleam straight from Clojure</h3>
     <p>Once the compiler binary is built, one command compiles a Gleam snippet and calls it, no REPL setup:</p>
 <pre class="block"><span class="cmt"># compile a Gleam fn and invoke it from Clojure in one shot</span>
 clojure -M:try <span class="st">'pub fn add(a: Int, b: Int) -> Int { a + b }'</span> add 2 40
@@ -397,7 +397,7 @@ clojure -M:try <span class="st">'pub fn add(a: Int, b: Int) -> Int { a + b }'</s
 
 <span class="cmt"># or drop into a REPL with the runtime + loader wired up</span>
 clojure -M:repl</pre>
-    <p>From that REPL, <code>gleam-clj.load</code> compiles <code>.gleam</code> files on demand and loads the emitted namespace — cached by source hash, so re-loading unchanged source is free:</p>
+    <p>From that REPL, <code>gleam-clj.load</code> compiles <code>.gleam</code> files on demand and loads the emitted namespace, cached by source hash, so re-loading unchanged source is free:</p>
 <pre class="block">(<span class="pr">require</span> '[gleam-clj.load <span class="fl">:as</span> gl])
 
 (gl/require-gleam <span class="st">"gleam-src/coin_change.gleam"</span>)   <span class="cmt">;; => 'coin-change</span>
@@ -405,7 +405,7 @@ clojure -M:repl</pre>
 
 (gl/eval-gleam <span class="st">"pub fn double(x: Int) -> Int { x * 2 }"</span>)
 <span class="cmt">;; the snippet's public fns are now callable</span></pre>
-    <p>And when the Gleam doesn't hold up, you get <strong>Gleam's own compiler error</strong> — the same diagnostic <code>gleam build</code> prints, right there in your REPL. Forget a variant in a <code>case</code> and the type checker names the one you missed before a single line runs:</p>
+    <p>And when the Gleam doesn't hold up, you get <strong>Gleam's own compiler error</strong>: the same diagnostic <code>gleam build</code> prints, right there in your REPL. Forget a variant in a <code>case</code> and the type checker names the one you missed before a single line runs:</p>
 <pre class="block">(gl/eval-gleam <span class="st">"
   pub type Shape { Circle Square Triangle }
   pub fn name(s: Shape) -> String {
@@ -431,27 +431,27 @@ clojure -M:repl</pre>
 ;; The missing patterns are:
 ;;
 ;;     Triangle</span></pre>
-    <p>That check runs in Gleam's real type checker (this project reuses it), so exhaustiveness, type mismatches, and syntax errors all surface with source spans and hints — never a stack trace from the machinery underneath.</p>
+    <p>That check runs in Gleam's real type checker (this project reuses it), so exhaustiveness, type mismatches, and syntax errors all surface with source spans and hints. Never a stack trace from the machinery underneath.</p>
   </section>
 
   <section id="backends">
     <div class="sec-tag">Compared to erlang &amp; js</div>
     <h2>A third backend, held to the first two's standard</h2>
-    <p>Gleam officially compiles to <strong>Erlang</strong> (the BEAM) and <strong>JavaScript</strong>. gleam-clj is an unofficial third target: the JVM, via Clojure. It reuses Gleam's own compiler front-end — the same parser and type checker — so a program that type-checks for the official backends type-checks here.</p>
+    <p>Gleam officially compiles to <strong>Erlang</strong> (the BEAM) and <strong>JavaScript</strong>. gleam-clj is an unofficial third target: the JVM, via Clojure. It reuses Gleam's own compiler front-end (the same parser and type checker), so a program that type-checks for the official backends type-checks here.</p>
     <div class="cmp-wrap">
     <table class="cmp">
       <thead><tr><th>&nbsp;</th><th class="erl">→ Erlang (BEAM)</th><th class="js">→ JavaScript</th><th class="jvm">→ Clojure (this)</th></tr></thead>
       <tbody>
-        <tr><th>Official?</th><td class="erl">Yes</td><td class="js">Yes</td><td class="jvm">No — community</td></tr>
-        <tr><th>Integers</th><td class="erl">Arbitrary precision</td><td class="js">f64 (unsafe past 2⁵³)</td><td class="jvm">Arbitrary precision — Clojure's <code>+'</code>. Matches BEAM, not JS.</td></tr>
+        <tr><th>Official?</th><td class="erl">Yes</td><td class="js">Yes</td><td class="jvm">No; community</td></tr>
+        <tr><th>Integers</th><td class="erl">Arbitrary precision</td><td class="js">f64 (unsafe past 2⁵³)</td><td class="jvm">Arbitrary precision via Clojure's <code>+'</code>. Matches BEAM, not JS.</td></tr>
         <tr><th>Concurrency</th><td class="erl">BEAM processes, OTP</td><td class="js">Single-threaded, async</td><td class="jvm">JVM threads. OTP is out of scope.</td></tr>
         <tr><th>Tail calls</th><td class="erl">Native TCO</td><td class="js">Trampolined</td><td class="jvm">Self-calls → <code>recur</code>; mutual recursion is stack-bounded.</td></tr>
-        <tr><th>Interop target</th><td class="erl">Erlang / Elixir</td><td class="js">JS / TS / browser</td><td class="jvm">Clojure — plain records, keyword access, value equality.</td></tr>
-        <tr><th>Output you read</th><td class="erl">Generated Erlang</td><td class="js">Generated JS/mjs</td><td class="jvm">Idiomatic Clojure — the point of the project.</td></tr>
+        <tr><th>Interop target</th><td class="erl">Erlang / Elixir</td><td class="js">JS / TS / browser</td><td class="jvm">Clojure: plain records, keyword access, value equality.</td></tr>
+        <tr><th>Output you read</th><td class="erl">Generated Erlang</td><td class="js">Generated JS/mjs</td><td class="jvm">Idiomatic Clojure, the point of the project.</td></tr>
       </tbody>
     </table>
     </div>
-    <p>The headline difference: the official backends generate code you're not meant to read. gleam-clj treats <strong>readable, idiomatic Clojure as the deliverable</strong> — kebab-case, docstrings, <code>-&gt;</code> threading, records with keyword access — so the output is code a Clojure team can review, call, and trust.</p>
+    <p>The headline difference: the official backends generate code you're not meant to read. gleam-clj treats <strong>readable, idiomatic Clojure as the deliverable</strong>: kebab-case, docstrings, <code>-&gt;</code> threading, records with keyword access. The output is code a Clojure team can review, call, and trust.</p>
   </section>
 
   <section id="runtime">
@@ -462,12 +462,12 @@ clojure -M:repl</pre>
       <div class="layer">
         <h3><code>gleam.prelude</code> + <code>stdlib</code></h3>
         <span class="badge">368 / 468 fns</span>
-        <p>The standard library's pure functions — folds, sorts, Result plumbing, string ops — are pure Gleam, so they're <strong>compiled, not reimplemented</strong>. They run Gleam's actual logic.</p>
+        <p>The standard library's pure functions (folds, sorts, Result plumbing, string ops) are pure Gleam, so they're <strong>compiled, not reimplemented</strong>. They run Gleam's actual logic.</p>
       </div>
       <div class="layer">
-        <h3><code>gleam-ffi</code> — the native core</h3>
+        <h3><code>gleam-ffi</code>: the native core</h3>
         <span class="badge">~110 fns</span>
-        <p>The only hand-written layer: Clojure implementations of every <code>@external</code> the stdlib bottoms out in — dict as a persistent map, graphemes via <code>BreakIterator</code>, UTF-8 byte ops, base64. The one place a bug could be <em>silent</em> — which is exactly where the fuzzers aim.</p>
+        <p>The only hand-written layer: Clojure implementations of every <code>@external</code> the stdlib bottoms out in: dict as a persistent map, graphemes via <code>BreakIterator</code>, UTF-8 byte ops, base64. The one place a bug could be <em>silent</em>, which is exactly where the fuzzers aim.</p>
       </div>
       <div class="layer">
         <h3>Data representation</h3>
@@ -504,13 +504,13 @@ clojure -M:repl</pre>
         </div>
       </div>
     </div>
-    <p style="margin-top:16px"><code>Shape?</code> is a plain <code>instance?</code> on the protocol's generated interface — an O(1) check, exactly as fast as the per-variant predicates, not a slow <code>satisfies?</code>. And every type gets a generated schema constructor — a <code>Shape</code> argument's schema is <code>(Shape-schema)</code>, which validates the variant <em>and</em> its fields, with type parameters becoming schema-fn parameters so nested types compose the way the Gleam type expression does. Note the <code>^double</code> field hints: <code>Float</code> fields compile to primitive record slots, because the checker already proved they hold doubles.</p>
+    <p style="margin-top:16px"><code>Shape?</code> is a plain <code>instance?</code> on the protocol's generated interface: an O(1) check, exactly as fast as the per-variant predicates, not a slow <code>satisfies?</code>. And every type gets a generated schema constructor: a <code>Shape</code> argument's schema is <code>(Shape-schema)</code>, which validates the variant <em>and</em> its fields. Type parameters become schema-fn parameters, so nested types compose the way the Gleam type expression does. Note the <code>^double</code> field hints: <code>Float</code> fields compile to primitive record slots, because the checker already proved they hold doubles.</p>
   </section>
 
   <section id="samples">
     <div class="sec-tag">Samples</div>
     <h2>A whole program, before and after</h2>
-    <p class="lede">The snippets above are excerpts. This is the real thing: a complete fixture from the repo's test corpus — dynamic-programming coin change, with pipes, guards, higher-order functions, and deliberate <code>echo</code> debugging — and the <strong>unedited compiler output</strong> next to it. CI regenerates and re-runs this file on every push.</p>
+    <p class="lede">The snippets above are excerpts. This is the real thing: a complete fixture from the repo's test corpus (dynamic-programming coin change, with pipes, guards, higher-order functions, and deliberate <code>echo</code> debugging) and the <strong>unedited compiler output</strong> next to it. CI regenerates and re-runs this file on every push.</p>
     <div class="compile" style="margin-top:26px">
       <div class="compile-grid">
         <div class="pane pane--src">
@@ -562,7 +562,7 @@ clojure -M:repl</pre>
         </div>
         <div class="seam"><span class="chip">compiles to</span></div>
         <div class="pane pane--out">
-          <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">coin_change.clj — unedited</span></div>
+          <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">coin_change.clj · unedited</span></div>
 <pre>(<span class="k">ns</span> <span class="fn">coin-change</span>
   (:require
    [gleam.dict <span class="ty">:as</span> dict]
@@ -623,15 +623,15 @@ clojure -M:repl</pre>
         </div>
       </div>
     </div>
-    <p style="margin-top:20px">Worth noticing, because each one is the type checker's knowledge surviving into the output:</p>
+    <p style="margin-top:20px">Each of these is the type checker's knowledge surviving into the output:</p>
     <ul class="clean">
-      <li><strong>Docstrings lead with the checked Gleam signature</strong> — <code>(doc min-coins)</code> in a REPL tells you the real types, and the <code>///</code> doc comment follows it.</li>
+      <li><strong>Docstrings lead with the checked Gleam signature</strong>: <code>(doc min-coins)</code> in a REPL tells you the real types, and the <code>///</code> doc comment follows it.</li>
       <li><strong><code>:gleam/src</code> points home.</strong> Every fn carries the <code>.gleam</code> file and line that defined it; even <code>echo</code> prints its original source position.</li>
-      <li><strong>Pipes become threading, guards become <code>cond</code></strong> — with the pattern order the checker verified, not a heuristic rewrite.</li>
-      <li><strong>Int math uses <code>+'</code>/<code>-'</code></strong>, Clojure's promoting ops, because Gleam ints are arbitrary-precision. <code>Float</code> args would get primitive <code>^double</code> hints instead — see <a href="#runtime">the runtime model</a>.</li>
+      <li><strong>Pipes become threading, guards become <code>cond</code></strong>, with the pattern order the checker verified, not a heuristic rewrite.</li>
+      <li><strong>Int math uses <code>+'</code>/<code>-'</code></strong>, Clojure's promoting ops, because Gleam ints are arbitrary-precision. <code>Float</code> args would get primitive <code>^double</code> hints instead; see <a href="#runtime">the runtime model</a>.</li>
     </ul>
 
-    <h3>Types that carry proof — and keep it through the compile</h3>
+    <h3>Types that carry proof, and keep it through the compile</h3>
     <p>A bigger sample with <code>opaque</code> types: parse an untrusted user-id string once, mint a permission proof at the boundary, and let privileged functions demand the proof in their signature. The Gleam type checker makes unauthorized calls unrepresentable; the compiled Clojure keeps the discipline as <code>instance?</code> predicates and malli schemas:</p>
     <div class="compile" style="margin-top:18px">
       <div class="compile-grid">
@@ -641,7 +641,7 @@ clojure -M:repl</pre>
   <span class="ty">UserId</span>(<span class="ty">Int</span>)
 }
 
-<span class="cm">/// Parse untrusted input into a UserId —
+<span class="cm">/// Parse untrusted input into a UserId:
 /// the only way to make one.</span>
 <span class="k">pub fn</span> <span class="fn">parse_user_id</span>(raw: <span class="ty">String</span>)
   -> <span class="ty">Result</span>(<span class="ty">UserId</span>, <span class="ty">IdError</span>) {
@@ -658,7 +658,7 @@ clojure -M:repl</pre>
         </div>
         <div class="seam"><span class="chip">compiles to</span></div>
         <div class="pane pane--out">
-          <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">permissions.clj — excerpt, unedited</span></div>
+          <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">permissions.clj · excerpt, unedited</span></div>
 <pre><span class="cm">;; type UserId</span>
 (<span class="k">defprotocol</span> <span class="ty">IUserId</span>)
 (<span class="k">defrecord</span> <span class="ty">UserId</span> [value] <span class="ty">IUserId</span>)
@@ -668,7 +668,7 @@ clojure -M:repl</pre>
 (<span class="k">defn</span> <span class="fn">parse-user-id</span>
   <span class="st">"parse_user_id(raw: String) -> Result(UserId, IdError)
 
-   Parse untrusted input into a UserId —
+   Parse untrusted input into a UserId:
    the only way to make one."</span>
   {<span class="ty">:malli/schema</span> [:=&gt; [:cat :string]
                       (p/<span class="fn">result-of</span> (<span class="fn">UserId-schema</span>) (<span class="fn">IdError-schema</span>))]
@@ -692,41 +692,41 @@ clojure -M:repl</pre>
         </div>
       </div>
     </div>
-    <p style="margin-top:20px">The <code>^java.lang.String</code> hint comes from the checked argument type; the error variants each became a record you can dispatch on from Clojure. Note the return schema: <code>(p/result-of …)</code> carries the <em>payload</em> types, so an instrumented boundary rejects an <code>Ok</code> wrapping the wrong thing — not just a non-Result. The full walkthrough — why the permission check should <em>mint a value</em> instead of returning a <code>Bool</code>, with the compiler's verbatim refusals — is its own post: <a href="blog/parse-dont-validate.html"><strong>Permission checks are parsers →</strong></a></p>
+    <p style="margin-top:20px">The <code>^java.lang.String</code> hint comes from the checked argument type; the error variants each became a record you can dispatch on from Clojure. Note the return schema: <code>(p/result-of …)</code> carries the <em>payload</em> types, so an instrumented boundary rejects an <code>Ok</code> wrapping the wrong thing, not just a non-Result. The full walkthrough, with the compiler's verbatim refusals, is its own post: <a href="blog/parse-dont-validate.html"><strong>Permission checks are parsers →</strong></a></p>
   </section>
 
   <section id="verify">
     <div class="sec-tag">Verification &amp; oracles</div>
     <h2>Every claim has an oracle</h2>
-    <p class="lede">A compiler is only as trustworthy as its evidence. gleam-clj never asserts equivalence it didn't measure — and the measurement uses the <strong>official Gleam compiler as the source of truth</strong>.</p>
+    <p class="lede">A compiler is only as trustworthy as its evidence. gleam-clj never asserts equivalence it didn't measure, and the measurement uses the <strong>official Gleam compiler as the source of truth</strong>.</p>
     <h3>Stdout-parity corpora</h3>
     <p>Every test program runs twice: once with the official Gleam compiler on the BEAM (the oracle), once compiled to Clojure on the JVM. Pass means byte-identical stdout; programs that crash on purpose must crash with matching output.</p>
     <ul class="clean">
-      <li><strong>54 / 54</strong> runnable Rosetta Code tasks — byte-identical</li>
-      <li><strong>60 / 60</strong> runnable Gleam language-tour lessons — byte-identical</li>
+      <li><strong>54 / 54</strong> runnable Rosetta Code tasks, byte-identical</li>
+      <li><strong>60 / 60</strong> runnable Gleam language-tour lessons, byte-identical</li>
       <li>A <strong>ratchet</strong> in CI: the passing count can never drop</li>
     </ul>
     <h3>Differential fuzzing</h3>
-    <p>For the real-world port of Metabase's SQL-parameter parser, the upstream test table was ported <em>and</em> the two implementations were fed 5,000 random inputs across four modes — <strong>20,000 comparisons against the original Clojure</strong>, zero divergence, down to which error type is thrown. It found a genuine runtime bug in minutes.</p>
+    <p>For the real-world port of Metabase's SQL-parameter parser, the upstream test table was ported <em>and</em> the two implementations were fed 5,000 random inputs across four modes: <strong>20,000 comparisons against the original Clojure</strong>, zero divergence, down to which error type is thrown. It found a genuine runtime bug in minutes.</p>
     <h3>Fail loud, everywhere</h3>
     <p>Unsupported constructs panic at build time with the feature named. Labelled arguments are checked against real function signatures or refuse to compile. CI re-proves the whole chain on every push and narrates the method in its own logs.</p>
-    <div class="note"><strong>The one soft spot, named honestly:</strong> the FFI core is the only layer that can be silently wrong (everything else fails loud). That's precisely where every new real-world consumer — and every fuzzer — is aimed.</div>
+    <div class="note"><strong>The one soft spot, named honestly:</strong> the FFI core is the only layer that can be silently wrong (everything else fails loud). That's precisely where every new real-world consumer, and every fuzzer, is aimed.</div>
   </section>
 
   <section id="libs">
     <div class="sec-tag">Packaging</div>
     <h2>Consume it as an ordinary Clojure library</h2>
-    <p>Compiled Gleam ships as plain Clojure source with a runtime snapshot — a git-dep, no exotic build step. Two libraries prove the model:</p>
+    <p>Compiled Gleam ships as plain Clojure source with a runtime snapshot: a git-dep, no exotic build step. Two libraries prove the model:</p>
     <ul class="clean">
-      <li><strong>gleam-parser</strong> — <a href="https://hexdocs.pm/glance/">glance</a>, Gleam's own parser (written in Gleam), compiled to Clojure. It parses its own 2,300-line source on the JVM.</li>
-      <li><strong>mb-lib-parse</strong> — Metabase's <code>lib.parse</code> rewritten in ~450 lines of Gleam and wired into Metabase itself; every consumer test passes on it.</li>
+      <li><strong>gleam-parser</strong>: <a href="https://hexdocs.pm/glance/">glance</a>, Gleam's own parser (written in Gleam), compiled to Clojure. It parses its own 2,300-line source on the JVM.</li>
+      <li><strong>mb-lib-parse</strong>: Metabase's <code>lib.parse</code> rewritten in ~450 lines of Gleam and wired into Metabase itself; every consumer test passes on it.</li>
     </ul>
-<pre class="block"><span class="cmt">;; deps.edn — pull a compiled-Gleam library like any git dep</span>
+<pre class="block"><span class="cmt">;; deps.edn: pull a compiled-Gleam library like any git dep</span>
 {<span class="fl">:deps</span> {io.github.escherize/gleam-parser
         {<span class="fl">:git/url</span> <span class="st">"https://github.com/escherize/gleam-clj"</span>
          <span class="fl">:git/sha</span> <span class="st">"..."</span>
          <span class="fl">:deps/root</span> <span class="st">"libs/gleam-parser"</span>}}}</pre>
-    <p>Every public function carries <code>{:malli/schema …}</code> metadata derived from the Gleam types — so <a href="https://github.com/metosin/malli">malli</a> instrumentation and clj-kondo type-linting work out of the box, with zero runtime cost until you opt in. The rest of the checker's knowledge ships too: every fn's docstring leads with its <strong>Gleam signature</strong>, <code>:gleam/src</code> metadata names the defining <code>.gleam</code> file and line, and <code>Float</code>/<code>String</code> types become JVM type hints (<code>^double</code>, <code>^java.lang.String</code>) — primitive math and reflection-free interop, no annotations written by hand.</p>
+    <p>Every public function carries <code>{:malli/schema …}</code> metadata derived from the Gleam types, so <a href="https://github.com/metosin/malli">malli</a> instrumentation and clj-kondo type-linting work out of the box, with zero runtime cost until you opt in. The rest of the checker's knowledge ships too: every fn's docstring leads with its <strong>Gleam signature</strong>, <code>:gleam/src</code> metadata names the defining <code>.gleam</code> file and line, and <code>Float</code>/<code>String</code> types become JVM type hints (<code>^double</code>, <code>^java.lang.String</code>). That buys primitive math and reflection-free interop, with no annotations written by hand.</p>
   </section>
 
   <section id="limits">
@@ -760,7 +760,7 @@ clojure -M:repl</pre>
 
 <footer>
   <div class="shell">
-    <p>gleam-clj — a Gleam → Clojure/JVM compiler. Not affiliated with the Gleam project.</p>
+    <p>gleam-clj: a Gleam → Clojure/JVM compiler. Not affiliated with the Gleam project.</p>
     <span class="glyphs">
       <img src="assets/gleam-lucy.svg" alt="Gleam">
       <img src="assets/clojure.svg" alt="Clojure">

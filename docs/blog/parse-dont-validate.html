@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Permission checks are parsers — gleam-clj</title>
+<title>Permission checks are parsers · gleam-clj</title>
 <meta name="description" content="Parse, don't validate, applied to authorization: turn a user id's permission check into a value the type system can demand, in Gleam, and watch the proof survive compilation to Clojure.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -200,11 +200,11 @@
 <div class="post-head">
   <div class="post-kicker">Writing · type-driven design</div>
   <h1>Permission checks are <span class="pink">parsers</span></h1>
-  <p class="post-sub">"Parse, don't validate," applied to authorization: make the permission check on a user id return a value only it can create — then require that value where the privilege is used. In Gleam, and in the Clojure it compiles to.</p>
+  <p class="post-sub">"Parse, don't validate," applied to authorization: make the permission check on a user id return a value only it can create, then require that value where the privilege is used. In Gleam, and in the Clojure it compiles to.</p>
   <p class="post-meta">gleam-clj · every snippet below was compiled and run by the compiler in this repo; the error messages are verbatim</p>
 </div>
 
-<p>Alexis King's <a href="https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/">Parse, don't validate</a> names a habit good type-driven code shares: when you learn something about a value, <strong>record what you learned in its type</strong>. A validator inspects data and returns the same data plus a yes/no. A parser inspects data and returns <em>different, more informative</em> data — or an error. The validator's knowledge evaporates one line later; the parser's knowledge is carried by the value itself.</p>
+<p>Alexis King's <a href="https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/">Parse, don't validate</a> names a habit good type-driven code shares: when you learn something about a value, <strong>record what you learned in its type</strong>. A validator inspects data and returns the same data plus a yes/no. A parser inspects data and returns <em>different, more informative</em> data, or an error. The validator's knowledge evaporates one line later; the parser's knowledge is carried by the value itself.</p>
 
 <p>Authorization is the sharpest place to apply this, because the cost of the validator habit is a security bug, not a style complaint.</p>
 
@@ -222,14 +222,14 @@
 
 <p>Three failure modes, all invisible to the compiler:</p>
 <ul class="clean">
-  <li><strong>Boolean blindness.</strong> <code>can_edit</code> learned something real and returned <code>True</code> — one bit. Which user? Checked against what? The answer existed for one expression, then vanished.</li>
+  <li><strong>Boolean blindness.</strong> <code>can_edit</code> learned something real and returned <code>True</code>: one bit. Which user? Checked against what? The answer existed for one expression, then vanished.</li>
   <li><strong>The check and the use drift apart.</strong> The call site that checks and the function that acts are held together by convention. Refactors add a new path to <code>rename_dashboard</code>; nothing forces the new path to check.</li>
-  <li><strong>The id is still a string.</strong> Empty string, <code>"0"</code>, <code>"robert'); DROP"</code> — every function that touches a raw id re-inherits every doubt about it.</li>
+  <li><strong>The id is still a string.</strong> Empty string, <code>"0"</code>, <code>"robert'); DROP"</code>: every function that touches a raw id re-inherits every doubt about it.</li>
 </ul>
 
 <h2 id="parse-the-id">Step one: parse the id at the boundary <a class="anchor" href="#parse-the-id" aria-label="Link to this section">#</a></h2>
 
-<p>First, the id itself. An <code>opaque type</code> in Gleam exports the type but not its constructor — so the only way for the rest of the program to obtain a <code>UserId</code> is through the function that scrutinizes the raw string. The doubts are handled once, in one place, and the result is a value that can no longer be empty, negative, or unparsed:</p>
+<p>First, the id itself. An <code>opaque type</code> in Gleam exports the type but not its constructor. The only way for the rest of the program to obtain a <code>UserId</code> is through the function that scrutinizes the raw string. The doubts are handled once, in one place, and the result is a value that can no longer be empty, negative, or unparsed:</p>
 
 <div class="pane-label"><img src="../assets/gleam-lucy.svg" alt=""><span class="lang gleam">permissions.gleam</span></div>
 <pre class="block"><span class="k">pub opaque type</span> <span class="ty">UserId</span> {
@@ -242,7 +242,7 @@
   <span class="ty">OutOfRange</span>(<span class="ty">Int</span>)
 }
 
-<span class="cm">/// Parse untrusted input into a UserId — the only way to make one.</span>
+<span class="cm">/// Parse untrusted input into a UserId: the only way to make one.</span>
 <span class="k">pub fn</span> <span class="fn">parse_user_id</span>(raw: <span class="ty">String</span>) -&gt; <span class="ty">Result</span>(<span class="ty">UserId</span>, <span class="ty">IdError</span>) {
   <span class="k">case</span> string.<span class="fn">trim</span>(raw) {
     <span class="st">""</span> -&gt; <span class="ty">Error</span>(<span class="ty">Empty</span>)
@@ -259,7 +259,7 @@
 
 <h2 id="mint-a-proof">Step two: the permission check mints a proof <a class="anchor" href="#mint-a-proof" aria-label="Link to this section">#</a></h2>
 
-<p>Now the same move, one level up. Instead of asking "may user 42 edit?" and getting a bit, ask the check to <em>parse the situation</em> — user plus role — into a value that exists only when the answer is yes. The privileged function then demands that value:</p>
+<p>Now the same move, one level up. Instead of asking "may user 42 edit?" and getting a bit, ask the check to <em>parse the situation</em>, user plus role, into a value that exists only when the answer is yes. The privileged function then demands that value:</p>
 
 <div class="pane-label"><img src="../assets/gleam-lucy.svg" alt=""><span class="lang gleam">permissions.gleam, continued</span></div>
 <pre class="block"><span class="k">pub type</span> <span class="ty">Role</span> {
@@ -295,12 +295,12 @@
 <ul class="clean">
   <li><strong>The check can't be skipped.</strong> <code>rename_dashboard</code> takes a <code>CanEdit</code>, and only <code>require_editor</code> can construct one. A call site without a check has nothing to pass.</li>
   <li><strong>The check can't drift from the use.</strong> The proof value <em>is</em> the connection; it travels through the code from check to use, visible in every intermediate signature.</li>
-  <li><strong>Denial is data, not absence.</strong> <code>Denied(who, needs)</code> carries who was refused and what they lacked — an audit log entry, not a silent <code>False</code>.</li>
+  <li><strong>Denial is data, not absence.</strong> <code>Denied(who, needs)</code> carries who was refused and what they lacked: an audit log entry, not a silent <code>False</code>.</li>
 </ul>
 
 <h2 id="compiler-holds-the-door">The compiler holds the door <a class="anchor" href="#compiler-holds-the-door" aria-label="Link to this section">#</a></h2>
 
-<p>Claims about "can't" deserve receipts. Try to use a bare <code>UserId</code> where the proof is required — the diagnostic below is the compiler's actual output, reproduced by this repo's build:</p>
+<p>Claims about "can't" deserve receipts. Try to use a bare <code>UserId</code> where the proof is required. The diagnostic below is the compiler's actual output, reproduced by this repo's build:</p>
 
 <div class="pane-label"><span class="lang err">gleam's type checker, verbatim</span></div>
 <pre class="block"><span class="er">error: Type mismatch</span>
@@ -317,7 +317,7 @@ Found type:
 
     <span class="ty">UserId</span></pre>
 
-<p>And forging the proof from outside the module fails at the import — <code>opaque</code> exports the type, not the constructor:</p>
+<p>And forging the proof from outside the module fails at the import. <code>opaque</code> exports the type, not the constructor:</p>
 
 <div class="pane-label"><span class="lang err">from another module, verbatim</span></div>
 <pre class="block"><span class="er">error: Unknown module value</span>
@@ -328,15 +328,15 @@ Found type:
 
 `<span class="ty">CanEdit</span>` is only a type, it cannot be imported as a value.</pre>
 
-<p>The trusted surface of the whole scheme shrank to two short functions — <code>parse_user_id</code> and <code>require_editor</code>. Audit those, and every other call site is covered by the type checker.</p>
+<p>The trusted surface of the whole scheme shrank to two short functions: <code>parse_user_id</code> and <code>require_editor</code>. Audit those, and every other call site is covered by the type checker.</p>
 
 <h2 id="scoped-proof">Scoping the proof to one dashboard <a class="anchor" href="#scoped-proof" aria-label="Link to this section">#</a></h2>
 
-<p><code>CanEdit</code> proves edit rights <em>generally</em>. That leaves a residual bug shaped like this: the privileged function still takes its target as a separate argument —</p>
+<p><code>CanEdit</code> proves edit rights <em>generally</em>. That leaves a residual bug shaped like this: the privileged function still takes its target as a separate argument:</p>
 
 <pre class="block"><span class="k">pub fn</span> <span class="fn">rename</span>(proof: <span class="ty">CanEdit</span>, dash: <span class="ty">DashboardId</span>, name: <span class="ty">String</span>) -&gt; <span class="ty">String</span></pre>
 
-<p>— which means the request has <strong>two sources of truth</strong>. The proof was minted while looking at dashboard 7; the <code>dash</code> argument says 9. Nothing connects them. This is the classic confused-deputy gap: a genuine credential, applied to the wrong resource, and every call site is back to promising it kept the two in sync.</p>
+<p>The request now has <strong>two sources of truth</strong>. The proof was minted while looking at dashboard 7; the <code>dash</code> argument says 9. Nothing connects them. This is the classic confused-deputy gap: a genuine credential, applied to the wrong resource, and every call site is back to promising it kept the two in sync.</p>
 
 <p>Same move as before: whatever the check examined, <strong>put it in the value the check returns</strong>. The proof grows a field, and the mint function demands the dashboard up front:</p>
 
@@ -374,15 +374,15 @@ Found type:
   &lt;&gt; name
 }</pre>
 
-<p>Look at what disappeared: <code>rename_scoped</code> has <strong>no dashboard parameter</strong>. The target comes out of the proof, because it went into the proof at the moment it was checked. There is no second argument to drift, so "checked 7, renamed 9" is not a bug you can write — the disagreement has no place to live. The signature also reads as its own documentation: any function taking <code>CanEditDashboard</code> visibly operates on exactly the dashboard someone was authorized for.</p>
+<p>Look at what disappeared: <code>rename_scoped</code> has <strong>no dashboard parameter</strong>. The target comes out of the proof, because it went into the proof at the moment it was checked. There is no second argument to drift, so "checked 7, renamed 9" is not a bug you can write; the disagreement has no place to live. The signature also reads as its own documentation: any function taking <code>CanEditDashboard</code> visibly operates on exactly the dashboard someone was authorized for.</p>
 
-<div class="note pink"><strong>Precision about what the types do here:</strong> two proofs for two different dashboards have the <em>same type</em> — this is not dependent typing, and the checker cannot tell dashboard 7's proof from dashboard 9's. What the shape eliminates is structural: the resource travels <em>inside</em> the credential instead of beside it, so no call site ever recombines the two. The cost is honest too: <code>require_editor_of</code> joins <code>parse_user_id</code> and <code>require_editor</code> in the trusted core — three short functions to audit now, still a bargain.</div>
+<div class="note pink"><strong>Precision about what the types do here:</strong> two proofs for two different dashboards have the <em>same type</em>. This is not dependent typing, and the checker cannot tell dashboard 7's proof from dashboard 9's. What the shape eliminates is structural: the resource travels <em>inside</em> the credential instead of beside it, so no call site ever recombines the two. The cost is honest too: <code>require_editor_of</code> joins <code>parse_user_id</code> and <code>require_editor</code> in the trusted core: three short functions to audit now, still a bargain.</div>
 
 <h2 id="compile-to-clojure">What survives the compile to Clojure <a class="anchor" href="#compile-to-clojure" aria-label="Link to this section">#</a></h2>
 
 <p>This site documents a Gleam → Clojure compiler, so the natural question: what happens to a proof-carrying type when it lands on the JVM, where nothing stops a determined caller from conjuring records? Here is the compiled <code>rename_dashboard</code>, verbatim:</p>
 
-<div class="pane-label"><img src="../assets/clojure.svg" alt=""><span class="lang clj">permissions.clj — compiler output, excerpted but unedited</span></div>
+<div class="pane-label"><img src="../assets/clojure.svg" alt=""><span class="lang clj">permissions.clj · compiler output, excerpted but unedited</span></div>
 <pre class="block"><span class="cm">;; type CanEdit</span>
 (<span class="k">defprotocol</span> <span class="ty">ICanEdit</span>)
 (<span class="k">defrecord</span> <span class="ty">CanEdit</span> [value] <span class="ty">ICanEdit</span>)
@@ -398,21 +398,21 @@ Found type:
   (<span class="k">let</span> [{{id :value} :value} proof]
     (<span class="k">str</span> <span class="st">"user "</span> (int/<span class="fn">to-string</span> id) <span class="st">" renamed dashboard to "</span> name)))</pre>
 
-<p>The static guarantee is Gleam's; Clojure callers are outside the type checker's reach. But the proof doesn't dissolve into a bare map — it compiles to <strong>checkable structure</strong>:</p>
+<p>The static guarantee is Gleam's; Clojure callers are outside the type checker's reach. But the proof doesn't dissolve into a bare map. It compiles to <strong>checkable structure</strong>:</p>
 
 <ul class="clean">
   <li><strong>The docstring carries the contract.</strong> <code>(doc rename-dashboard)</code> in any REPL shows the Gleam signature, and <code>:gleam/src</code> points at the line that defines it.</li>
-  <li><strong>The schema demands the proof at runtime.</strong> <code>(CanEdit-schema)</code> is a generated schema constructor derived from the Gleam type — it checks the variant and its fields. Turn on <a href="https://github.com/metosin/malli">malli</a> instrumentation and a Clojure call passing a raw id — <code>(rename-dashboard 42 "x")</code> — throws <code>:malli.core/invalid-input</code> at the boundary instead of misbehaving past it.</li>
+  <li><strong>The schema demands the proof at runtime.</strong> <code>(CanEdit-schema)</code> is a generated schema constructor derived from the Gleam type; it checks the variant and its fields. Turn on <a href="https://github.com/metosin/malli">malli</a> instrumentation and a Clojure call passing a raw id, <code>(rename-dashboard 42 "x")</code>, throws <code>:malli.core/invalid-input</code> at the boundary instead of misbehaving past it.</li>
   <li><strong>The same schema feeds clj-kondo</strong>, so an obviously wrong call is a static lint error in the editor before anything runs.</li>
 </ul>
 
-<div class="note blue"><strong>Honest asterisk:</strong> on the Clojure side <code>(-&gt;CanEdit user)</code> is one expression away — records are open construction there. What the compile preserves is the <em>boundary discipline</em>: the proof type, its predicate, and an opt-in runtime check at exactly the functions that demand proof. Inside the Gleam world the guarantee is total; at the interop edge it degrades to an instrumented contract rather than nothing.</div>
+<div class="note blue"><strong>Honest asterisk:</strong> on the Clojure side <code>(-&gt;CanEdit user)</code> is one expression away; records are open construction there. What the compile preserves is the <em>boundary discipline</em>: the proof type, its predicate, and an opt-in runtime check at exactly the functions that demand proof. Inside the Gleam world the guarantee is total; at the interop edge it degrades to an instrumented contract rather than nothing.</div>
 
 <h2 id="deep-schemas">The schema knows which layer you broke <a class="anchor" href="#deep-schemas" aria-label="Link to this section">#</a></h2>
 
-<p>Since this post first shipped, the compiler started deriving a <strong>schema constructor for every type</strong> — and they compose exactly the way the Gleam type expression composes. Here is <code>require_editor_of</code>'s metadata, unedited; read the return schema next to the Gleam type <code>Result(CanEditDashboard, Denied)</code> and notice it is the same expression wearing parentheses:</p>
+<p>The compiler derives a <strong>schema constructor for every type</strong>, and they compose exactly the way the Gleam type expression composes. Here is <code>require_editor_of</code>'s metadata, unedited; read the return schema next to the Gleam type <code>Result(CanEditDashboard, Denied)</code> and notice it is the same expression wearing parentheses:</p>
 
-<div class="pane-label"><img src="../assets/clojure.svg" alt=""><span class="lang clj">permissions.clj — compiler output, unedited</span></div>
+<div class="pane-label"><img src="../assets/clojure.svg" alt=""><span class="lang clj">permissions.clj · compiler output, unedited</span></div>
 <pre class="block">(<span class="k">defn</span> <span class="fn">CanEditDashboard-schema</span>
   <span class="st">"Malli schema for CanEditDashboard."</span>
   []
@@ -429,7 +429,7 @@ Found type:
    <span class="ty">:gleam/src</span> <span class="st">"permissions.gleam:78"</span>}
   [user role dash]</pre>
 
-<p>Which means validation is no longer a yes/no at the boundary — it reaches every field of every layer, and when something is wrong it can say <em>where</em>. Forge a scoped proof around a corrupted id — a string where the <code>UserId</code>'s int belongs, two records deep — and ask malli to explain:</p>
+<p>Which means validation is no longer a yes/no at the boundary. It reaches every field of every layer, and when something is wrong it can say <em>where</em>. Forge a scoped proof around a corrupted id, a string where the <code>UserId</code>'s int belongs two records deep, and ask malli to explain:</p>
 
 <div class="pane-label"><span class="lang clj">REPL, verbatim</span></div>
 <pre class="block">(me/<span class="fn">humanize</span>
@@ -437,27 +437,27 @@ Found type:
              (-&gt;<span class="ty">CanEditDashboard</span> (-&gt;<span class="ty">UserId</span> <span class="st">"42"</span>) (-&gt;<span class="ty">DashboardId</span> 7))))
 <span class="cm">;; =&gt; {:user {:value ["should be an integer"]}}</span></pre>
 
-<p>Sit with that output for a second. Nobody wrote these schemas. The Gleam type checker proved the shape, the compiler carried the proof across languages, and now a <em>different runtime</em> can walk a forged value and spell out the path to the lie, field by field: not "invalid input", but <strong>the <code>:value</code> inside the <code>:user</code> inside the proof should be an integer</strong>. The recursion has a documented edge — a self-referential type cuts over to an identity check at the cycle rather than descending forever — but for the shapes an authorization layer actually has, the whole value is covered.</p>
+<p>Nobody wrote these schemas. The Gleam type checker proved the shape, the compiler carried the proof across languages, and now a <em>different runtime</em> can walk a forged value and spell out the path to the lie, field by field. Not "invalid input": <strong>the <code>:value</code> inside the <code>:user</code> inside the proof should be an integer</strong>. The recursion has a documented edge: a self-referential type cuts over to an identity check at the cycle rather than descending forever. For the shapes an authorization layer actually has, the whole value is covered.</p>
 
-<p>This is the post's thesis completing a lap. Parse, don't validate says: when you learn something, put it in the value's type. The compile extends it: what the type knows travels — into docstrings, into predicates, into schemas that can <em>testify</em>. The trusted core is still three small functions; everything else is now either type-checked by Gleam or explainable by malli, and neither of those layers was written by hand.</p>
+<p>Parse, don't validate says: when you learn something, put it in the value's type. The compile extends it: what the type knows travels: into docstrings, into predicates, into schemas that can <em>testify</em>. The trusted core is still three small functions; everything else is now either type-checked by Gleam or explainable by malli, and neither of those layers was written by hand.</p>
 
 <h2 id="tradeoffs">What this pattern does and doesn't buy <a class="anchor" href="#tradeoffs" aria-label="Link to this section">#</a></h2>
 
 <ul class="clean">
   <li><strong>It buys:</strong> unskippable checks, error cases you must handle (<code>Result</code> forces the <code>Denied</code> branch), a two-function trusted core, and denial as loggable data.</li>
-  <li><strong>It doesn't buy by default:</strong> resource-level precision — the first <code>CanEdit</code> proves edit rights generally. Binding the resource into the proof, as <code>CanEditDashboard</code> does above, closes the checked-7-renamed-9 gap; it costs one field and one more audited mint function.</li>
+  <li><strong>It doesn't buy by default:</strong> resource-level precision. The first <code>CanEdit</code> proves edit rights generally. Binding the resource into the proof, as <code>CanEditDashboard</code> does above, closes the checked-7-renamed-9 gap; it costs one field and one more audited mint function.</li>
   <li><strong>It can't buy:</strong> freshness. A proof minted at request start can outlive a mid-request revocation, exactly like a session token. Scope proofs to a request; don't cache them.</li>
 </ul>
 
-<p>The pattern generalizes past permissions: non-empty lists, sanitized HTML, verified email addresses, positive amounts. Anywhere the code asks a yes/no question and then acts on the answer somewhere else, there is a type that could carry the yes — <strong>parse once, and let the checker chase the value so you don't have to chase the convention.</strong></p>
+<p>The pattern generalizes past permissions: non-empty lists, sanitized HTML, verified email addresses, positive amounts. Anywhere the code asks a yes/no question and then acts on the answer somewhere else, there is a type that could carry the yes: <strong>parse once, and let the checker chase the value so you don't have to chase the convention.</strong></p>
 
-<div class="note"><strong>Run it yourself:</strong> the full example lives in the repo as <code>gleam-src/permissions.gleam</code>, gated by CI like every other fixture. <code>clojure -M:repl</code>, then <code>(gl/require-gleam "gleam-src/permissions.gleam")</code>. Its <code>main</code> parses <code>"42"</code>, mints the proof, and prints <code>user 42 renamed dashboard to Q3 revenue</code> — on the JVM, byte-identical to what <code>gleam run</code> prints on the BEAM.</div>
+<div class="note"><strong>Run it yourself:</strong> the full example lives in the repo as <code>gleam-src/permissions.gleam</code>, gated by CI like every other fixture. <code>clojure -M:repl</code>, then <code>(gl/require-gleam "gleam-src/permissions.gleam")</code>. Its <code>main</code> parses <code>"42"</code>, mints the proof, and prints <code>user 42 renamed dashboard to Q3 revenue</code>, byte-identical on the JVM to what <code>gleam run</code> prints on the BEAM.</div>
 
 </article>
 
 <footer>
   <div class="inner">
-    <p>gleam-clj — a Gleam → Clojure/JVM compiler. Not affiliated with the Gleam project.</p>
+    <p>gleam-clj: a Gleam → Clojure/JVM compiler. Not affiliated with the Gleam project.</p>
     <span class="glyphs">
       <img src="../assets/gleam-lucy.svg" alt="Gleam">
       <img src="../assets/clojure.svg" alt="Clojure">
