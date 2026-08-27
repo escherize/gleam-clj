@@ -210,14 +210,11 @@ fn build_typed(proj: &str, out_dir: &str, stdlib_dir: &str) {
     let sources = gather_typed_sources(proj, stdlib_dir);
     let analyzed = analysis::analyze(sources);
     let global = emit::build_typed_global(&analyzed);
-    let mut externals = load_externals(proj);
-    if std::fs::canonicalize(proj).ok() != std::fs::canonicalize(stdlib_dir).ok() {
-        // Stdlib overrides apply when its modules get analyzed for interfaces
-        // but are never emitted here, so only project map entries matter; the
-        // stdlib map is still needed when emitting the stdlib itself.
-    } else {
-        externals.extend(load_externals(stdlib_dir));
-    }
+    // The stdlib map ships repo-provided shims for known hex packages
+    // (gleam/regexp, ...) whose modules ARE emitted in dep builds; the
+    // project map overrides it.
+    let mut externals = load_externals(stdlib_dir);
+    externals.extend(load_externals(proj));
     for m in &analyzed {
         if !m.emit {
             continue;

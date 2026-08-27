@@ -277,7 +277,6 @@
   (:refer-clojure :exclude [cast float int map])
   (:require
    [gleam-ffi]
-   [gleam.bit-array :as bit_array]
    [gleam.dict :as dict]
    [gleam.dynamic :as dynamic]
    [gleam.float :as float]
@@ -400,18 +399,7 @@
 
 (def bit-array (->Decoder decode-bit-array))
 
-(defn- dynamic-string
-  "dynamic_string(from data: Dynamic) -> Result(String, String)"
-  {:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:661"}
-  [data]
-  (let [subject (dynamic-bit-array data)]
-    (if (instance? Ok subject)
-      (let [data (:value subject) subject (bit_array/to-string data)]
-        (if (instance? Ok subject)
-          (let [string (:value subject)]
-            (p/->Ok string))
-          (p/->Error "")))
-      (p/->Error ""))))
+(def ^{:gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:661"} dynamic-string gleam-ffi/dynamic-string)
 
 (defn- decode-string
   "decode_string(data: Dynamic) -> #(String, List(DecodeError))"

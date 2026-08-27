@@ -112,3 +112,23 @@ gleam/bit_array compare gleam-ffi/ba-compare
 gleam/string to_utf_codepoints gleam-ffi/to-utf-codepoints
 gleam/string to_utf_codepoints_loop gleam-ffi/to-utf-codepoints
 gleam/bit_array starts_with gleam-ffi/ba-starts-with
+
+# Repo-provided shims for hex packages compiled as deps (JVM implementations
+# in src/; semantics parity-tested against the BEAM).
+gleam/regexp do_compile gleam-regexp-ffi/compile
+gleam/regexp do_check gleam-regexp-ffi/check
+gleam/regexp do_split gleam-regexp-ffi/split
+gleam/regexp do_scan gleam-regexp-ffi/scan
+gleam/regexp replace gleam-regexp-ffi/replace
+gleam/regexp match_map gleam-regexp-ffi/match-map
+gleam/json decode_string gleam-json-ffi/decode-string
+gleam/json do_to_string gleam-json-ffi/json-to-string
+gleam/json to_string_tree gleam-json-ffi/json-to-iodata
+gleam/json do_string gleam-json-ffi/do-string
+gleam/json do_bool gleam-json-ffi/do-bool
+gleam/json do_int gleam-json-ffi/do-int
+gleam/json do_float gleam-json-ffi/do-float
+gleam/json do_null gleam-json-ffi/do-null
+gleam/json do_object gleam-json-ffi/do-object
+gleam/json do_preprocessed_array gleam-json-ffi/do-preprocessed-array
+gleam/dynamic/decode dynamic_string gleam-ffi/dynamic-string
