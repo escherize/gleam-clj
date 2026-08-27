@@ -6,13 +6,23 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
+(declare Dict? Dict-schema TransientDict? TransientDict-schema)
+
 ;; type Dict
 (defprotocol IDict)
 (defn Dict? "True if `v` is any Dict value." [v] (instance? gleam.dict.IDict v))
+(defn Dict-schema
+  "Malli schema for Dict(key, value)."
+  [_key _value]
+  [:fn Dict?])
 
 ;; type TransientDict
 (defprotocol ITransientDict)
 (defn TransientDict? "True if `v` is any TransientDict value." [v] (instance? gleam.dict.ITransientDict v))
+(defn TransientDict-schema
+  "Malli schema for TransientDict(key, value)."
+  [_key _value]
+  [:fn TransientDict?])
 
 (def ^{:gleam/src "stdlib-src/src/gleam/dict.gleam:30"} to-transient gleam-ffi/dict-to-transient)
 
@@ -474,7 +484,7 @@
    assert dict.upsert(dict, \"b\", increment)
    == dict.from_list([#(\"a\", 0), #(\"b\", 0)])
    ```"
-  {:malli/schema [:=> [:cat [:map-of :any :any] :any [:=> [:cat [:fn option/Option?]] :any]]
+  {:malli/schema [:=> [:cat [:map-of :any :any] :any [:=> [:cat (option/Option-schema :any)] :any]]
                       [:map-of :any :any]]
    :gleam/src "stdlib-src/src/gleam/dict.gleam:446"}
   [dict key fun]

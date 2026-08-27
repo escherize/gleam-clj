@@ -12,10 +12,16 @@
    [splitter :as splitter])
   (:import (gleam.prelude Ok)))
 
+(declare Lexer? Lexer-schema Normal? CheckForMinus? HasNestedDot? LexerMode? LexerMode-schema Position? Position-schema RegularComment? DocComment? ModuleComment? CommentKind? CommentKind-schema LexInt? LexFloat? LexFloatExponent? LexNumberMode? LexNumberMode-schema)
+
 ;; type Lexer
 (defprotocol ILexer)
 (defrecord Lexer [^java.lang.String original-source ^java.lang.String source byte-offset preserve-whitespace preserve-comments mode newlines] ILexer)
 (defn Lexer? "True if `v` is a Lexer value." [v] (instance? Lexer v))
+(defn Lexer-schema
+  "Malli schema for Lexer."
+  []
+  [:and [:fn Lexer?] [:map [:original-source :string] [:source :string] [:byte-offset :int] [:preserve-whitespace :boolean] [:preserve-comments :boolean] [:mode (LexerMode-schema)] [:newlines (splitter/Splitter-schema)]]])
 
 ;; type LexerMode
 (defprotocol ILexerMode)
@@ -26,11 +32,22 @@
 (defrecord HasNestedDot [] ILexerMode)
 (defn HasNestedDot? "True if `v` is a HasNestedDot value." [v] (instance? HasNestedDot v))
 (defn LexerMode? "True if `v` is any LexerMode value." [v] (instance? glexer.ILexerMode v))
+(defn LexerMode-schema
+  "Malli schema for LexerMode."
+  []
+  [:or
+   [:fn Normal?]
+   [:fn CheckForMinus?]
+   [:fn HasNestedDot?]])
 
 ;; type Position
 (defprotocol IPosition)
 (defrecord Position [byte-offset] IPosition)
 (defn Position? "True if `v` is a Position value." [v] (instance? Position v))
+(defn Position-schema
+  "Malli schema for Position."
+  []
+  [:and [:fn Position?] [:map [:byte-offset :int]]])
 
 ;; type CommentKind
 (defprotocol ICommentKind)
@@ -41,6 +58,13 @@
 (defrecord ModuleComment [] ICommentKind)
 (defn ModuleComment? "True if `v` is a ModuleComment value." [v] (instance? ModuleComment v))
 (defn CommentKind? "True if `v` is any CommentKind value." [v] (instance? glexer.ICommentKind v))
+(defn CommentKind-schema
+  "Malli schema for CommentKind."
+  []
+  [:or
+   [:fn RegularComment?]
+   [:fn DocComment?]
+   [:fn ModuleComment?]])
 
 ;; type LexNumberMode
 (defprotocol ILexNumberMode)
@@ -51,10 +75,17 @@
 (defrecord LexFloatExponent [] ILexNumberMode)
 (defn LexFloatExponent? "True if `v` is a LexFloatExponent value." [v] (instance? LexFloatExponent v))
 (defn LexNumberMode? "True if `v` is any LexNumberMode value." [v] (instance? glexer.ILexNumberMode v))
+(defn LexNumberMode-schema
+  "Malli schema for LexNumberMode."
+  []
+  [:or
+   [:fn LexInt?]
+   [:fn LexFloat?]
+   [:fn LexFloatExponent?]])
 
 (defn new*
   "new(source: String) -> Lexer"
-  {:malli/schema [:=> [:cat :string] [:fn Lexer?]]
+  {:malli/schema [:=> [:cat :string] (Lexer-schema)]
    :gleam/src "project/build/packages/glexer/src/glexer.gleam:40"}
   [^java.lang.String source]
   (->Lexer source
@@ -67,14 +98,14 @@
 
 (defn discard-whitespace
   "discard_whitespace(lexer: Lexer) -> Lexer"
-  {:malli/schema [:=> [:cat [:fn Lexer?]] [:fn Lexer?]]
+  {:malli/schema [:=> [:cat (Lexer-schema)] (Lexer-schema)]
    :gleam/src "project/build/packages/glexer/src/glexer.gleam:52"}
   [lexer]
   (->Lexer (:original-source lexer) (:source lexer) (:byte-offset lexer) false (:preserve-comments lexer) (:mode lexer) (:newlines lexer)))
 
 (defn discard-comments
   "discard_comments(lexer: Lexer) -> Lexer"
-  {:malli/schema [:=> [:cat [:fn Lexer?]] [:fn Lexer?]]
+  {:malli/schema [:=> [:cat (Lexer-schema)] (Lexer-schema)]
    :gleam/src "project/build/packages/glexer/src/glexer.gleam:56"}
   [lexer]
   (->Lexer (:original-source lexer) (:source lexer) (:byte-offset lexer) (:preserve-whitespace lexer) false (:mode lexer) (:newlines lexer)))
@@ -1700,8 +1731,8 @@
 
 (defn lex
   "lex(lexer: Lexer) -> List(#(Token, Position))"
-  {:malli/schema [:=> [:cat [:fn Lexer?]]
-                      [:sequential [:tuple [:fn token/Token?] [:fn Position?]]]]
+  {:malli/schema [:=> [:cat (Lexer-schema)]
+                      [:sequential [:tuple (token/Token-schema) (Position-schema)]]]
    :gleam/src "project/build/packages/glexer/src/glexer.gleam:60"}
   [lexer]
   (-> (do-lex lexer (list)) list/reverse))
@@ -1797,7 +1828,7 @@
   "to_source(tokens: List(#(Token, Position))) -> String
 
    Turn a sequence of tokens back to their Gleam source code representation."
-  {:malli/schema [:=> [:cat [:sequential [:tuple [:fn token/Token?] [:fn Position?]]]]
+  {:malli/schema [:=> [:cat [:sequential [:tuple (token/Token-schema) (Position-schema)]]]
                       :string]
    :gleam/src "project/build/packages/glexer/src/glexer.gleam:843"}
   ^java.lang.String [tokens]

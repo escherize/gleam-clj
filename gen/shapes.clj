@@ -12,12 +12,19 @@
 (defrecord Point [] IShape)
 (defn Point? "True if `v` is a Point value." [v] (instance? Point v))
 (defn Shape? "True if `v` is any Shape value." [v] (instance? shapes.IShape v))
+(defn Shape-schema
+  "Malli schema for Shape."
+  []
+  [:or
+   [:and [:fn Circle?] [:map [:value :double]]]
+   [:and [:fn Rect?] [:map [:width :double] [:height :double]]]
+   [:fn Point?]])
 
 (defn area
   "area(shape: Shape) -> Float
 
    Area with pi = 3.0, engineering approximation."
-  {:malli/schema [:=> [:cat [:fn Shape?]] :double]
+  {:malli/schema [:=> [:cat (Shape-schema)] :double]
    :gleam/src "shapes.gleam:10"}
   ^double [shape]
   (cond
@@ -43,7 +50,7 @@
 
 (defn total-area
   "total_area(shapes: List(Shape)) -> Float"
-  {:malli/schema [:=> [:cat [:sequential [:fn Shape?]]] :double]
+  {:malli/schema [:=> [:cat [:sequential (Shape-schema)]] :double]
    :gleam/src "shapes.gleam:25"}
   ^double [shapes]
   (-> shapes (list/map area) sum))

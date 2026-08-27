@@ -504,7 +504,7 @@ clojure -M:repl</pre>
         </div>
       </div>
     </div>
-    <p style="margin-top:16px"><code>Shape?</code> is a plain <code>instance?</code> on the protocol's generated interface — an O(1) check, exactly as fast as the per-variant predicates, not a slow <code>satisfies?</code>. And it feeds the derived malli schema: a <code>Shape</code> argument becomes <code>[:fn Shape?]</code> rather than an <code>[:or …]</code> of every variant. Note the <code>^double</code> field hints: <code>Float</code> fields compile to primitive record slots, because the checker already proved they hold doubles.</p>
+    <p style="margin-top:16px"><code>Shape?</code> is a plain <code>instance?</code> on the protocol's generated interface — an O(1) check, exactly as fast as the per-variant predicates, not a slow <code>satisfies?</code>. And every type gets a generated schema constructor — a <code>Shape</code> argument's schema is <code>(Shape-schema)</code>, which validates the variant <em>and</em> its fields, with type parameters becoming schema-fn parameters so nested types compose the way the Gleam type expression does. Note the <code>^double</code> field hints: <code>Float</code> fields compile to primitive record slots, because the checker already proved they hold doubles.</p>
   </section>
 
   <section id="samples">
@@ -671,7 +671,7 @@ clojure -M:repl</pre>
    Parse untrusted input into a UserId —
    the only way to make one."</span>
   {<span class="ty">:malli/schema</span> [:=&gt; [:cat :string]
-                      (p/<span class="fn">result-of</span> [:fn <span class="fn">UserId?</span>] [:fn <span class="fn">IdError?</span>])]
+                      (p/<span class="fn">result-of</span> (<span class="fn">UserId-schema</span>) (<span class="fn">IdError-schema</span>))]
    <span class="ty">:gleam/src</span> <span class="st">"permissions.gleam:16"</span>}
   [^java.lang.String raw]
   (<span class="k">let</span> [subject (string/<span class="fn">trim</span> raw)]

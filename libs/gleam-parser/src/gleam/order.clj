@@ -10,6 +10,13 @@
 (defrecord Gt [] IOrder)
 (defn Gt? "True if `v` is a Gt value." [v] (instance? Gt v))
 (defn Order? "True if `v` is any Order value." [v] (instance? gleam.order.IOrder v))
+(defn Order-schema
+  "Malli schema for Order."
+  []
+  [:or
+   [:fn Lt?]
+   [:fn Eq?]
+   [:fn Gt?]])
 
 (defn negate
   "negate(order: Order) -> Order
@@ -30,7 +37,7 @@
    ```gleam
    assert order.negate(Gt) == Lt
    ```"
-  {:malli/schema [:=> [:cat [:fn Order?]] [:fn Order?]]
+  {:malli/schema [:=> [:cat (Order-schema)] (Order-schema)]
    :gleam/src "stdlib-src/src/gleam/order.gleam:32"}
   [order]
   (cond
@@ -56,7 +63,7 @@
    ```gleam
    assert order.to_int(Gt) == 1
    ```"
-  {:malli/schema [:=> [:cat [:fn Order?]] :int]
+  {:malli/schema [:=> [:cat (Order-schema)] :int]
    :gleam/src "stdlib-src/src/gleam/order.gleam:56"}
   [order]
   (cond
@@ -74,7 +81,7 @@
    ```gleam
    assert order.compare(Eq, with: Lt) == Gt
    ```"
-  {:malli/schema [:=> [:cat [:fn Order?] [:fn Order?]] [:fn Order?]]
+  {:malli/schema [:=> [:cat (Order-schema) (Order-schema)] (Order-schema)]
    :gleam/src "stdlib-src/src/gleam/order.gleam:72"}
   [a b]
   (cond
@@ -96,8 +103,8 @@
 
    assert list.sort([1, 5, 4], by: order.reverse(int.compare)) == [5, 4, 1]
    ```"
-  {:malli/schema [:=> [:cat [:=> [:cat :any :any] [:fn Order?]]]
-                      [:=> [:cat :any :any] [:fn Order?]]]
+  {:malli/schema [:=> [:cat [:=> [:cat :any :any] (Order-schema)]]
+                      [:=> [:cat :any :any] (Order-schema)]]
    :gleam/src "stdlib-src/src/gleam/order.gleam:92"}
   [orderer]
   (fn [a b] (orderer b a)))
@@ -120,7 +127,7 @@
 
    assert order.break_tie(in: int.compare(1, 0), with: Eq) == Gt
    ```"
-  {:malli/schema [:=> [:cat [:fn Order?] [:fn Order?]] [:fn Order?]]
+  {:malli/schema [:=> [:cat (Order-schema) (Order-schema)] (Order-schema)]
    :gleam/src "stdlib-src/src/gleam/order.gleam:112"}
   [order other]
   (if (or (instance? Lt order) (instance? Gt order)) order other))
@@ -147,8 +154,8 @@
 
    assert order.lazy_break_tie(in: int.compare(1, 0), with: fn() { Eq }) == Gt
    ```"
-  {:malli/schema [:=> [:cat [:fn Order?] [:=> [:cat] [:fn Order?]]]
-                      [:fn Order?]]
+  {:malli/schema [:=> [:cat (Order-schema) [:=> [:cat] (Order-schema)]]
+                      (Order-schema)]
    :gleam/src "stdlib-src/src/gleam/order.gleam:139"}
   [order comparison]
   (if (or (instance? Lt order) (instance? Gt order)) order (comparison)))

@@ -113,7 +113,7 @@
    To handle
    [Floating Point Imprecision](https://en.wikipedia.org/wiki/Floating-point_arithmetic#Accuracy_problems)
    you may use [`loosely_compare`](#loosely_compare) instead."
-  {:malli/schema [:=> [:cat :double :double] [:fn order/Order?]]
+  {:malli/schema [:=> [:cat :double :double] (order/Order-schema)]
    :gleam/src "stdlib-src/src/gleam/float.gleam:100"}
   [^double a ^double b]
   (let [subject (= a b)]
@@ -162,7 +162,7 @@
 
    If you want to check only for equality you may use
    [`loosely_equals`](#loosely_equals) instead."
-  {:malli/schema [:=> [:cat :double :double :double] [:fn order/Order?]]
+  {:malli/schema [:=> [:cat :double :double :double] (order/Order-schema)]
    :gleam/src "stdlib-src/src/gleam/float.gleam:129"}
   [^double a ^double b ^double tolerance]
   (let [difference (absolute-value (- a b)) subject (<= difference tolerance)]

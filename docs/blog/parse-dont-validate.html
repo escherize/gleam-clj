@@ -392,7 +392,7 @@ Found type:
   <span class="st">"rename_dashboard(proof: CanEdit, name: String) -&gt; String
 
    Demands the proof. Unauthorized calls don't type-check."</span>
-  {<span class="ty">:malli/schema</span> [:=&gt; [:cat [:fn <span class="fn">CanEdit?</span>] :string] :string]
+  {<span class="ty">:malli/schema</span> [:=&gt; [:cat (<span class="fn">CanEdit-schema</span>) :string] :string]
    <span class="ty">:gleam/src</span> <span class="st">"permissions.gleam:52"</span>}
   ^java.lang.String [proof ^java.lang.String name]
   (<span class="k">let</span> [{{id :value} :value} proof]
@@ -402,7 +402,7 @@ Found type:
 
 <ul class="clean">
   <li><strong>The docstring carries the contract.</strong> <code>(doc rename-dashboard)</code> in any REPL shows the Gleam signature, and <code>:gleam/src</code> points at the line that defines it.</li>
-  <li><strong>The schema demands the proof at runtime.</strong> <code>[:fn CanEdit?]</code> is derived from the Gleam type. Turn on <a href="https://github.com/metosin/malli">malli</a> instrumentation and a Clojure call passing a raw id — <code>(rename-dashboard 42 "x")</code> — throws <code>:malli.core/invalid-input</code> at the boundary instead of misbehaving past it.</li>
+  <li><strong>The schema demands the proof at runtime.</strong> <code>(CanEdit-schema)</code> is a generated schema constructor derived from the Gleam type — it checks the variant and its fields. Turn on <a href="https://github.com/metosin/malli">malli</a> instrumentation and a Clojure call passing a raw id — <code>(rename-dashboard 42 "x")</code> — throws <code>:malli.core/invalid-input</code> at the boundary instead of misbehaving past it.</li>
   <li><strong>The same schema feeds clj-kondo</strong>, so an obviously wrong call is a static lint error in the editor before anything runs.</li>
 </ul>
 

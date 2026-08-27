@@ -287,15 +287,25 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
+(declare DecodeError? DecodeError-schema Decoder? Decoder-schema)
+
 ;; type DecodeError
 (defprotocol IDecodeError)
 (defrecord DecodeError [^java.lang.String expected ^java.lang.String found path] IDecodeError)
 (defn DecodeError? "True if `v` is a DecodeError value." [v] (instance? DecodeError v))
+(defn DecodeError-schema
+  "Malli schema for DecodeError."
+  []
+  [:and [:fn DecodeError?] [:map [:expected :string] [:found :string] [:path [:sequential :string]]]])
 
 ;; type Decoder
 (defprotocol IDecoder)
 (defrecord Decoder [function] IDecoder)
 (defn Decoder? "True if `v` is a Decoder value." [v] (instance? Decoder v))
+(defn Decoder-schema
+  "Malli schema for Decoder(t)."
+  [t]
+  [:and [:fn Decoder?] [:map [:function [:=> [:cat (dynamic/Dynamic-schema)] [:tuple t [:sequential (DecodeError-schema)]]]]]])
 
 (defn- decode-dynamic
   "decode_dynamic(data: Dynamic) -> #(Dynamic, List(DecodeError))"
@@ -322,8 +332,8 @@
 
    decode.run(data, decoder)
    ```"
-  {:malli/schema [:=> [:cat [:or ] [:fn Decoder?]]
-                      (p/result-of :any [:sequential [:fn DecodeError?]])]
+  {:malli/schema [:=> [:cat (dynamic/Dynamic-schema) (Decoder-schema :any)]
+                      (p/result-of :any [:sequential (DecodeError-schema)])]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:371"}
   [data decoder]
   (let [[maybe-invalid-data errors] ((:function decoder) data)]
@@ -362,8 +372,8 @@
    let result = decode.run(dynamic.int(1000), decoder)
    assert result == Ok(\"1000\")
    ```"
-  {:malli/schema [:=> [:cat [:fn Decoder?] [:=> [:cat :any] :any]]
-                      [:fn Decoder?]]
+  {:malli/schema [:=> [:cat (Decoder-schema :any) [:=> [:cat :any] :any]]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:917"}
   [decoder transformer]
   (->Decoder (fn [d]
@@ -440,8 +450,8 @@
    ])
    assert decode.run(dynamic.int(1000), decoder) == Ok(\"1000\")
    ```"
-  {:malli/schema [:=> [:cat [:fn Decoder?] [:sequential [:fn Decoder?]]]
-                      [:fn Decoder?]]
+  {:malli/schema [:=> [:cat (Decoder-schema :any) [:sequential (Decoder-schema :any)]]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:994"}
   [first' alternatives]
   (->Decoder (fn [dynamic-data]
@@ -493,7 +503,8 @@
    |> decode.run(decode.list(of: decode.int))
    assert result == Ok([1, 2, 3])
    ```"
-  {:malli/schema [:=> [:cat [:fn Decoder?]] [:fn Decoder?]]
+  {:malli/schema [:=> [:cat (Decoder-schema :any)]
+                      (Decoder-schema [:sequential :any])]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:794"}
   [inner]
   (->Decoder (fn [data]
@@ -557,8 +568,8 @@
    let result = decode.run(data, decoder)
    assert result == Ok(SignUp(name: \"Lucy\", email: \"lucy@example.com\"))
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
-                      [:fn Decoder?]]
+  {:malli/schema [:=> [:cat [:sequential :any] (Decoder-schema :any) [:=> [:cat :any] (Decoder-schema :any)]]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:339"}
   [field-path field-decoder next]
   (->Decoder (fn [data]
@@ -608,7 +619,8 @@
    |> decode.run(decode.optional(decode.int))
    == Ok(option.None)
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:fn Decoder?]] [:fn Decoder?]]
+  {:malli/schema [:=> [:cat [:sequential :any] (Decoder-schema :any)]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:410"}
   [path inner]
   (->Decoder (fn [data]
@@ -644,7 +656,7 @@
    let result = decode.run(data, decoder)
    assert result == Ok(SignUp(name: \"Lucy\", email: \"lucy@example.com\"))
    ```"
-  {:malli/schema [:=> [:cat :any] [:fn Decoder?]]
+  {:malli/schema [:=> [:cat :any] (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:501"}
   [data]
   (->Decoder (fn [_] [data (list)])))
@@ -653,7 +665,8 @@
   "decode_error(expected expected: String, found found: Dynamic) -> List(DecodeError)
 
    Construct a decode error for some unexpected dynamic data."
-  {:malli/schema [:=> [:cat :string [:or ]] [:sequential [:fn DecodeError?]]]
+  {:malli/schema [:=> [:cat :string (dynamic/Dynamic-schema)]
+                      [:sequential (DecodeError-schema)]]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:507"}
   [^java.lang.String expected found]
   (list (->DecodeError expected (dynamic/classify found) (list))))
@@ -693,8 +706,8 @@
 
    If you wish to return a default in the event that a field is not present,
    see [`optional_field`](#optional_field) and / [`optionally_at`](#optionally_at)."
-  {:malli/schema [:=> [:cat :any [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
-                      [:fn Decoder?]]
+  {:malli/schema [:=> [:cat :any (Decoder-schema :any) [:=> [:cat :any] (Decoder-schema :any)]]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:547"}
   [field-name field-decoder next]
   (subfield (list field-name) field-decoder next))
@@ -727,8 +740,8 @@
    let result = decode.run(data, decoder)
    assert result == Ok(SignUp(name: \"Lucy\", email: \"n/a\"))
    ```"
-  {:malli/schema [:=> [:cat :any :any [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
-                      [:fn Decoder?]]
+  {:malli/schema [:=> [:cat :any :any (Decoder-schema :any) [:=> [:cat :any] (Decoder-schema :any)]]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:581"}
   [key default field-decoder next]
   (->Decoder (fn [data]
@@ -772,8 +785,8 @@
 
    assert decode.run(data, decoder) == Ok(100)
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:fn Decoder?]]
-                      [:fn Decoder?]]
+  {:malli/schema [:=> [:cat [:sequential :any] :any (Decoder-schema :any)]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:622"}
   [path default inner]
   (->Decoder (fn [data]
@@ -830,7 +843,8 @@
    let result = decode.run(values, decode.dict(decode.string, decode.int))
    assert result == Ok(values)
    ```"
-  {:malli/schema [:=> [:cat [:fn Decoder?] [:fn Decoder?]] [:fn Decoder?]]
+  {:malli/schema [:=> [:cat (Decoder-schema :any) (Decoder-schema :any)]
+                      (Decoder-schema [:map-of :any :any])]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:826"}
   [key value]
   (->Decoder (fn [data]
@@ -873,7 +887,8 @@
    let result = decode.run(dynamic.nil(), decode.optional(decode.int))
    assert result == Ok(option.None)
    ```"
-  {:malli/schema [:=> [:cat [:fn Decoder?]] [:fn Decoder?]]
+  {:malli/schema [:=> [:cat (Decoder-schema :any)]
+                      (Decoder-schema (option/Option-schema :any))]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:895"}
   [inner]
   (->Decoder (fn [data]
@@ -887,8 +902,8 @@
   "map_errors(decoder: Decoder(a), transformer: fn(List(DecodeError)) -> List(DecodeError)) -> Decoder(a)
 
    Apply a transformation function to any errors returned by the decoder."
-  {:malli/schema [:=> [:cat [:fn Decoder?] [:=> [:cat [:sequential [:fn DecodeError?]]] [:sequential [:fn DecodeError?]]]]
-                      [:fn Decoder?]]
+  {:malli/schema [:=> [:cat (Decoder-schema :any) [:=> [:cat [:sequential (DecodeError-schema)]] [:sequential (DecodeError-schema)]]]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:926"}
   [decoder transformer]
   (->Decoder (fn [d]
@@ -911,7 +926,8 @@
    let result = decode.run(dynamic.int(1000), decoder)
    assert result == Error([DecodeError(\"MyThing\", \"Int\", [])])
    ```"
-  {:malli/schema [:=> [:cat [:fn Decoder?] :string] [:fn Decoder?]]
+  {:malli/schema [:=> [:cat (Decoder-schema :any) :string]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:950"}
   [decoder ^java.lang.String name]
   (->Decoder (fn [dynamic-data]
@@ -926,8 +942,8 @@
    Create a new decoder based upon the value of a previous decoder.
 
    This may be useful to run one previous decoder to use in further decoding."
-  {:malli/schema [:=> [:cat [:fn Decoder?] [:=> [:cat :any] [:fn Decoder?]]]
-                      [:fn Decoder?]]
+  {:malli/schema [:=> [:cat (Decoder-schema :any) [:=> [:cat :any] (Decoder-schema :any)]]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:964"}
   [decoder next]
   (->Decoder (fn [dynamic-data]
@@ -953,7 +969,7 @@
    ```gleam
    decode.failure(User(name: \"\", score: 0, tags: []), expected: \"User\")
    ```"
-  {:malli/schema [:=> [:cat :any :string] [:fn Decoder?]]
+  {:malli/schema [:=> [:cat :any :string] (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:1040"}
   [placeholder ^java.lang.String name]
   (->Decoder (fn [d] [placeholder (decode-error name d)])))
@@ -997,8 +1013,8 @@
    false -> {error, 0}
    end.
    ```"
-  {:malli/schema [:=> [:cat :string [:=> [:cat [:or ]] (p/result-of :any :any)]]
-                      [:fn Decoder?]]
+  {:malli/schema [:=> [:cat :string [:=> [:cat (dynamic/Dynamic-schema)] (p/result-of :any :any)]]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:1081"}
   [^java.lang.String name decoding-function]
   (->Decoder (fn [d]
@@ -1034,7 +1050,8 @@
    ])
    }
    ```"
-  {:malli/schema [:=> [:cat [:=> [:cat] [:fn Decoder?]]] [:fn Decoder?]]
+  {:malli/schema [:=> [:cat [:=> [:cat] (Decoder-schema :any)]]
+                      (Decoder-schema :any)]
    :gleam/src "stdlib-src/src/gleam/dynamic/decode.gleam:1118"}
   [inner]
   (->Decoder (fn [data]

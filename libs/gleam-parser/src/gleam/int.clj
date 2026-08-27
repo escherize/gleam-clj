@@ -304,7 +304,7 @@
    ```gleam
    assert int.compare(3, 3) == Eq
    ```"
-  {:malli/schema [:=> [:cat :int :int] [:fn order/Order?]]
+  {:malli/schema [:=> [:cat :int :int] (order/Order-schema)]
    :gleam/src "stdlib-src/src/gleam/int.gleam:295"}
   [a b]
   (let [subject (= a b)]

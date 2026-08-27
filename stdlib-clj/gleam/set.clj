@@ -9,12 +9,16 @@
 (defprotocol ISet)
 (defrecord Set [dict] ISet)
 (defn Set? "True if `v` is a Set value." [v] (instance? Set v))
+(defn Set-schema
+  "Malli schema for Set(member)."
+  [member]
+  [:and [:fn Set?] [:map [:dict [:map-of member [:sequential :nil]]]]])
 
 (defn new*
   "new() -> Set(a)
 
    Creates a new empty set."
-  {:malli/schema [:=> [:cat] [:fn Set?]]
+  {:malli/schema [:=> [:cat] (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:32"}
   []
   (->Set (dict/new*)))
@@ -35,7 +39,7 @@
    |> set.size
    == 2
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?]] :int]
+  {:malli/schema [:=> [:cat (Set-schema :any)] :int]
    :gleam/src "stdlib-src/src/gleam/set.gleam:50"}
   [set]
   (dict/size (:dict set)))
@@ -54,7 +58,7 @@
    ```gleam
    assert !{ set.new() |> set.insert(1) |> set.is_empty }
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?]] :boolean]
+  {:malli/schema [:=> [:cat (Set-schema :any)] :boolean]
    :gleam/src "stdlib-src/src/gleam/set.gleam:66"}
   [set]
   (= set (new*)))
@@ -77,7 +81,7 @@
    |> set.size
    == 2
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] :any] [:fn Set?]]
+  {:malli/schema [:=> [:cat (Set-schema :any) :any] (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:84"}
   [set member]
   (->Set (dict/insert (:dict set) member token)))
@@ -104,7 +108,7 @@
    |> set.contains(1)
    }
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] :any] :boolean]
+  {:malli/schema [:=> [:cat (Set-schema :any) :any] :boolean]
    :gleam/src "stdlib-src/src/gleam/set.gleam:108"}
   [set member]
   (-> (:dict set) (dict/get member) result/is-ok))
@@ -127,7 +131,7 @@
    |> set.contains(2)
    }
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] :any] [:fn Set?]]
+  {:malli/schema [:=> [:cat (Set-schema :any) :any] (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:130"}
   [set member]
   (->Set (dict/delete (:dict set) member)))
@@ -147,7 +151,7 @@
    ```gleam
    assert set.new() |> set.insert(2) |> set.to_list == [2]
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?]] [:sequential :any]]
+  {:malli/schema [:=> [:cat (Set-schema :any)] [:sequential :any]]
    :gleam/src "stdlib-src/src/gleam/set.gleam:147"}
   [set]
   (dict/keys (:dict set)))
@@ -171,7 +175,7 @@
    |> list.sort(by: int.compare)
    == [1, 2, 3, 4]
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any]] [:fn Set?]]
+  {:malli/schema [:=> [:cat [:sequential :any]] (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:168"}
   [members]
   (let [dict (list/fold members
@@ -196,7 +200,8 @@
    |> set.fold(0, fn(accumulator, member) { accumulator + member })
    == 13
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] :any [:=> [:cat :any :any] :any]] :any]
+  {:malli/schema [:=> [:cat (Set-schema :any) :any [:=> [:cat :any :any] :any]]
+                      :any]
    :gleam/src "stdlib-src/src/gleam/set.gleam:191"}
   [set initial reducer]
   (dict/fold (:dict set) initial (fn [a k _] (reducer a k))))
@@ -219,7 +224,8 @@
    |> set.to_list
    == [4, 6, 44]
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] [:=> [:cat :any] :boolean]] [:fn Set?]]
+  {:malli/schema [:=> [:cat (Set-schema :any) [:=> [:cat :any] :boolean]]
+                      (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:215"}
   [set predicate]
   (->Set (dict/filter (:dict set) (fn [m _] (predicate m)))))
@@ -238,7 +244,8 @@
    |> set.to_list
    == [2, 4, 6, 8]
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] [:=> [:cat :any] :any]] [:fn Set?]]
+  {:malli/schema [:=> [:cat (Set-schema :any) [:=> [:cat :any] :any]]
+                      (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:234"}
   [set fun]
   (fold set (new*) (fn [acc member] (insert acc (fun member)))))
@@ -257,7 +264,8 @@
    |> set.to_list
    == [2, 4]
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] [:sequential :any]] [:fn Set?]]
+  {:malli/schema [:=> [:cat (Set-schema :any) [:sequential :any]]
+                      (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:252"}
   [set disallowed]
   (list/fold disallowed set delete))
@@ -278,7 +286,8 @@
    |> set.to_list
    == [1, 3]
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] [:sequential :any]] [:fn Set?]]
+  {:malli/schema [:=> [:cat (Set-schema :any) [:sequential :any]]
+                      (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:273"}
   [set desired]
   (->Set (dict/take (:dict set) desired)))
@@ -303,7 +312,8 @@
    assert set.union(set.from_list([1, 2]), set.from_list([2, 3])) |> set.to_list
    == [1, 2, 3]
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] [:fn Set?]]
+  {:malli/schema [:=> [:cat (Set-schema :any) (Set-schema :any)]
+                      (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:291"}
   [first' second]
   (let [[larger smaller] (order first' second)]
@@ -323,7 +333,8 @@
    |> set.to_list
    == [2]
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] [:fn Set?]]
+  {:malli/schema [:=> [:cat (Set-schema :any) (Set-schema :any)]
+                      (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:318"}
   [first' second]
   (let [[larger smaller] (order first' second)]
@@ -342,7 +353,8 @@
    |> set.to_list
    == [1]
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] [:fn Set?]]
+  {:malli/schema [:=> [:cat (Set-schema :any) (Set-schema :any)]
+                      (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:337"}
   [first' second]
   (drop first' (to-list second)))
@@ -361,7 +373,7 @@
    ```gleam
    assert !set.is_subset(set.from_list([1, 2, 3]), set.from_list([3, 4, 5]))
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] :boolean]
+  {:malli/schema [:=> [:cat (Set-schema :any) (Set-schema :any)] :boolean]
    :gleam/src "stdlib-src/src/gleam/set.gleam:356"}
   [first' second]
   (= (intersection first' second) first'))
@@ -380,7 +392,7 @@
    ```gleam
    assert !set.is_disjoint(set.from_list([1, 2, 3]), set.from_list([3, 4, 5]))
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] :boolean]
+  {:malli/schema [:=> [:cat (Set-schema :any) (Set-schema :any)] :boolean]
    :gleam/src "stdlib-src/src/gleam/set.gleam:372"}
   [first' second]
   (= (intersection first' second) (new*)))
@@ -401,7 +413,8 @@
    |> set.to_list
    == [1, 2, 4]
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] [:fn Set?]] [:fn Set?]]
+  {:malli/schema [:=> [:cat (Set-schema :any) (Set-schema :any)]
+                      (Set-schema :any)]
    :gleam/src "stdlib-src/src/gleam/set.gleam:390"}
   [first' second]
   (difference (union first' second) (intersection first' second)))
@@ -427,7 +440,7 @@
    // banana
    // cherry
    ```"
-  {:malli/schema [:=> [:cat [:fn Set?] [:=> [:cat :any] :any]] :nil]
+  {:malli/schema [:=> [:cat (Set-schema :any) [:=> [:cat :any] :any]] :nil]
    :gleam/src "stdlib-src/src/gleam/set.gleam:419"}
   [set fun]
   (fold set

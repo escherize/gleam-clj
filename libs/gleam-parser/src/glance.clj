@@ -11,30 +11,52 @@
    [glexer.token :as t])
   (:import (gleam.prelude Ok)))
 
+(declare Definition? Definition-schema Attribute? Attribute-schema Module? Module-schema Function? Function-schema Span? Span-schema Use? Assignment? Assert? Expression? Statement? Statement-schema Let? LetAssert? AssignmentKind? AssignmentKind-schema UsePattern? UsePattern-schema PatternInt? PatternFloat? PatternString? PatternDiscard? PatternVariable? PatternTuple? PatternList? PatternAssignment? PatternConcatenate? PatternBitString? PatternVariant? Pattern? Pattern-schema Int? Float? String? Variable? NegateInt? NegateBool? Block? Panic? Todo? Tuple? List? Fn? RecordUpdate? FieldAccess? Call? TupleIndex? FnCapture? BitString? Case? BinaryOperator? Echo? Expression-schema Clause? Clause-schema BytesOption? IntOption? FloatOption? BitsOption? Utf8Option? Utf16Option? Utf32Option? Utf8CodepointOption? Utf16CodepointOption? Utf32CodepointOption? SignedOption? UnsignedOption? BigOption? LittleOption? NativeOption? SizeValueOption? SizeOption? UnitOption? BitStringSegmentOption? BitStringSegmentOption-schema BitArraySizeInt? BitArraySizeVariable? BitArraySizeBinaryOperator? BitArraySizeBlock? BitArraySize? BitArraySize-schema BitArraySizeAdd? BitArraySizeSubtract? BitArraySizeMultiply? BitArraySizeDivide? BitArraySizeRemainder? BitArraySizeOperator? BitArraySizeOperator-schema And? Or? Eq? NotEq? LtInt? LtEqInt? LtFloat? LtEqFloat? GtEqInt? GtInt? GtEqFloat? GtFloat? Pipe? AddInt? AddFloat? SubInt? SubFloat? MultInt? MultFloat? DivInt? DivFloat? RemainderInt? Concatenate? BinaryOperator-schema FnParameter? FnParameter-schema FunctionParameter? FunctionParameter-schema Named? Discarded? AssignmentName? AssignmentName-schema Import? Import-schema Constant? Constant-schema UnqualifiedImport? UnqualifiedImport-schema Public? Private? Publicity? Publicity-schema TypeAlias? TypeAlias-schema CustomType? CustomType-schema Variant? Variant-schema RecordUpdateField? RecordUpdateField-schema LabelledVariantField? UnlabelledVariantField? VariantField? VariantField-schema LabelledField? ShorthandField? UnlabelledField? Field? Field-schema NamedType? TupleType? FunctionType? VariableType? HoleType? Type? Type-schema UnexpectedEndOfInput? UnexpectedToken? Error-schema UnqualifiedImports? UnqualifiedImports-schema PatternConstructorArguments? PatternConstructorArguments-schema RegularExpressionUnit? ExpressionUnitAfterPipe? ParseExpressionUnitContext? ParseExpressionUnitContext-schema ParsedList? ParsedList-schema)
+
 ;; type Definition
 (defprotocol IDefinition)
 (defrecord Definition [attributes definition] IDefinition)
 (defn Definition? "True if `v` is a Definition value." [v] (instance? Definition v))
+(defn Definition-schema
+  "Malli schema for Definition(definition)."
+  [definition]
+  [:and [:fn Definition?] [:map [:attributes [:sequential (Attribute-schema)]] [:definition definition]]])
 
 ;; type Attribute
 (defprotocol IAttribute)
 (defrecord Attribute [^java.lang.String name arguments] IAttribute)
 (defn Attribute? "True if `v` is a Attribute value." [v] (instance? Attribute v))
+(defn Attribute-schema
+  "Malli schema for Attribute."
+  []
+  [:and [:fn Attribute?] [:map [:name :string] [:arguments [:sequential (Expression-schema)]]]])
 
 ;; type Module
 (defprotocol IModule)
 (defrecord Module [imports custom-types type-aliases constants functions] IModule)
 (defn Module? "True if `v` is a Module value." [v] (instance? Module v))
+(defn Module-schema
+  "Malli schema for Module."
+  []
+  [:and [:fn Module?] [:map [:imports [:sequential (Definition-schema (Import-schema))]] [:custom-types [:sequential (Definition-schema (CustomType-schema))]] [:type-aliases [:sequential (Definition-schema (TypeAlias-schema))]] [:constants [:sequential (Definition-schema (Constant-schema))]] [:functions [:sequential (Definition-schema (Function-schema))]]]])
 
 ;; type Function
 (defprotocol IFunction)
 (defrecord Function [location ^java.lang.String name publicity parameters return body] IFunction)
 (defn Function? "True if `v` is a Function value." [v] (instance? Function v))
+(defn Function-schema
+  "Malli schema for Function."
+  []
+  [:and [:fn Function?] [:map [:location (Span-schema)] [:name :string] [:publicity (Publicity-schema)] [:parameters [:sequential (FunctionParameter-schema)]] [:return (option/Option-schema (Type-schema))] [:body [:sequential (Statement-schema)]]]])
 
 ;; type Span
 (defprotocol ISpan)
 (defrecord Span [start end] ISpan)
 (defn Span? "True if `v` is a Span value." [v] (instance? Span v))
+(defn Span-schema
+  "Malli schema for Span."
+  []
+  [:and [:fn Span?] [:map [:start :int] [:end :int]]])
 
 ;; type Statement
 (defprotocol IStatement)
@@ -47,6 +69,14 @@
 (defrecord Expression [value] IStatement)
 (defn Expression? "True if `v` is a Expression value." [v] (instance? Expression v))
 (defn Statement? "True if `v` is any Statement value." [v] (instance? glance.IStatement v))
+(defn Statement-schema
+  "Malli schema for Statement."
+  []
+  [:or
+   [:and [:fn Use?] [:map [:location (Span-schema)] [:patterns [:sequential (UsePattern-schema)]] [:function [:fn Expression?]]]]
+   [:and [:fn Assignment?] [:map [:location (Span-schema)] [:kind [:fn AssignmentKind?]] [:pattern (Pattern-schema)] [:annotation (option/Option-schema (Type-schema))] [:value [:fn Expression?]]]]
+   [:and [:fn Assert?] [:map [:location (Span-schema)] [:expression [:fn Expression?]] [:message (option/Option-schema [:fn Expression?])]]]
+   [:and [:fn Expression?] [:map [:value [:fn Expression?]]]]])
 
 ;; type AssignmentKind
 (defprotocol IAssignmentKind)
@@ -55,11 +85,21 @@
 (defrecord LetAssert [message] IAssignmentKind)
 (defn LetAssert? "True if `v` is a LetAssert value." [v] (instance? LetAssert v))
 (defn AssignmentKind? "True if `v` is any AssignmentKind value." [v] (instance? glance.IAssignmentKind v))
+(defn AssignmentKind-schema
+  "Malli schema for AssignmentKind."
+  []
+  [:or
+   [:fn Let?]
+   [:and [:fn LetAssert?] [:map [:message (option/Option-schema [:fn Expression?])]]]])
 
 ;; type UsePattern
 (defprotocol IUsePattern)
 (defrecord UsePattern [pattern annotation] IUsePattern)
 (defn UsePattern? "True if `v` is a UsePattern value." [v] (instance? UsePattern v))
+(defn UsePattern-schema
+  "Malli schema for UsePattern."
+  []
+  [:and [:fn UsePattern?] [:map [:pattern (Pattern-schema)] [:annotation (option/Option-schema (Type-schema))]]])
 
 ;; type Pattern
 (defprotocol IPattern)
@@ -86,6 +126,21 @@
 (defrecord PatternVariant [location module ^java.lang.String constructor arguments with-spread] IPattern)
 (defn PatternVariant? "True if `v` is a PatternVariant value." [v] (instance? PatternVariant v))
 (defn Pattern? "True if `v` is any Pattern value." [v] (instance? glance.IPattern v))
+(defn Pattern-schema
+  "Malli schema for Pattern."
+  []
+  [:or
+   [:and [:fn PatternInt?] [:map [:location (Span-schema)] [:value :string]]]
+   [:and [:fn PatternFloat?] [:map [:location (Span-schema)] [:value :string]]]
+   [:and [:fn PatternString?] [:map [:location (Span-schema)] [:value :string]]]
+   [:and [:fn PatternDiscard?] [:map [:location (Span-schema)] [:name :string]]]
+   [:and [:fn PatternVariable?] [:map [:location (Span-schema)] [:name :string]]]
+   [:and [:fn PatternTuple?] [:map [:location (Span-schema)] [:elements [:sequential [:fn Pattern?]]]]]
+   [:and [:fn PatternList?] [:map [:location (Span-schema)] [:elements [:sequential [:fn Pattern?]]] [:tail (option/Option-schema [:fn Pattern?])]]]
+   [:and [:fn PatternAssignment?] [:map [:location (Span-schema)] [:pattern [:fn Pattern?]] [:name :string]]]
+   [:and [:fn PatternConcatenate?] [:map [:location (Span-schema)] [:prefix :string] [:prefix-name (option/Option-schema (AssignmentName-schema))] [:rest-name (AssignmentName-schema)]]]
+   [:and [:fn PatternBitString?] [:map [:location (Span-schema)] [:segments [:sequential [:tuple [:fn Pattern?] [:sequential (BitStringSegmentOption-schema (BitArraySize-schema))]]]]]]
+   [:and [:fn PatternVariant?] [:map [:location (Span-schema)] [:module (option/Option-schema :string)] [:constructor :string] [:arguments [:sequential (Field-schema [:fn Pattern?])]] [:with-spread :boolean]]]])
 
 ;; type Expression
 (defprotocol IExpression)
@@ -133,11 +188,40 @@
 (defn BinaryOperator? "True if `v` is a BinaryOperator value." [v] (instance? BinaryOperator v))
 (defrecord Echo [location expression message] IExpression)
 (defn Echo? "True if `v` is a Echo value." [v] (instance? Echo v))
+(defn Expression-schema
+  "Malli schema for Expression."
+  []
+  [:or
+   [:and [:fn Int?] [:map [:location (Span-schema)] [:value :string]]]
+   [:and [:fn Float?] [:map [:location (Span-schema)] [:value :string]]]
+   [:and [:fn String?] [:map [:location (Span-schema)] [:value :string]]]
+   [:and [:fn Variable?] [:map [:location (Span-schema)] [:name :string]]]
+   [:and [:fn NegateInt?] [:map [:location (Span-schema)] [:value [:fn Expression?]]]]
+   [:and [:fn NegateBool?] [:map [:location (Span-schema)] [:value [:fn Expression?]]]]
+   [:and [:fn Block?] [:map [:location (Span-schema)] [:statements [:sequential [:fn Statement?]]]]]
+   [:and [:fn Panic?] [:map [:location (Span-schema)] [:message (option/Option-schema [:fn Expression?])]]]
+   [:and [:fn Todo?] [:map [:location (Span-schema)] [:message (option/Option-schema [:fn Expression?])]]]
+   [:and [:fn Tuple?] [:map [:location (Span-schema)] [:elements [:sequential [:fn Expression?]]]]]
+   [:and [:fn List?] [:map [:location (Span-schema)] [:elements [:sequential [:fn Expression?]]] [:rest (option/Option-schema [:fn Expression?])]]]
+   [:and [:fn Fn?] [:map [:location (Span-schema)] [:arguments [:sequential (FnParameter-schema)]] [:return-annotation (option/Option-schema (Type-schema))] [:body [:sequential [:fn Statement?]]]]]
+   [:and [:fn RecordUpdate?] [:map [:location (Span-schema)] [:module (option/Option-schema :string)] [:constructor :string] [:record [:fn Expression?]] [:fields [:sequential (RecordUpdateField-schema [:fn Expression?])]]]]
+   [:and [:fn FieldAccess?] [:map [:location (Span-schema)] [:container [:fn Expression?]] [:label :string]]]
+   [:and [:fn Call?] [:map [:location (Span-schema)] [:function [:fn Expression?]] [:arguments [:sequential (Field-schema [:fn Expression?])]]]]
+   [:and [:fn TupleIndex?] [:map [:location (Span-schema)] [:tuple [:fn Expression?]] [:index :int]]]
+   [:and [:fn FnCapture?] [:map [:location (Span-schema)] [:label (option/Option-schema :string)] [:function [:fn Expression?]] [:arguments-before [:sequential (Field-schema [:fn Expression?])]] [:arguments-after [:sequential (Field-schema [:fn Expression?])]]]]
+   [:and [:fn BitString?] [:map [:location (Span-schema)] [:segments [:sequential [:tuple [:fn Expression?] [:sequential (BitStringSegmentOption-schema [:fn Expression?])]]]]]]
+   [:and [:fn Case?] [:map [:location (Span-schema)] [:subjects [:sequential [:fn Expression?]]] [:clauses [:sequential [:fn Clause?]]]]]
+   [:and [:fn BinaryOperator?] [:map [:location (Span-schema)] [:name (BinaryOperator-schema)] [:left [:fn Expression?]] [:right [:fn Expression?]]]]
+   [:and [:fn Echo?] [:map [:location (Span-schema)] [:expression (option/Option-schema [:fn Expression?])] [:message (option/Option-schema [:fn Expression?])]]]])
 
 ;; type Clause
 (defprotocol IClause)
 (defrecord Clause [patterns guard body] IClause)
 (defn Clause? "True if `v` is a Clause value." [v] (instance? Clause v))
+(defn Clause-schema
+  "Malli schema for Clause."
+  []
+  [:and [:fn Clause?] [:map [:patterns [:sequential [:sequential (Pattern-schema)]]] [:guard (option/Option-schema [:fn Expression?])] [:body [:fn Expression?]]]])
 
 ;; type BitStringSegmentOption
 (defprotocol IBitStringSegmentOption)
@@ -178,6 +262,28 @@
 (defrecord UnitOption [value] IBitStringSegmentOption)
 (defn UnitOption? "True if `v` is a UnitOption value." [v] (instance? UnitOption v))
 (defn BitStringSegmentOption? "True if `v` is any BitStringSegmentOption value." [v] (instance? glance.IBitStringSegmentOption v))
+(defn BitStringSegmentOption-schema
+  "Malli schema for BitStringSegmentOption(t)."
+  [t]
+  [:or
+   [:fn BytesOption?]
+   [:fn IntOption?]
+   [:fn FloatOption?]
+   [:fn BitsOption?]
+   [:fn Utf8Option?]
+   [:fn Utf16Option?]
+   [:fn Utf32Option?]
+   [:fn Utf8CodepointOption?]
+   [:fn Utf16CodepointOption?]
+   [:fn Utf32CodepointOption?]
+   [:fn SignedOption?]
+   [:fn UnsignedOption?]
+   [:fn BigOption?]
+   [:fn LittleOption?]
+   [:fn NativeOption?]
+   [:and [:fn SizeValueOption?] [:map [:value t]]]
+   [:and [:fn SizeOption?] [:map [:value :int]]]
+   [:and [:fn UnitOption?] [:map [:value :int]]]])
 
 ;; type BitArraySize
 (defprotocol IBitArraySize)
@@ -190,6 +296,14 @@
 (defrecord BitArraySizeBlock [location inner] IBitArraySize)
 (defn BitArraySizeBlock? "True if `v` is a BitArraySizeBlock value." [v] (instance? BitArraySizeBlock v))
 (defn BitArraySize? "True if `v` is any BitArraySize value." [v] (instance? glance.IBitArraySize v))
+(defn BitArraySize-schema
+  "Malli schema for BitArraySize."
+  []
+  [:or
+   [:and [:fn BitArraySizeInt?] [:map [:location (Span-schema)] [:value :string]]]
+   [:and [:fn BitArraySizeVariable?] [:map [:location (Span-schema)] [:name :string]]]
+   [:and [:fn BitArraySizeBinaryOperator?] [:map [:location (Span-schema)] [:operator (BitArraySizeOperator-schema)] [:left [:fn BitArraySize?]] [:right [:fn BitArraySize?]]]]
+   [:and [:fn BitArraySizeBlock?] [:map [:location (Span-schema)] [:inner [:fn BitArraySize?]]]]])
 
 ;; type BitArraySizeOperator
 (defprotocol IBitArraySizeOperator)
@@ -204,6 +318,15 @@
 (defrecord BitArraySizeRemainder [] IBitArraySizeOperator)
 (defn BitArraySizeRemainder? "True if `v` is a BitArraySizeRemainder value." [v] (instance? BitArraySizeRemainder v))
 (defn BitArraySizeOperator? "True if `v` is any BitArraySizeOperator value." [v] (instance? glance.IBitArraySizeOperator v))
+(defn BitArraySizeOperator-schema
+  "Malli schema for BitArraySizeOperator."
+  []
+  [:or
+   [:fn BitArraySizeAdd?]
+   [:fn BitArraySizeSubtract?]
+   [:fn BitArraySizeMultiply?]
+   [:fn BitArraySizeDivide?]
+   [:fn BitArraySizeRemainder?]])
 
 ;; type BinaryOperator
 (defprotocol IBinaryOperator)
@@ -253,16 +376,51 @@
 (defn RemainderInt? "True if `v` is a RemainderInt value." [v] (instance? RemainderInt v))
 (defrecord Concatenate [] IBinaryOperator)
 (defn Concatenate? "True if `v` is a Concatenate value." [v] (instance? Concatenate v))
+(defn BinaryOperator-schema
+  "Malli schema for BinaryOperator."
+  []
+  [:or
+   [:fn And?]
+   [:fn Or?]
+   [:fn Eq?]
+   [:fn NotEq?]
+   [:fn LtInt?]
+   [:fn LtEqInt?]
+   [:fn LtFloat?]
+   [:fn LtEqFloat?]
+   [:fn GtEqInt?]
+   [:fn GtInt?]
+   [:fn GtEqFloat?]
+   [:fn GtFloat?]
+   [:fn Pipe?]
+   [:fn AddInt?]
+   [:fn AddFloat?]
+   [:fn SubInt?]
+   [:fn SubFloat?]
+   [:fn MultInt?]
+   [:fn MultFloat?]
+   [:fn DivInt?]
+   [:fn DivFloat?]
+   [:fn RemainderInt?]
+   [:fn Concatenate?]])
 
 ;; type FnParameter
 (defprotocol IFnParameter)
 (defrecord FnParameter [name type-] IFnParameter)
 (defn FnParameter? "True if `v` is a FnParameter value." [v] (instance? FnParameter v))
+(defn FnParameter-schema
+  "Malli schema for FnParameter."
+  []
+  [:and [:fn FnParameter?] [:map [:name (AssignmentName-schema)] [:type- (option/Option-schema (Type-schema))]]])
 
 ;; type FunctionParameter
 (defprotocol IFunctionParameter)
 (defrecord FunctionParameter [label name type-] IFunctionParameter)
 (defn FunctionParameter? "True if `v` is a FunctionParameter value." [v] (instance? FunctionParameter v))
+(defn FunctionParameter-schema
+  "Malli schema for FunctionParameter."
+  []
+  [:and [:fn FunctionParameter?] [:map [:label (option/Option-schema :string)] [:name (AssignmentName-schema)] [:type- (option/Option-schema (Type-schema))]]])
 
 ;; type AssignmentName
 (defprotocol IAssignmentName)
@@ -271,21 +429,39 @@
 (defrecord Discarded [^java.lang.String value] IAssignmentName)
 (defn Discarded? "True if `v` is a Discarded value." [v] (instance? Discarded v))
 (defn AssignmentName? "True if `v` is any AssignmentName value." [v] (instance? glance.IAssignmentName v))
+(defn AssignmentName-schema
+  "Malli schema for AssignmentName."
+  []
+  [:or
+   [:and [:fn Named?] [:map [:value :string]]]
+   [:and [:fn Discarded?] [:map [:value :string]]]])
 
 ;; type Import
 (defprotocol IImport)
 (defrecord Import [location ^java.lang.String module alias unqualified-types unqualified-values] IImport)
 (defn Import? "True if `v` is a Import value." [v] (instance? Import v))
+(defn Import-schema
+  "Malli schema for Import."
+  []
+  [:and [:fn Import?] [:map [:location (Span-schema)] [:module :string] [:alias (option/Option-schema (AssignmentName-schema))] [:unqualified-types [:sequential (UnqualifiedImport-schema)]] [:unqualified-values [:sequential (UnqualifiedImport-schema)]]]])
 
 ;; type Constant
 (defprotocol IConstant)
 (defrecord Constant [location ^java.lang.String name publicity annotation value] IConstant)
 (defn Constant? "True if `v` is a Constant value." [v] (instance? Constant v))
+(defn Constant-schema
+  "Malli schema for Constant."
+  []
+  [:and [:fn Constant?] [:map [:location (Span-schema)] [:name :string] [:publicity (Publicity-schema)] [:annotation (option/Option-schema (Type-schema))] [:value (Expression-schema)]]])
 
 ;; type UnqualifiedImport
 (defprotocol IUnqualifiedImport)
 (defrecord UnqualifiedImport [^java.lang.String name alias] IUnqualifiedImport)
 (defn UnqualifiedImport? "True if `v` is a UnqualifiedImport value." [v] (instance? UnqualifiedImport v))
+(defn UnqualifiedImport-schema
+  "Malli schema for UnqualifiedImport."
+  []
+  [:and [:fn UnqualifiedImport?] [:map [:name :string] [:alias (option/Option-schema :string)]]])
 
 ;; type Publicity
 (defprotocol IPublicity)
@@ -294,26 +470,48 @@
 (defrecord Private [] IPublicity)
 (defn Private? "True if `v` is a Private value." [v] (instance? Private v))
 (defn Publicity? "True if `v` is any Publicity value." [v] (instance? glance.IPublicity v))
+(defn Publicity-schema
+  "Malli schema for Publicity."
+  []
+  [:or
+   [:fn Public?]
+   [:fn Private?]])
 
 ;; type TypeAlias
 (defprotocol ITypeAlias)
 (defrecord TypeAlias [location ^java.lang.String name publicity parameters aliased] ITypeAlias)
 (defn TypeAlias? "True if `v` is a TypeAlias value." [v] (instance? TypeAlias v))
+(defn TypeAlias-schema
+  "Malli schema for TypeAlias."
+  []
+  [:and [:fn TypeAlias?] [:map [:location (Span-schema)] [:name :string] [:publicity (Publicity-schema)] [:parameters [:sequential :string]] [:aliased (Type-schema)]]])
 
 ;; type CustomType
 (defprotocol ICustomType)
 (defrecord CustomType [location ^java.lang.String name publicity opaque- parameters variants] ICustomType)
 (defn CustomType? "True if `v` is a CustomType value." [v] (instance? CustomType v))
+(defn CustomType-schema
+  "Malli schema for CustomType."
+  []
+  [:and [:fn CustomType?] [:map [:location (Span-schema)] [:name :string] [:publicity (Publicity-schema)] [:opaque- :boolean] [:parameters [:sequential :string]] [:variants [:sequential (Variant-schema)]]]])
 
 ;; type Variant
 (defprotocol IVariant)
 (defrecord Variant [^java.lang.String name fields attributes] IVariant)
 (defn Variant? "True if `v` is a Variant value." [v] (instance? Variant v))
+(defn Variant-schema
+  "Malli schema for Variant."
+  []
+  [:and [:fn Variant?] [:map [:name :string] [:fields [:sequential (VariantField-schema)]] [:attributes [:sequential (Attribute-schema)]]]])
 
 ;; type RecordUpdateField
 (defprotocol IRecordUpdateField)
 (defrecord RecordUpdateField [^java.lang.String label item] IRecordUpdateField)
 (defn RecordUpdateField? "True if `v` is a RecordUpdateField value." [v] (instance? RecordUpdateField v))
+(defn RecordUpdateField-schema
+  "Malli schema for RecordUpdateField(t)."
+  [t]
+  [:and [:fn RecordUpdateField?] [:map [:label :string] [:item (option/Option-schema t)]]])
 
 ;; type VariantField
 (defprotocol IVariantField)
@@ -322,6 +520,12 @@
 (defrecord UnlabelledVariantField [item] IVariantField)
 (defn UnlabelledVariantField? "True if `v` is a UnlabelledVariantField value." [v] (instance? UnlabelledVariantField v))
 (defn VariantField? "True if `v` is any VariantField value." [v] (instance? glance.IVariantField v))
+(defn VariantField-schema
+  "Malli schema for VariantField."
+  []
+  [:or
+   [:and [:fn LabelledVariantField?] [:map [:item (Type-schema)] [:label :string]]]
+   [:and [:fn UnlabelledVariantField?] [:map [:item (Type-schema)]]]])
 
 ;; type Field
 (defprotocol IField)
@@ -332,6 +536,13 @@
 (defrecord UnlabelledField [item] IField)
 (defn UnlabelledField? "True if `v` is a UnlabelledField value." [v] (instance? UnlabelledField v))
 (defn Field? "True if `v` is any Field value." [v] (instance? glance.IField v))
+(defn Field-schema
+  "Malli schema for Field(t)."
+  [t]
+  [:or
+   [:and [:fn LabelledField?] [:map [:label :string] [:label-location (Span-schema)] [:item t]]]
+   [:and [:fn ShorthandField?] [:map [:label :string] [:location (Span-schema)]]]
+   [:and [:fn UnlabelledField?] [:map [:item t]]]])
 
 ;; type Type
 (defprotocol IType)
@@ -346,6 +557,15 @@
 (defrecord HoleType [location ^java.lang.String name] IType)
 (defn HoleType? "True if `v` is a HoleType value." [v] (instance? HoleType v))
 (defn Type? "True if `v` is any Type value." [v] (instance? glance.IType v))
+(defn Type-schema
+  "Malli schema for Type."
+  []
+  [:or
+   [:and [:fn NamedType?] [:map [:location (Span-schema)] [:name :string] [:module (option/Option-schema :string)] [:parameters [:sequential [:fn Type?]]]]]
+   [:and [:fn TupleType?] [:map [:location (Span-schema)] [:elements [:sequential [:fn Type?]]]]]
+   [:and [:fn FunctionType?] [:map [:location (Span-schema)] [:parameters [:sequential [:fn Type?]]] [:return [:fn Type?]]]]
+   [:and [:fn VariableType?] [:map [:location (Span-schema)] [:name :string]]]
+   [:and [:fn HoleType?] [:map [:location (Span-schema)] [:name :string]]]])
 
 ;; type Error
 (defprotocol IError)
@@ -353,16 +573,30 @@
 (defn UnexpectedEndOfInput? "True if `v` is a UnexpectedEndOfInput value." [v] (instance? UnexpectedEndOfInput v))
 (defrecord UnexpectedToken [token position] IError)
 (defn UnexpectedToken? "True if `v` is a UnexpectedToken value." [v] (instance? UnexpectedToken v))
+(defn Error-schema
+  "Malli schema for Error."
+  []
+  [:or
+   [:fn UnexpectedEndOfInput?]
+   [:and [:fn UnexpectedToken?] [:map [:token (t/Token-schema)] [:position (glexer/Position-schema)]]]])
 
 ;; type UnqualifiedImports
 (defprotocol IUnqualifiedImports)
 (defrecord UnqualifiedImports [types values end remaining-tokens] IUnqualifiedImports)
 (defn UnqualifiedImports? "True if `v` is a UnqualifiedImports value." [v] (instance? UnqualifiedImports v))
+(defn UnqualifiedImports-schema
+  "Malli schema for UnqualifiedImports."
+  []
+  [:and [:fn UnqualifiedImports?] [:map [:types [:sequential (UnqualifiedImport-schema)]] [:values [:sequential (UnqualifiedImport-schema)]] [:end :int] [:remaining-tokens [:sequential [:tuple (t/Token-schema) (glexer/Position-schema)]]]]])
 
 ;; type PatternConstructorArguments
 (defprotocol IPatternConstructorArguments)
 (defrecord PatternConstructorArguments [fields spread end remaining-tokens] IPatternConstructorArguments)
 (defn PatternConstructorArguments? "True if `v` is a PatternConstructorArguments value." [v] (instance? PatternConstructorArguments v))
+(defn PatternConstructorArguments-schema
+  "Malli schema for PatternConstructorArguments."
+  []
+  [:and [:fn PatternConstructorArguments?] [:map [:fields [:sequential (Field-schema (Pattern-schema))]] [:spread :boolean] [:end :int] [:remaining-tokens [:sequential [:tuple (t/Token-schema) (glexer/Position-schema)]]]]])
 
 ;; type ParseExpressionUnitContext
 (defprotocol IParseExpressionUnitContext)
@@ -371,15 +605,25 @@
 (defrecord ExpressionUnitAfterPipe [] IParseExpressionUnitContext)
 (defn ExpressionUnitAfterPipe? "True if `v` is a ExpressionUnitAfterPipe value." [v] (instance? ExpressionUnitAfterPipe v))
 (defn ParseExpressionUnitContext? "True if `v` is any ParseExpressionUnitContext value." [v] (instance? glance.IParseExpressionUnitContext v))
+(defn ParseExpressionUnitContext-schema
+  "Malli schema for ParseExpressionUnitContext."
+  []
+  [:or
+   [:fn RegularExpressionUnit?]
+   [:fn ExpressionUnitAfterPipe?]])
 
 ;; type ParsedList
 (defprotocol IParsedList)
 (defrecord ParsedList [values spread remaining-tokens end] IParsedList)
 (defn ParsedList? "True if `v` is a ParsedList value." [v] (instance? ParsedList v))
+(defn ParsedList-schema
+  "Malli schema for ParsedList(ast_node)."
+  [ast-node]
+  [:and [:fn ParsedList?] [:map [:values [:sequential ast-node]] [:spread (option/Option-schema ast-node)] [:remaining-tokens [:sequential [:tuple (t/Token-schema) (glexer/Position-schema)]]] [:end :int]]])
 
 (defn precedence
   "precedence(operator: BinaryOperator) -> Int"
-  {:malli/schema [:=> [:cat [:fn BinaryOperator?]] :int]
+  {:malli/schema [:=> [:cat (BinaryOperator-schema)] :int]
    :gleam/src "project/build/packages/glance/src/glance.gleam:236"}
   [operator]
   (cond
@@ -2346,7 +2590,7 @@
 (defn module
   "module(src: String) -> Result(Module, Error)"
   {:malli/schema [:=> [:cat :string]
-                      (p/result-of [:fn Module?] [:fn (fn [v] (instance? glance.IError v))])]
+                      (p/result-of (Module-schema) (Error-schema))]
    :gleam/src "project/build/packages/glance/src/glance.gleam:361"}
   [^java.lang.String src]
   (-> (glexer/new* src)

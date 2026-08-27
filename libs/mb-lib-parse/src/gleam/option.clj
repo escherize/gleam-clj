@@ -11,6 +11,12 @@
 (defrecord None [] IOption)
 (defn None? "True if `v` is a None value." [v] (instance? None v))
 (defn Option? "True if `v` is any Option value." [v] (instance? gleam.option.IOption v))
+(defn Option-schema
+  "Malli schema for Option(a)."
+  [a]
+  [:or
+   [:and [:fn Some?] [:map [:value a]]]
+   [:fn None?]])
 
 (defn- reverse-and-prepend
   "reverse_and_prepend(list prefix: List(a), to suffix: List(a)) -> List(a)"
@@ -58,7 +64,8 @@
    ```gleam
    assert option.all([Some(1), None]) == None
    ```"
-  {:malli/schema [:=> [:cat [:sequential [:fn Option?]]] [:fn Option?]]
+  {:malli/schema [:=> [:cat [:sequential (Option-schema :any)]]
+                      (Option-schema [:sequential :any])]
    :gleam/src "stdlib-src/src/gleam/option.gleam:38"}
   [list']
   (all-loop list' (list)))
@@ -77,7 +84,7 @@
    ```gleam
    assert !option.is_some(None)
    ```"
-  {:malli/schema [:=> [:cat [:fn Option?]] :boolean]
+  {:malli/schema [:=> [:cat (Option-schema :any)] :boolean]
    :gleam/src "stdlib-src/src/gleam/option.gleam:76"}
   [option]
   (not= option (->None)))
@@ -96,7 +103,7 @@
    ```gleam
    assert option.is_none(None)
    ```"
-  {:malli/schema [:=> [:cat [:fn Option?]] :boolean]
+  {:malli/schema [:=> [:cat (Option-schema :any)] :boolean]
    :gleam/src "stdlib-src/src/gleam/option.gleam:92"}
   [option]
   (= option (->None)))
@@ -115,7 +122,8 @@
    ```gleam
    assert option.to_result(None, \"some_error\") == Error(\"some_error\")
    ```"
-  {:malli/schema [:=> [:cat [:fn Option?] :any] (p/result-of :any :any)]
+  {:malli/schema [:=> [:cat (Option-schema :any) :any]
+                      (p/result-of :any :any)]
    :gleam/src "stdlib-src/src/gleam/option.gleam:108"}
   [option e]
   (if (instance? Some option)
@@ -137,7 +145,7 @@
    ```gleam
    assert option.from_result(Error(\"some_error\")) == None
    ```"
-  {:malli/schema [:=> [:cat (p/result-of :any :any)] [:fn Option?]]
+  {:malli/schema [:=> [:cat (p/result-of :any :any)] (Option-schema :any)]
    :gleam/src "stdlib-src/src/gleam/option.gleam:127"}
   [result]
   (if (instance? Ok result)
@@ -159,7 +167,7 @@
    ```gleam
    assert option.unwrap(None, 0) == 0
    ```"
-  {:malli/schema [:=> [:cat [:fn Option?] :any] :any]
+  {:malli/schema [:=> [:cat (Option-schema :any) :any] :any]
    :gleam/src "stdlib-src/src/gleam/option.gleam:146"}
   [option default]
   (if (instance? Some option)
@@ -181,7 +189,7 @@
    ```gleam
    assert option.lazy_unwrap(None, fn() { 0 }) == 0
    ```"
-  {:malli/schema [:=> [:cat [:fn Option?] [:=> [:cat] :any]] :any]
+  {:malli/schema [:=> [:cat (Option-schema :any) [:=> [:cat] :any]] :any]
    :gleam/src "stdlib-src/src/gleam/option.gleam:165"}
   [option default]
   (if (instance? Some option)
@@ -207,8 +215,8 @@
    ```gleam
    assert option.map(over: None, with: fn(x) { x + 1 }) == None
    ```"
-  {:malli/schema [:=> [:cat [:fn Option?] [:=> [:cat :any] :any]]
-                      [:fn Option?]]
+  {:malli/schema [:=> [:cat (Option-schema :any) [:=> [:cat :any] :any]]
+                      (Option-schema :any)]
    :gleam/src "stdlib-src/src/gleam/option.gleam:188"}
   [option fun]
   (if (instance? Some option)
@@ -234,7 +242,8 @@
    ```gleam
    assert option.flatten(None) == None
    ```"
-  {:malli/schema [:=> [:cat [:fn Option?]] [:fn Option?]]
+  {:malli/schema [:=> [:cat (Option-schema (Option-schema :any))]
+                      (Option-schema :any)]
    :gleam/src "stdlib-src/src/gleam/option.gleam:211"}
   [option]
   (if (instance? Some option)
@@ -272,8 +281,8 @@
    ```gleam
    assert option.then(None, fn(x) { Some(x + 1) }) == None
    ```"
-  {:malli/schema [:=> [:cat [:fn Option?] [:=> [:cat :any] [:fn Option?]]]
-                      [:fn Option?]]
+  {:malli/schema [:=> [:cat (Option-schema :any) [:=> [:cat :any] (Option-schema :any)]]
+                      (Option-schema :any)]
    :gleam/src "stdlib-src/src/gleam/option.gleam:246"}
   [option fun]
   (if (instance? Some option)
@@ -303,7 +312,8 @@
    ```gleam
    assert option.or(None, None) == None
    ```"
-  {:malli/schema [:=> [:cat [:fn Option?] [:fn Option?]] [:fn Option?]]
+  {:malli/schema [:=> [:cat (Option-schema :any) (Option-schema :any)]
+                      (Option-schema :any)]
    :gleam/src "stdlib-src/src/gleam/option.gleam:273"}
   [first' second]
   (if (instance? Some first') first' second))
@@ -330,8 +340,8 @@
    ```gleam
    assert option.lazy_or(None, fn() { None }) == None
    ```"
-  {:malli/schema [:=> [:cat [:fn Option?] [:=> [:cat] [:fn Option?]]]
-                      [:fn Option?]]
+  {:malli/schema [:=> [:cat (Option-schema :any) [:=> [:cat] (Option-schema :any)]]
+                      (Option-schema :any)]
    :gleam/src "stdlib-src/src/gleam/option.gleam:300"}
   [first' second]
   (if (instance? Some first') first' (second)))
@@ -363,7 +373,8 @@
    ```gleam
    assert option.values([Some(1), None, Some(3)]) == [1, 3]
    ```"
-  {:malli/schema [:=> [:cat [:sequential [:fn Option?]]] [:sequential :any]]
+  {:malli/schema [:=> [:cat [:sequential (Option-schema :any)]]
+                      [:sequential :any]]
    :gleam/src "stdlib-src/src/gleam/option.gleam:316"}
   [options]
   (values-loop options (list)))

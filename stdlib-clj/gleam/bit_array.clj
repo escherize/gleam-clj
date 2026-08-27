@@ -104,6 +104,6 @@
 
 (def ^{:malli/schema [:=> [:cat [:vector :int]] :string] :gleam/src "stdlib-src/src/gleam/bit_array.gleam:202"} inspect gleam-ffi/ba-inspect)
 
-(def ^{:malli/schema [:=> [:cat [:vector :int] [:vector :int]] [:fn order/Order?]] :gleam/src "stdlib-src/src/gleam/bit_array.gleam:248"} compare gleam-ffi/ba-compare)
+(def ^{:malli/schema [:=> [:cat [:vector :int] [:vector :int]] (order/Order-schema)] :gleam/src "stdlib-src/src/gleam/bit_array.gleam:248"} compare gleam-ffi/ba-compare)
 
 (def ^{:malli/schema [:=> [:cat [:vector :int] [:vector :int]] :boolean] :gleam/src "stdlib-src/src/gleam/bit_array.gleam:288"} starts-with gleam-ffi/ba-starts-with)

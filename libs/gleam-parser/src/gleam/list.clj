@@ -30,6 +30,8 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
+(declare Continue? Stop? ContinueOrStop? ContinueOrStop-schema Ascending? Descending? Sorting? Sorting-schema)
+
 ;; type ContinueOrStop
 (defprotocol IContinueOrStop)
 (defrecord Continue [value] IContinueOrStop)
@@ -37,6 +39,12 @@
 (defrecord Stop [value] IContinueOrStop)
 (defn Stop? "True if `v` is a Stop value." [v] (instance? Stop v))
 (defn ContinueOrStop? "True if `v` is any ContinueOrStop value." [v] (instance? gleam.list.IContinueOrStop v))
+(defn ContinueOrStop-schema
+  "Malli schema for ContinueOrStop(a)."
+  [a]
+  [:or
+   [:and [:fn Continue?] [:map [:value a]]]
+   [:and [:fn Stop?] [:map [:value a]]]])
 
 ;; type Sorting
 (defprotocol ISorting)
@@ -45,6 +53,12 @@
 (defrecord Descending [] ISorting)
 (defn Descending? "True if `v` is a Descending value." [v] (instance? Descending v))
 (defn Sorting? "True if `v` is any Sorting value." [v] (instance? gleam.list.ISorting v))
+(defn Sorting-schema
+  "Malli schema for Sorting."
+  []
+  [:or
+   [:fn Ascending?]
+   [:fn Descending?]])
 
 (defn- length-loop
   "length_loop(list: List(a), count: Int) -> Int"
@@ -881,7 +895,7 @@
    })
    == 3
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] [:fn ContinueOrStop?]]]
+  {:malli/schema [:=> [:cat [:sequential :any] :any [:=> [:cat :any :any] (ContinueOrStop-schema :any)]]
                       :any]
    :gleam/src "stdlib-src/src/gleam/list.gleam:822"}
   [list' initial fun]
@@ -1372,7 +1386,7 @@
    assert list.sort([4, 3, 6, 5, 4, 1, 2], by: int.compare)
    == [1, 2, 3, 4, 4, 5, 6]
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:fn order/Order?]]]
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] (order/Order-schema)]]
                       [:sequential :any]]
    :gleam/src "stdlib-src/src/gleam/list.gleam:1137"}
   [list' compare]
@@ -2196,7 +2210,7 @@
    ```gleam
    assert [\"a\", \"c\", \"b\"] |> list.max(string.compare) == Ok(\"c\")
    ```"
-  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] [:fn order/Order?]]]
+  {:malli/schema [:=> [:cat [:sequential :any] [:=> [:cat :any :any] (order/Order-schema)]]
                       (p/result-of :any :nil)]
    :gleam/src "stdlib-src/src/gleam/list.gleam:2173"}
   [list' compare]

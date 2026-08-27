@@ -6,7 +6,7 @@
 (defn parse
   "parse(src: String) -> Result(Module, Error)"
   {:malli/schema [:=> [:cat :string]
-                      (p/result-of [:fn glance/Module?] [:fn (fn [v] (instance? glance.IError v))])]
+                      (p/result-of (glance/Module-schema) (glance/Error-schema))]
    :gleam/src "project/src/glance_host.gleam:5"}
   [^java.lang.String src]
   (glance/module src))

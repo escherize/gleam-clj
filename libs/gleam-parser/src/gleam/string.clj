@@ -34,6 +34,12 @@
 (defrecord Trailing [] IDirection)
 (defn Trailing? "True if `v` is a Trailing value." [v] (instance? Trailing v))
 (defn Direction? "True if `v` is any Direction value." [v] (instance? gleam.string.IDirection v))
+(defn Direction-schema
+  "Malli schema for Direction."
+  []
+  [:or
+   [:fn Leading?]
+   [:fn Trailing?]])
 
 (defn is-empty
   "is_empty(str: String) -> Bool
@@ -126,7 +132,7 @@
 
    assert string.compare(\"A\", \"B\") == order.Lt
    ```"
-  {:malli/schema [:=> [:cat :string :string] [:fn order/Order?]]
+  {:malli/schema [:=> [:cat :string :string] (order/Order-schema)]
    :gleam/src "stdlib-src/src/gleam/string.gleam:154"}
   [^java.lang.String a ^java.lang.String b]
   (let [subject (= a b)]
@@ -576,7 +582,7 @@
    ```gleam
    assert string.to_option(\"hats\") == Some(\"hats\")
    ```"
-  {:malli/schema [:=> [:cat :string] [:fn option/Option?]]
+  {:malli/schema [:=> [:cat :string] (option/Option-schema :string)]
    :gleam/src "stdlib-src/src/gleam/string.gleam:758"}
   [^java.lang.String string]
   (if (= string "") (option/->None) (option/->Some string)))

@@ -34,6 +34,13 @@
 (defrecord Many [value] IBytesTree)
 (defn Many? "True if `v` is a Many value." [v] (instance? Many v))
 (defn BytesTree? "True if `v` is any BytesTree value." [v] (instance? gleam.bytes_tree.IBytesTree v))
+(defn BytesTree-schema
+  "Malli schema for BytesTree."
+  []
+  [:or
+   [:and [:fn Bytes?] [:map [:value [:vector :int]]]]
+   [:and [:fn Text?] [:map [:value (string_tree/StringTree-schema)]]]
+   [:and [:fn Many?] [:map [:value [:sequential [:fn BytesTree?]]]]]])
 
 (defn concat
   "concat(trees: List(BytesTree)) -> BytesTree
@@ -41,7 +48,8 @@
    Joins a list of bytes trees into a single one.
 
    Runs in constant time."
-  {:malli/schema [:=> [:cat [:sequential [:fn BytesTree?]]] [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat [:sequential (BytesTree-schema)]]
+                      (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:101"}
   [trees]
   (->Many trees))
@@ -51,7 +59,7 @@
 
    Create an empty `BytesTree`. Useful as the start of a pipe chaining many
    trees together."
-  {:malli/schema [:=> [:cat] [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat] (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:35"}
   []
   (concat (list)))
@@ -68,7 +76,7 @@
    Creates a new bytes tree from a bit array.
 
    Runs in constant time."
-  {:malli/schema [:=> [:cat [:vector :int]] [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat [:vector :int]] (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:139"}
   [bits]
   (-> bits bit_array/pad-to-bytes wrap-list))
@@ -79,8 +87,8 @@
    Appends a bytes tree onto the end of another.
 
    Runs in constant time."
-  {:malli/schema [:=> [:cat [:fn BytesTree?] [:fn BytesTree?]]
-                      [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat (BytesTree-schema) (BytesTree-schema)]
+                      (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:71"}
   [first' second]
   (if (instance? Many second)
@@ -94,7 +102,8 @@
    Prepends a bit array to the start of a bytes tree.
 
    Runs in constant time."
-  {:malli/schema [:=> [:cat [:fn BytesTree?] [:vector :int]] [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat (BytesTree-schema) [:vector :int]]
+                      (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:43"}
   [second first']
   (append-tree (from-bit-array first') second))
@@ -105,7 +114,8 @@
    Appends a bit array to the end of a bytes tree.
 
    Runs in constant time."
-  {:malli/schema [:=> [:cat [:fn BytesTree?] [:vector :int]] [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat (BytesTree-schema) [:vector :int]]
+                      (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:51"}
   [first' second]
   (append-tree first' (from-bit-array second)))
@@ -116,8 +126,8 @@
    Prepends a bytes tree onto the start of another.
 
    Runs in constant time."
-  {:malli/schema [:=> [:cat [:fn BytesTree?] [:fn BytesTree?]]
-                      [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat (BytesTree-schema) (BytesTree-schema)]
+                      (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:59"}
   [second first']
   (append-tree first' second))
@@ -129,7 +139,7 @@
 
    Runs in constant time when running on Erlang.
    Runs in linear time otherwise."
-  {:malli/schema [:=> [:cat :string] [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat :string] (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:121"}
   [^java.lang.String string]
   (->Text (string_tree/from-string string)))
@@ -141,7 +151,7 @@
 
    Runs in constant time when running on Erlang.
    Runs in linear time with the length of the string otherwise."
-  {:malli/schema [:=> [:cat [:fn BytesTree?] :string] [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat (BytesTree-schema) :string] (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:83"}
   [second ^java.lang.String first']
   (append-tree (from-string first') second))
@@ -153,7 +163,7 @@
 
    Runs in constant time when running on Erlang.
    Runs in linear time with the length of the string otherwise."
-  {:malli/schema [:=> [:cat [:fn BytesTree?] :string] [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat (BytesTree-schema) :string] (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:92"}
   [first' ^java.lang.String second]
   (append-tree first' (from-string second)))
@@ -164,7 +174,7 @@
    Joins a list of bit arrays into a single bytes tree.
 
    Runs in constant time."
-  {:malli/schema [:=> [:cat [:sequential [:vector :int]]] [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat [:sequential [:vector :int]]] (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:109"}
   [bits]
   (-> bits (list/map from-bit-array) concat))
@@ -176,7 +186,8 @@
 
    Runs in constant time when running on Erlang.
    Runs in linear time otherwise."
-  {:malli/schema [:=> [:cat [:or ]] [:fn BytesTree?]]
+  {:malli/schema [:=> [:cat (string_tree/StringTree-schema)]
+                      (BytesTree-schema)]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:131"}
   [tree]
   (->Text tree))
@@ -214,7 +225,7 @@
 
    When running on Erlang this function is implemented natively by the
    virtual machine and is highly optimised."
-  {:malli/schema [:=> [:cat [:fn BytesTree?]] [:vector :int]]
+  {:malli/schema [:=> [:cat (BytesTree-schema)] [:vector :int]]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:158"}
   [tree]
   (-> (list (list tree)) (to-list (list)) list/reverse bit_array/concat))
@@ -225,7 +236,7 @@
    Returns the size of the bytes tree's content in bytes.
 
    Runs in linear time."
-  {:malli/schema [:=> [:cat [:fn BytesTree?]] :int]
+  {:malli/schema [:=> [:cat (BytesTree-schema)] :int]
    :gleam/src "stdlib-src/src/gleam/bytes_tree.gleam:192"}
   [tree]
   (-> (list (list tree))

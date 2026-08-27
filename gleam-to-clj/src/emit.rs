@@ -80,6 +80,9 @@ struct Emit<'a> {
     is_dep: bool,
     file: String,
     line_starts: Vec<u32>,
+    /// Same-module type -> same-module types its fields reference, for
+    /// schema-fn cycle cutoffs.
+    local_type_deps: HashMap<String, HashSet<String>>,
 }
 
 struct Tail {
@@ -140,6 +143,44 @@ impl Emit<'_> {
     }
 
     /// Reference to a variant's generated predicate fn (`Circle?`).
+    /// True if same-module type `target` can reach back to `from` through
+    /// field references (including target == from): calling target's schema
+    /// fn from inside from's would loop at schema-build time.
+    fn local_cycle(&self, from: &str, target: &str) -> bool {
+        if target == from {
+            return true;
+        }
+        let mut seen: HashSet<&str> = HashSet::new();
+        let mut stack = vec![target];
+        while let Some(t) = stack.pop() {
+            if !seen.insert(t) {
+                continue;
+            }
+            if let Some(deps) = self.local_type_deps.get(t) {
+                for d in deps {
+                    if d == from {
+                        return true;
+                    }
+                    stack.push(d.as_str());
+                }
+            }
+        }
+        false
+    }
+
+    /// Reference to a type's generated `<Name>-schema` fn.
+    fn schema_fn_ref(&self, module: &str, name: &str) -> String {
+        if module == self.module_path {
+            return format!("{name}-schema");
+        }
+        let ns = kebab(&module.replace('/', "."));
+        let _ = self.schema_requires.borrow_mut().insert(ns.clone());
+        match self.aliases.get(module) {
+            Some(alias) => format!("{alias}/{name}-schema"),
+            None => format!("{ns}/{name}-schema"),
+        }
+    }
+
     fn pred_ref(&self, module: &str, name: &str) -> String {
         if module == "gleam" {
             let _ = self.schema_requires.borrow_mut().insert("gleam.prelude".into());
@@ -188,6 +229,44 @@ pub fn emit_module(
             requires.push((kebab(&import.module.replace("/", ".")), alias.to_string()));
         }
     }
+    fn collect_local_named(
+        t: &gleam_core::type_::Type,
+        module: &str,
+        out: &mut HashSet<String>,
+    ) {
+        use gleam_core::type_::{Type, TypeVar};
+        match t {
+            Type::Var { type_ } => {
+                if let TypeVar::Link { type_ } = &*type_.borrow() {
+                    collect_local_named(type_, module, out);
+                }
+            }
+            Type::Tuple { elements } => {
+                elements.iter().for_each(|e| collect_local_named(e, module, out))
+            }
+            Type::Fn { arguments, return_ } => {
+                arguments.iter().for_each(|a| collect_local_named(a, module, out));
+                collect_local_named(return_, module, out);
+            }
+            Type::Named { module: m, name, arguments, .. } => {
+                if m.as_str() == module {
+                    let _ = out.insert(name.to_string());
+                }
+                arguments.iter().for_each(|a| collect_local_named(a, module, out));
+            }
+        }
+    }
+    let mut local_type_deps: HashMap<String, HashSet<String>> = HashMap::new();
+    for t in &defs.custom_types {
+        let mut refs = HashSet::new();
+        for c in &t.constructors {
+            for a in &c.arguments {
+                collect_local_named(&a.type_, &am.path, &mut refs);
+            }
+        }
+        let _ = local_type_deps.insert(t.name.to_string(), refs);
+    }
+
     let ctx = Emit {
         module_path: &am.path,
         schema_requires: std::cell::RefCell::new(HashSet::new()),
@@ -197,6 +276,7 @@ pub fn emit_module(
         is_dep: am.is_dep,
         file: am.file_name.clone(),
         line_starts,
+        local_type_deps,
     };
 
     // Namespaces of externals used by this module.
@@ -246,8 +326,24 @@ pub fn emit_module(
         .iter()
         .flat_map(|t| t.constructors.iter().map(|c| c.name.as_str()))
         .collect();
+    // Schema fns may forward-reference later types' schema fns and
+    // predicates (non-cyclic forward refs); declare them all up front.
+    if defs.custom_types.len() > 1 {
+        let mut names: Vec<String> = Vec::new();
+        for t in &defs.custom_types {
+            for c in &t.constructors {
+                names.push(format!("{}?", c.name));
+            }
+            let tn = t.name.as_str();
+            if !all_variant_names.contains(tn) && !JAVA_LANG.contains(&tn) {
+                names.push(format!("{tn}?"));
+            }
+            names.push(format!("{tn}-schema"));
+        }
+        let _ = writeln!(out, "\n(declare {})", names.join(" "));
+    }
     for t in &defs.custom_types {
-        emit_custom_type(&mut out, t, &am.path, &all_variant_names);
+        emit_custom_type(&ctx, &mut out, t, &am.path, &all_variant_names);
     }
 
     // Definitions in call-dependency order (computed pre-analysis); a declare
@@ -444,27 +540,52 @@ pub fn emit_module(
     format!("{header}{body}")
 }
 
-/// Gleam type -> malli schema (as emitted Clojure code; custom types become
-/// instance? predicates over their variant record classes).
+/// Emitting inside a type's generated schema fn: type variables resolve to
+/// the fn's parameters, and same-module references that can cycle back
+/// degrade to identity predicates.
+struct SchemaCtx<'a> {
+    env: HashMap<u64, String>,
+    current_type: &'a str,
+    /// Type-var ids actually referenced by emitted field schemas, so unused
+    /// schema-fn parameters can be underscore-prefixed.
+    used: std::cell::RefCell<HashSet<u64>>,
+}
+
+/// Gleam type -> malli schema (as emitted Clojure code). Custom types call
+/// their generated `<Name>-schema` fns, composing payload schemas the same
+/// way the Gleam type expression composes.
 fn malli_type(ctx: &Emit, t: &gleam_core::type_::Type) -> String {
+    malli_type_in(ctx, t, None)
+}
+
+fn malli_type_in(ctx: &Emit, t: &gleam_core::type_::Type, sc: Option<&SchemaCtx>) -> String {
     use gleam_core::type_::{Type, TypeVar};
     match t {
         Type::Var { type_ } => match &*type_.borrow() {
-            TypeVar::Link { type_ } => malli_type(ctx, type_),
-            _ => ":any".into(),
+            TypeVar::Link { type_ } => malli_type_in(ctx, type_, sc),
+            TypeVar::Generic { id } | TypeVar::Unbound { id } => sc
+                .and_then(|s| {
+                    s.env.get(id).map(|sym| {
+                        let _ = s.used.borrow_mut().insert(*id);
+                        sym.clone()
+                    })
+                })
+                .unwrap_or_else(|| ":any".into()),
         },
         Type::Tuple { elements } => {
-            let parts: Vec<String> = elements.iter().map(|e| malli_type(ctx, e)).collect();
+            let parts: Vec<String> =
+                elements.iter().map(|e| malli_type_in(ctx, e, sc)).collect();
             format!("[:tuple {}]", parts.join(" "))
         }
         Type::Fn { arguments, return_ } => {
-            let parts: Vec<String> = arguments.iter().map(|a| malli_type(ctx, a)).collect();
+            let parts: Vec<String> =
+                arguments.iter().map(|a| malli_type_in(ctx, a, sc)).collect();
             let cat = if parts.is_empty() {
                 "[:cat]".to_string()
             } else {
                 format!("[:cat {}]", parts.join(" "))
             };
-            format!("[:=> {cat} {}]", malli_type(ctx, return_))
+            format!("[:=> {cat} {}]", malli_type_in(ctx, return_, sc))
         }
         Type::Named { module, name, arguments, .. } => {
             match (module.as_str(), name.as_str()) {
@@ -478,70 +599,64 @@ fn malli_type(ctx: &Emit, t: &gleam_core::type_::Type) -> String {
                 ("gleam", "List") => {
                     let inner = arguments
                         .first()
-                        .map(|a| malli_type(ctx, a))
+                        .map(|a| malli_type_in(ctx, a, sc))
                         .unwrap_or_else(|| ":any".into());
                     format!("[:sequential {inner}]")
                 }
                 ("gleam", "Result") => {
                     // Typed payloads: (p/result-of ok err) builds the
                     // variant-plus-:value schema in the prelude. The pred_ref
-                    // calls still run for their schema_requires side effect.
+                    // call still runs for its schema_requires side effect.
                     let _ = ctx.pred_ref("gleam", "Ok");
                     let ok = arguments
                         .first()
-                        .map(|a| malli_type(ctx, a))
+                        .map(|a| malli_type_in(ctx, a, sc))
                         .unwrap_or_else(|| ":any".into());
                     let err = arguments
                         .get(1)
-                        .map(|a| malli_type(ctx, a))
+                        .map(|a| malli_type_in(ctx, a, sc))
                         .unwrap_or_else(|| ":any".into());
                     format!("(p/result-of {ok} {err})")
                 }
                 ("gleam/dict", "Dict") => {
                     let k = arguments
                         .first()
-                        .map(|a| malli_type(ctx, a))
+                        .map(|a| malli_type_in(ctx, a, sc))
                         .unwrap_or_else(|| ":any".into());
                     let v = arguments
                         .get(1)
-                        .map(|a| malli_type(ctx, a))
+                        .map(|a| malli_type_in(ctx, a, sc))
                         .unwrap_or_else(|| ":any".into());
                     format!("[:map-of {k} {v}]")
                 }
                 (m, n) => {
-                    let Some(variants) = ctx
+                    if ctx
                         .global
                         .type_variants
                         .get(&(m.to_string(), n.to_string()))
-                    else {
+                        .is_none()
+                    {
                         return ":any".into();
-                    };
-                    // A multi-variant type whose name no variant claims has a
-                    // single `<Type>?` interface predicate — reference that
-                    // instead of or-ing every variant.
-                    let has_type_pred =
-                        variants.len() > 1 && variants.iter().all(|v| v != n);
-                    if has_type_pred {
-                        // A java.lang-colliding type name (e.g. glance's
-                        // Error) never gets a `Name?` type predicate; its
-                        // marker protocol interface always exists, so check
-                        // that class directly. pred_ref is still called for
-                        // its schema_requires side effect.
-                        if JAVA_LANG.contains(&n) {
-                            let _ = ctx.pred_ref(m, n);
-                            let class_ns = kebab(&m.replace('/', ".")).replace('-', "_");
-                            return format!("[:fn (fn [v] (instance? {class_ns}.I{n} v))]");
-                        }
-                        return format!("[:fn {}]", ctx.pred_ref(m, n));
                     }
-                    let checks: Vec<String> = variants
-                        .iter()
-                        .map(|v| format!("[:fn {}]", ctx.pred_ref(m, v)))
-                        .collect();
-                    if checks.len() == 1 {
-                        checks.into_iter().next().expect("one variant")
+                    // Remaining prelude types have predicates, not schema fns.
+                    if m == "gleam" {
+                        return type_pred_schema(ctx, m, n);
+                    }
+                    // Inside a schema fn, a same-module reference that can
+                    // cycle back degrades to the identity predicate; calling
+                    // its schema fn would loop at schema-build time.
+                    if let Some(s) = sc {
+                        if m == ctx.module_path && ctx.local_cycle(s.current_type, n) {
+                            return type_pred_schema(ctx, m, n);
+                        }
+                    }
+                    let args: Vec<String> =
+                        arguments.iter().map(|a| malli_type_in(ctx, a, sc)).collect();
+                    let fref = ctx.schema_fn_ref(m, n);
+                    if args.is_empty() {
+                        format!("({fref})")
                     } else {
-                        format!("[:or {}]", checks.join(" "))
+                        format!("({fref} {})", args.join(" "))
                     }
                 }
             }
@@ -549,7 +664,47 @@ fn malli_type(ctx: &Emit, t: &gleam_core::type_::Type) -> String {
     }
 }
 
+/// Identity-only schema for a custom type: the type predicate when it
+/// exists, the marker-protocol class check for java.lang-colliding names,
+/// or an or of the variant predicates.
+fn type_pred_schema(ctx: &Emit, m: &str, n: &str) -> String {
+    let Some(variants) = ctx.global.type_variants.get(&(m.to_string(), n.to_string())) else {
+        return ":any".into();
+    };
+    // Zero variants (external type) or a multi-variant type whose name no
+    // variant claims: use the type-level predicate / marker interface.
+    let has_type_pred = variants.is_empty()
+        || (variants.len() > 1 && variants.iter().all(|v| v != n));
+    if has_type_pred {
+        if JAVA_LANG.contains(&n) {
+            let _ = ctx.pred_ref(m, n);
+            let class_ns = kebab(&m.replace('/', ".")).replace('-', "_");
+            return format!("[:fn (fn [v] (instance? {class_ns}.I{n} v))]");
+        }
+        return format!("[:fn {}]", ctx.pred_ref(m, n));
+    }
+    let checks: Vec<String> =
+        variants.iter().map(|v| format!("[:fn {}]", ctx.pred_ref(m, v))).collect();
+    if checks.len() == 1 {
+        checks.into_iter().next().expect("one variant")
+    } else {
+        format!("[:or {}]", checks.join(" "))
+    }
+}
+
+fn type_var_id(t: &gleam_core::type_::Type) -> Option<u64> {
+    use gleam_core::type_::{Type, TypeVar};
+    match t {
+        Type::Var { type_ } => match &*type_.borrow() {
+            TypeVar::Generic { id } | TypeVar::Unbound { id } => Some(*id),
+            TypeVar::Link { type_ } => type_var_id(type_),
+        },
+        _ => None,
+    }
+}
+
 fn emit_custom_type(
+    ctx: &Emit,
     out: &mut String,
     t: &TypedCustomType,
     module_path: &str,
@@ -618,6 +773,64 @@ fn emit_custom_type(
             "(defn {type_name}? \"True if `v` is any {type_name} value.\" [v] (instance? {class_ns}.{proto} v))"
         );
     }
+
+    // The type's schema constructor: payload-typed malli schemas that
+    // compose the way the Gleam type expression composes. Type parameters
+    // become fn parameters; cyclic same-module references inside fields
+    // degrade to identity predicates (see malli_type_in).
+    let params: Vec<String> =
+        t.parameters.iter().map(|(_, p)| user_var(&kebab(p.as_str()))).collect();
+    let mut env: HashMap<u64, String> = HashMap::new();
+    for (tp, sym) in t.typed_parameters.iter().zip(&params) {
+        if let Some(id) = type_var_id(tp) {
+            let _ = env.insert(id, sym.clone());
+        }
+    }
+    let sc = SchemaCtx { env, current_type: type_name, used: std::cell::RefCell::new(HashSet::new()) };
+    let variant_schemas: Vec<String> = t
+        .constructors
+        .iter()
+        .map(|c| {
+            if c.arguments.is_empty() {
+                format!("[:fn {}?]", c.name)
+            } else {
+                let fields: Vec<String> = constructor_field_names(c)
+                    .iter()
+                    .zip(&c.arguments)
+                    .map(|(f, a)| format!("[:{f} {}]", malli_type_in(ctx, &a.type_, Some(&sc))))
+                    .collect();
+                format!("[:and [:fn {}?] [:map {}]]", c.name, fields.join(" "))
+            }
+        })
+        .collect();
+    let sig = if params.is_empty() {
+        type_name.to_string()
+    } else {
+        format!("{type_name}({})", t.parameters.iter().map(|(_, p)| p.as_str()).collect::<Vec<_>>().join(", "))
+    };
+    let body = match variant_schemas.len() {
+        // No constructors (external/opaque-external type): identity only.
+        0 => type_pred_schema(ctx, ctx.module_path, type_name),
+        1 => variant_schemas.into_iter().next().expect("one variant"),
+        _ => format!("[:or\n   {}]", variant_schemas.join("\n   ")),
+    };
+    // Underscore-prefix parameters no field schema referenced (phantom or
+    // constructor-less type params) so the output lints clean.
+    let used = sc.used.borrow();
+    let params: Vec<String> = t
+        .typed_parameters
+        .iter()
+        .zip(&params)
+        .map(|(tp, sym)| match type_var_id(tp) {
+            Some(id) if used.contains(&id) => sym.clone(),
+            _ => format!("_{sym}"),
+        })
+        .collect();
+    let _ = writeln!(
+        out,
+        "(defn {type_name}-schema\n  \"Malli schema for {sig}.\"\n  [{}]\n  {body})",
+        params.join(" ")
+    );
 }
 
 /// Malli function schema for a fn's checked signature, as (input, output).

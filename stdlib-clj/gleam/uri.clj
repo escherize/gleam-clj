@@ -20,6 +20,10 @@
 (defprotocol IUri)
 (defrecord Uri [scheme userinfo host port ^java.lang.String path query fragment] IUri)
 (defn Uri? "True if `v` is a Uri value." [v] (instance? Uri v))
+(defn Uri-schema
+  "Malli schema for Uri."
+  []
+  [:and [:fn Uri?] [:map [:scheme (option/Option-schema :string)] [:userinfo (option/Option-schema :string)] [:host (option/Option-schema :string)] [:port (option/Option-schema :int)] [:path :string] [:query (option/Option-schema :string)] [:fragment (option/Option-schema :string)]]])
 
 (def empty (->Uri (option/->None) (option/->None) (option/->None) (option/->None) "" (option/->None) (option/->None)))
 
@@ -442,7 +446,7 @@
    fragment: Some(\"fragment\"),
    ))
    ```"
-  {:malli/schema [:=> [:cat :string] (p/result-of [:fn Uri?] :nil)]
+  {:malli/schema [:=> [:cat :string] (p/result-of (Uri-schema) :nil)]
    :gleam/src "stdlib-src/src/gleam/uri.gleam:78"}
   [^java.lang.String uri-string]
   (parse-scheme-loop uri-string uri-string empty 0))
@@ -528,7 +532,7 @@
    let uri = Uri(..empty, scheme: Some(\"https\"), host: Some(\"example.com\"))
    assert uri.to_string(uri) == \"https://example.com\"
    ```"
-  {:malli/schema [:=> [:cat [:fn Uri?]] :string]
+  {:malli/schema [:=> [:cat (Uri-schema)] :string]
    :gleam/src "stdlib-src/src/gleam/uri.gleam:633"}
   ^java.lang.String [uri]
   (let [out (let [subject (:scheme uri)]
@@ -570,7 +574,7 @@
    let assert Ok(uri) = uri.parse(\"https://example.com/path?foo#bar\")
    assert uri.origin(uri) == Ok(\"https://example.com\")
    ```"
-  {:malli/schema [:=> [:cat [:fn Uri?]] (p/result-of :string :nil)]
+  {:malli/schema [:=> [:cat (Uri-schema)] (p/result-of :string :nil)]
    :gleam/src "stdlib-src/src/gleam/uri.gleam:695"}
   [uri]
   (let [{scheme :scheme host :host port :port} uri]
@@ -613,8 +617,8 @@
    The base URI must be an absolute URI or this function will return an error.
    The algorithm for merging URIs is described in
    [RFC 3986](https://tools.ietf.org/html/rfc3986#section-5.2)."
-  {:malli/schema [:=> [:cat [:fn Uri?] [:fn Uri?]]
-                      (p/result-of [:fn Uri?] :nil)]
+  {:malli/schema [:=> [:cat (Uri-schema) (Uri-schema)]
+                      (p/result-of (Uri-schema) :nil)]
    :gleam/src "stdlib-src/src/gleam/uri.gleam:716"}
   [base relative]
   (if (and (instance? Uri base) (instance? gleam.option.Some (:scheme base)) (instance? gleam.option.Some (:host base)))

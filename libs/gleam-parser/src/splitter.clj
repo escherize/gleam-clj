@@ -6,6 +6,10 @@
 ;; type Splitter
 (defprotocol ISplitter)
 (defn Splitter? "True if `v` is any Splitter value." [v] (instance? splitter.ISplitter v))
+(defn Splitter-schema
+  "Malli schema for Splitter."
+  []
+  [:fn Splitter?])
 
 (def ^{:gleam/src "project/build/packages/splitter/src/splitter.gleam:127"} make splitter-ffi/make)
 
@@ -24,15 +28,15 @@
    There is a small cost to creating a splitter, so if you are going to split
    a string multiple times, and you want as much performance as possible, then
    it is better to reuse the same splitter than to create a new one each time."
-  {:malli/schema [:=> [:cat [:sequential :string]] [:or ]]
+  {:malli/schema [:=> [:cat [:sequential :string]] (Splitter-schema)]
    :gleam/src "project/build/packages/splitter/src/splitter.gleam:18"}
   [substrings]
   (-> substrings (list/filter (fn [x] (not= x ""))) make))
 
-(def ^{:malli/schema [:=> [:cat [:or ] :string] [:tuple :string :string :string]] :gleam/src "project/build/packages/splitter/src/splitter.gleam:49"} split splitter-ffi/split)
+(def ^{:malli/schema [:=> [:cat (Splitter-schema) :string] [:tuple :string :string :string]] :gleam/src "project/build/packages/splitter/src/splitter.gleam:49"} split splitter-ffi/split)
 
-(def ^{:malli/schema [:=> [:cat [:or ] :string] [:tuple :string :string]] :gleam/src "project/build/packages/splitter/src/splitter.gleam:75"} split-before splitter-ffi/split-before)
+(def ^{:malli/schema [:=> [:cat (Splitter-schema) :string] [:tuple :string :string]] :gleam/src "project/build/packages/splitter/src/splitter.gleam:75"} split-before splitter-ffi/split-before)
 
-(def ^{:malli/schema [:=> [:cat [:or ] :string] [:tuple :string :string]] :gleam/src "project/build/packages/splitter/src/splitter.gleam:101"} split-after splitter-ffi/split-after)
+(def ^{:malli/schema [:=> [:cat (Splitter-schema) :string] [:tuple :string :string]] :gleam/src "project/build/packages/splitter/src/splitter.gleam:101"} split-after splitter-ffi/split-after)
 
-(def ^{:malli/schema [:=> [:cat [:or ] :string] :boolean] :gleam/src "project/build/packages/splitter/src/splitter.gleam:123"} would-split splitter-ffi/would-split)
+(def ^{:malli/schema [:=> [:cat (Splitter-schema) :string] :boolean] :gleam/src "project/build/packages/splitter/src/splitter.gleam:123"} would-split splitter-ffi/would-split)

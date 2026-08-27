@@ -19,6 +19,8 @@
    [gleam.string :as string])
   (:import (gleam.prelude Ok)))
 
+(declare OptionalBegin? OptionalEnd? ParamBegin? ParamEnd? SingleQuote? BlockCommentBegin? BlockCommentEnd? LineCommentBegin? Newline? Token? Token-schema Str? Tok? Piece? Piece-schema Literal? Param? Optional? Fragment? Fragment-schema Unterminated? InvalidParamName? EmptyParam? OptionalWithoutParam? ParseError? ParseError-schema Lit? ParamBeginPattern? Pattern? Pattern-schema NoComment? LineMode? BlockMode? Mode? Mode-schema State? State-schema)
+
 ;; type Token
 (defprotocol IToken)
 (defrecord OptionalBegin [] IToken)
@@ -40,6 +42,19 @@
 (defrecord Newline [] IToken)
 (defn Newline? "True if `v` is a Newline value." [v] (instance? Newline v))
 (defn Token? "True if `v` is any Token value." [v] (instance? mb_lib_parse.IToken v))
+(defn Token-schema
+  "Malli schema for Token."
+  []
+  [:or
+   [:fn OptionalBegin?]
+   [:fn OptionalEnd?]
+   [:fn ParamBegin?]
+   [:fn ParamEnd?]
+   [:fn SingleQuote?]
+   [:fn BlockCommentBegin?]
+   [:fn BlockCommentEnd?]
+   [:fn LineCommentBegin?]
+   [:fn Newline?]])
 
 ;; type Piece
 (defprotocol IPiece)
@@ -48,6 +63,12 @@
 (defrecord Tok [f0 ^java.lang.String f1] IPiece)
 (defn Tok? "True if `v` is a Tok value." [v] (instance? Tok v))
 (defn Piece? "True if `v` is any Piece value." [v] (instance? mb_lib_parse.IPiece v))
+(defn Piece-schema
+  "Malli schema for Piece."
+  []
+  [:or
+   [:and [:fn Str?] [:map [:value :string]]]
+   [:and [:fn Tok?] [:map [:f0 (Token-schema)] [:f1 :string]]]])
 
 ;; type Fragment
 (defprotocol IFragment)
@@ -58,6 +79,13 @@
 (defrecord Optional [value] IFragment)
 (defn Optional? "True if `v` is a Optional value." [v] (instance? Optional v))
 (defn Fragment? "True if `v` is any Fragment value." [v] (instance? mb_lib_parse.IFragment v))
+(defn Fragment-schema
+  "Malli schema for Fragment."
+  []
+  [:or
+   [:and [:fn Literal?] [:map [:value :string]]]
+   [:and [:fn Param?] [:map [:value :string]]]
+   [:and [:fn Optional?] [:map [:value [:sequential [:fn Fragment?]]]]]])
 
 ;; type ParseError
 (defprotocol IParseError)
@@ -70,6 +98,14 @@
 (defrecord OptionalWithoutParam [] IParseError)
 (defn OptionalWithoutParam? "True if `v` is a OptionalWithoutParam value." [v] (instance? OptionalWithoutParam v))
 (defn ParseError? "True if `v` is any ParseError value." [v] (instance? mb_lib_parse.IParseError v))
+(defn ParseError-schema
+  "Malli schema for ParseError."
+  []
+  [:or
+   [:fn Unterminated?]
+   [:fn InvalidParamName?]
+   [:fn EmptyParam?]
+   [:fn OptionalWithoutParam?]])
 
 ;; type Pattern
 (defprotocol IPattern)
@@ -78,6 +114,12 @@
 (defrecord ParamBeginPattern [] IPattern)
 (defn ParamBeginPattern? "True if `v` is a ParamBeginPattern value." [v] (instance? ParamBeginPattern v))
 (defn Pattern? "True if `v` is any Pattern value." [v] (instance? mb_lib_parse.IPattern v))
+(defn Pattern-schema
+  "Malli schema for Pattern."
+  []
+  [:or
+   [:and [:fn Lit?] [:map [:f0 :string] [:f1 (Token-schema)]]]
+   [:fn ParamBeginPattern?]])
 
 ;; type Mode
 (defprotocol IMode)
@@ -88,11 +130,22 @@
 (defrecord BlockMode [] IMode)
 (defn BlockMode? "True if `v` is a BlockMode value." [v] (instance? BlockMode v))
 (defn Mode? "True if `v` is any Mode value." [v] (instance? mb_lib_parse.IMode v))
+(defn Mode-schema
+  "Malli schema for Mode."
+  []
+  [:or
+   [:fn NoComment?]
+   [:fn LineMode?]
+   [:fn BlockMode?]])
 
 ;; type State
 (defprotocol IState)
 (defrecord State [optional-level param-level in-string mode] IState)
 (defn State? "True if `v` is a State value." [v] (instance? State v))
+(defn State-schema
+  "Malli schema for State."
+  []
+  [:and [:fn State?] [:map [:optional-level :int] [:param-level :int] [:in-string :boolean] [:mode (Mode-schema)]]])
 
 (defn- base-patterns
   "base_patterns() -> List(Pattern)"
@@ -168,7 +221,7 @@
    pattern's matches shadow later ones over the same span — this ordering,
    not a single left-to-right scan, is what the original Clojure does. When
    `handle_sql_comments` is False, comment tokens are not recognized."
-  {:malli/schema [:=> [:cat :string :boolean] [:sequential [:fn Piece?]]]
+  {:malli/schema [:=> [:cat :string :boolean] [:sequential (Piece-schema)]]
    :gleam/src "project/src/mb_lib_parse.gleam:140"}
   [^java.lang.String s handle-sql-comments]
   (let [patterns (if handle-sql-comments (sql-patterns) (base-patterns))]
@@ -422,7 +475,7 @@
    `:parse-error-type` option: when True an invalid clause is an `Error`;
    when False a terminated-but-invalid clause dissolves to nothing instead."
   {:malli/schema [:=> [:cat :string :boolean :boolean]
-                      (p/result-of [:sequential [:fn Fragment?]] [:fn ParseError?])]
+                      (p/result-of [:sequential (Fragment-schema)] (ParseError-schema))]
    :gleam/src "project/src/mb_lib_parse.gleam:430"}
   [^java.lang.String s handle-sql-comments strict]
   (let [subject (tokenize s handle-sql-comments)]
@@ -447,7 +500,7 @@
    Self-check: asserts a representative set of parses on the BEAM, so
    `gleam run` proves the same semantics the compiled Clojure claims."
   {:malli/schema [:=> [:cat]
-                      (p/result-of [:sequential [:fn Fragment?]] [:fn ParseError?])]
+                      (p/result-of [:sequential (Fragment-schema)] (ParseError-schema))]
    :gleam/src "project/src/mb_lib_parse.gleam:448"}
   []
   (p/let-assert (p/->Ok (list (->Literal "select 1")))

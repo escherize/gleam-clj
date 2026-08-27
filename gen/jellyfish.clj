@@ -9,6 +9,12 @@
 (defrecord Jellyfish [^java.lang.String name jiggly] IFish)
 (defn Jellyfish? "True if `v` is a Jellyfish value." [v] (instance? Jellyfish v))
 (defn Fish? "True if `v` is any Fish value." [v] (instance? jellyfish.IFish v))
+(defn Fish-schema
+  "Malli schema for Fish."
+  []
+  [:or
+   [:and [:fn Starfish?] [:map [:name :string] [:favourite-color :string]]]
+   [:and [:fn Jellyfish?] [:map [:name :string] [:jiggly :boolean]]]])
 
 (defn- describe
   "describe(fish: Fish) -> String"
