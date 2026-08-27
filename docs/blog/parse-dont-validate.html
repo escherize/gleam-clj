@@ -408,6 +408,39 @@ Found type:
 
 <div class="note blue"><strong>Honest asterisk:</strong> on the Clojure side <code>(-&gt;CanEdit user)</code> is one expression away — records are open construction there. What the compile preserves is the <em>boundary discipline</em>: the proof type, its predicate, and an opt-in runtime check at exactly the functions that demand proof. Inside the Gleam world the guarantee is total; at the interop edge it degrades to an instrumented contract rather than nothing.</div>
 
+<h2 id="deep-schemas">The schema knows which layer you broke <a class="anchor" href="#deep-schemas" aria-label="Link to this section">#</a></h2>
+
+<p>Since this post first shipped, the compiler started deriving a <strong>schema constructor for every type</strong> — and they compose exactly the way the Gleam type expression composes. Here is <code>require_editor_of</code>'s metadata, unedited; read the return schema next to the Gleam type <code>Result(CanEditDashboard, Denied)</code> and notice it is the same expression wearing parentheses:</p>
+
+<div class="pane-label"><img src="../assets/clojure.svg" alt=""><span class="lang clj">permissions.clj — compiler output, unedited</span></div>
+<pre class="block">(<span class="k">defn</span> <span class="fn">CanEditDashboard-schema</span>
+  <span class="st">"Malli schema for CanEditDashboard."</span>
+  []
+  [:and [:fn <span class="fn">CanEditDashboard?</span>]
+        [:map [:user (<span class="fn">UserId-schema</span>)] [:dash (<span class="fn">DashboardId-schema</span>)]]])
+
+(<span class="k">defn</span> <span class="fn">require-editor-of</span>
+  <span class="st">"require_editor_of(user: UserId, role: Role, dash: DashboardId)
+   -> Result(CanEditDashboard, Denied)
+
+   Scoped proof: rights to one dashboard, not dashboards in general."</span>
+  {<span class="ty">:malli/schema</span> [:=&gt; [:cat (<span class="fn">UserId-schema</span>) (<span class="fn">Role-schema</span>) (<span class="fn">DashboardId-schema</span>)]
+                      (p/<span class="fn">result-of</span> (<span class="fn">CanEditDashboard-schema</span>) (<span class="fn">Denied-schema</span>))]
+   <span class="ty">:gleam/src</span> <span class="st">"permissions.gleam:78"</span>}
+  [user role dash]</pre>
+
+<p>Which means validation is no longer a yes/no at the boundary — it reaches every field of every layer, and when something is wrong it can say <em>where</em>. Forge a scoped proof around a corrupted id — a string where the <code>UserId</code>'s int belongs, two records deep — and ask malli to explain:</p>
+
+<div class="pane-label"><span class="lang clj">REPL, verbatim</span></div>
+<pre class="block">(me/<span class="fn">humanize</span>
+  (m/<span class="fn">explain</span> (<span class="fn">CanEditDashboard-schema</span>)
+             (-&gt;<span class="ty">CanEditDashboard</span> (-&gt;<span class="ty">UserId</span> <span class="st">"42"</span>) (-&gt;<span class="ty">DashboardId</span> 7))))
+<span class="cm">;; =&gt; {:user {:value ["should be an integer"]}}</span></pre>
+
+<p>Sit with that output for a second. Nobody wrote these schemas. The Gleam type checker proved the shape, the compiler carried the proof across languages, and now a <em>different runtime</em> can walk a forged value and spell out the path to the lie, field by field: not "invalid input", but <strong>the <code>:value</code> inside the <code>:user</code> inside the proof should be an integer</strong>. The recursion has a documented edge — a self-referential type cuts over to an identity check at the cycle rather than descending forever — but for the shapes an authorization layer actually has, the whole value is covered.</p>
+
+<p>This is the post's thesis completing a lap. Parse, don't validate says: when you learn something, put it in the value's type. The compile extends it: what the type knows travels — into docstrings, into predicates, into schemas that can <em>testify</em>. The trusted core is still three small functions; everything else is now either type-checked by Gleam or explainable by malli, and neither of those layers was written by hand.</p>
+
 <h2 id="tradeoffs">What this pattern does and doesn't buy <a class="anchor" href="#tradeoffs" aria-label="Link to this section">#</a></h2>
 
 <ul class="clean">
