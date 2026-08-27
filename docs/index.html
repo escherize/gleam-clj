@@ -631,7 +631,7 @@ clojure -M:repl</pre>
     <p style="margin-top:20px">Each of these is the type checker's knowledge surviving into the output:</p>
     <ul class="clean">
       <li><strong>Docstrings lead with the checked Gleam signature</strong>: <code>(doc min-coins)</code> in a REPL tells you the real types, and the <code>///</code> doc comment follows it.</li>
-      <li><strong><code>:gleam/src</code> points home.</strong> Every fn carries the <code>.gleam</code> file and line that defined it; even <code>echo</code> prints its original source position.</li>
+      <li><strong><code>:gleam/src</code> names the origin.</strong> Every fn carries the <code>.gleam</code> file and line that defined it; even <code>echo</code> prints its source position.</li>
       <li><strong>Pipes become threading, guards become <code>cond</code></strong>, with the pattern order the checker verified, not a heuristic rewrite.</li>
       <li><strong>Int math uses <code>+'</code>/<code>-'</code></strong>, Clojure's promoting ops, because Gleam ints are arbitrary-precision. <code>Float</code> args would get primitive <code>^double</code> hints instead; see <a href="#runtime">the runtime model</a>.</li>
     </ul>
@@ -715,7 +715,7 @@ clojure -M:repl</pre>
     <p>For the real-world port of Metabase's SQL-parameter parser, the upstream test table was ported <em>and</em> the two implementations were fed 5,000 random inputs across four modes: <strong>20,000 comparisons against the original Clojure</strong>, zero divergence, down to which error type is thrown. It found a genuine runtime bug in minutes.</p>
     <h3>Fail loud, everywhere</h3>
     <p>Unsupported constructs panic at build time with the feature named. Labelled arguments are checked against real function signatures or refuse to compile. CI re-proves the whole chain on every push and narrates the method in its own logs.</p>
-    <div class="note"><strong>The one soft spot, named honestly:</strong> the FFI core is the only layer that can be silently wrong (everything else fails loud). That's precisely where every new real-world consumer, and every fuzzer, is aimed.</div>
+    <div class="note"><strong>The one soft spot:</strong> the FFI core is the only layer that can be silently wrong (everything else fails loud). That's precisely where every new real-world consumer, and every fuzzer, is aimed.</div>
   </section>
 
   <section id="libs">
