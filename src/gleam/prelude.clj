@@ -32,8 +32,13 @@
    actual))
 
 (defn ba-int
-  "Big-endian bytes of an int segment of `bits` width."
+  "Big-endian bytes of an int segment of `bits` width. Byte-aligned only:
+  a width that is not a positive multiple of 8 would silently produce wrong
+  bytes, so it throws instead."
   [v bits]
+  (when (or (not (pos? bits)) (pos? (rem bits 8)))
+    (throw (ex-info "bit-array int segment width must be a positive multiple of 8"
+                    {:bits bits})))
   (mapv #(bit-and 255 (bit-shift-right v %)) (range (- bits 8) -1 -8)))
 
 (defn ba-utf8 [s]

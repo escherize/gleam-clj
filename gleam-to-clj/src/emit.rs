@@ -501,7 +501,13 @@ pub fn emit_module(
                 .trim_end_matches(']')
                 .split_once(" :as ")
             {
-                body.contains(&format!("{alias}/")) || body.contains(&format!("{ns}."))
+                // A bare `alias/` search false-positives on :gleam/src path
+                // strings ("gleam/http/response.gleam"); require a reference
+                // position before the alias.
+                ["(", " ", "["]
+                    .iter()
+                    .any(|pre| body.contains(&format!("{pre}{alias}/")))
+                    || body.contains(&format!("{ns}."))
             } else {
                 true
             }
@@ -1919,21 +1925,50 @@ fn emit_expr(ctx: &Emit, e: &TypedExpr, ind: usize, tail: Option<&Tail>) -> Stri
                 .iter()
                 .map(|seg| {
                     let val = emit_expr(ctx, &seg.value, ind + 2, None);
-                    let utf8 = seg.options.iter().any(|o| matches!(o, Opt::Utf8 { .. }));
-                    let raw = seg
-                        .options
-                        .iter()
-                        .any(|o| matches!(o, Opt::Bits { .. } | Opt::Bytes { .. }));
-                    let size = seg.options.iter().find_map(|o| match o {
-                        Opt::Size { value, .. } => Some(emit_expr(ctx, value, ind + 2, None)),
-                        _ => None,
-                    });
+                    let mut utf8 = false;
+                    let mut raw = false;
+                    let mut size: Option<String> = None;
+                    for o in &seg.options {
+                        match o {
+                            Opt::Utf8 { .. } => utf8 = true,
+                            Opt::Bits { .. } | Opt::Bytes { .. } => raw = true,
+                            Opt::Size { value, .. } => {
+                                size = Some(emit_expr(ctx, value, ind + 2, None))
+                            }
+                            Opt::Int { .. } | Opt::Unsigned { .. } | Opt::Big { .. } => {}
+                            other => panic!(
+                                "unsupported bit-array segment option in {}: {other:?}",
+                                ctx.module_path
+                            ),
+                        }
+                    }
                     if utf8 {
                         format!("(p/ba-utf8 {val})")
                     } else if raw {
+                        // Splicing ignores any size; refuse rather than
+                        // silently emit the whole value.
+                        if size.is_some() {
+                            panic!(
+                                "bit-array expression in {}: sized :bits/:bytes segments \
+                                 are unsupported",
+                                ctx.module_path
+                            );
+                        }
                         val
                     } else {
-                        format!("(p/ba-int {val} {})", size.unwrap_or_else(|| "8".into()))
+                        let bits = size.unwrap_or_else(|| "8".into());
+                        // Constant sizes must be byte-aligned; runtime sizes
+                        // are checked in p/ba-int.
+                        if let Ok(n) = bits.parse::<u64>() {
+                            if n == 0 || n % 8 != 0 {
+                                panic!(
+                                    "bit-array expression in {}: int segment size {n} bits \
+                                     is not byte-aligned",
+                                    ctx.module_path
+                                );
+                            }
+                        }
+                        format!("(p/ba-int {val} {bits})")
                     }
                 })
                 .collect();
