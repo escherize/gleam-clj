@@ -186,8 +186,10 @@ fn gather_typed_sources(proj: &str, stdlib_dir: &str) -> Vec<analysis::SourceMod
                     );
                 };
                 let _ = seen.insert(m.clone());
-                // gleeunit: interface only, runtime comes from the shim.
-                let emit = !(m == "gleeunit" || m.starts_with("gleeunit/"));
+                // The gleeunit ROOT module's runtime is the Clojure shim
+                // (its main is BEAM/JS discovery externals); submodules like
+                // gleeunit/should are pure Gleam and compile like any dep.
+                let emit = m != "gleeunit";
                 files.push((m, dep_file.clone(), true, emit));
                 queue.push(dep_file);
             }

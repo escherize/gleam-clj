@@ -132,3 +132,4 @@ gleam/json do_null gleam-json-ffi/do-null
 gleam/json do_object gleam-json-ffi/do-object
 gleam/json do_preprocessed_array gleam-json-ffi/do-preprocessed-array
 gleam/dynamic/decode dynamic_string gleam-ffi/dynamic-string
+filepath is_windows gleam-filepath-ffi/is-windows
