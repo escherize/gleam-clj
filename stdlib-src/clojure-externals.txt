@@ -133,3 +133,11 @@ gleam/json do_object gleam-json-ffi/do-object
 gleam/json do_preprocessed_array gleam-json-ffi/do-preprocessed-array
 gleam/dynamic/decode dynamic_string gleam-ffi/dynamic-string
 filepath is_windows gleam-filepath-ffi/is-windows
+glexer slice_bytes glexer-ffi/slice-bytes
+glexer drop_byte glexer-ffi/drop-byte
+splitter make splitter-ffi/make
+splitter split splitter-ffi/split
+splitter split_before splitter-ffi/split-before
+splitter split_after splitter-ffi/split-after
+splitter would_split splitter-ffi/would-split
+gleam/string join gleam-ffi/str-join

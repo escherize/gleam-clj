@@ -174,6 +174,13 @@
     (doseq [cp cps] (.appendCodePoint sb (int cp)))
     (str sb)))
 
+(defn str-join
+  "gleam/string.join override: the Gleam body folds with <>, which BEAM's
+  binary-append optimization makes linear but JVM string copying makes
+  quadratic (9.5s for 250k parts). clojure.string/join is a StringBuilder."
+  [strings ^String separator]
+  (cstr/join separator strings))
+
 (defn byte-size [^String s] (alength (.getBytes s "UTF-8")))
 
 (defn remove-prefix [^String s ^String p]

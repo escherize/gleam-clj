@@ -12,7 +12,7 @@
    [splitter :as splitter])
   (:import (gleam.prelude Ok)))
 
-(declare Lexer? Lexer-schema Normal? CheckForMinus? HasNestedDot? LexerMode? LexerMode-schema Position? Position-schema RegularComment? DocComment? ModuleComment? CommentKind? CommentKind-schema LexInt? LexFloat? LexFloatExponent? LexNumberMode? LexNumberMode-schema)
+(declare LexerMode-schema)
 
 ;; type Lexer
 (defprotocol ILexer)

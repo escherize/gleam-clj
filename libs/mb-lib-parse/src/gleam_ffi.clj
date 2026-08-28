@@ -174,6 +174,13 @@
     (doseq [cp cps] (.appendCodePoint sb (int cp)))
     (str sb)))
 
+(defn str-join
+  "gleam/string.join override: the Gleam body folds with <>, which BEAM's
+  binary-append optimization makes linear but JVM string copying makes
+  quadratic (9.5s for 250k parts). clojure.string/join is a StringBuilder."
+  [strings ^String separator]
+  (cstr/join separator strings))
+
 (defn byte-size [^String s] (alength (.getBytes s "UTF-8")))
 
 (defn remove-prefix [^String s ^String p]
@@ -343,14 +350,31 @@
       (ok (none)))
     :else (gleam.prelude/->Error (classify data))))
 
-(defn dynamic-int [v] (if (integer? v) (ok v) (gleam.prelude/->Error v)))
-(defn dynamic-float [v] (if (float? v) (ok v) (gleam.prelude/->Error v)))
+;; On failure these return the type's ZERO as the Error payload (matching
+;; gleam_stdlib.erl): decoder combinators like `map` transform the
+;; placeholder, so a raw-value payload would reach the wrong-typed fn.
+(defn dynamic-string [v] (if (string? v) (ok v) (gleam.prelude/->Error "")))
+(defn dynamic-int [v] (if (integer? v) (ok v) (gleam.prelude/->Error 0)))
+(defn dynamic-float [v] (if (float? v) (ok v) (gleam.prelude/->Error 0.0)))
 (defn dynamic-bit-array [v]
-  (if (and (vector? v) (every? integer? v)) (ok v) (gleam.prelude/->Error v)))
+  (if (and (vector? v) (every? integer? v)) (ok v) (gleam.prelude/->Error [])))
 (defn decode-dict [v] (if (map? v) (ok v) (err)))
 (defn is-null [v] (nil? v))
-(defn decode-list [_data _item]
-  (throw (ex-info "gleam/dynamic/decode.decode_list is not implemented on the JVM backend yet" {})))
+(defn decode-list
+  "decode_list(data, item, push_path, index, acc) -> #(List(t), List(DecodeError)).
+  Mirrors gleam_stdlib.erl: first failing element wins, its errors pushed
+  under the element's index; non-list input is a List type error."
+  [data item push-path index _acc]
+  (if-not (sequential? data)
+    [(list) (list ((requiring-resolve 'gleam.dynamic.decode/->DecodeError)
+                   "List" (classify data) (list)))]
+    (loop [xs (seq data), i (long index), out []]
+      (if xs
+        (let [[o errs] (item (first xs))]
+          (if (empty? errs)
+            (recur (next xs) (inc i) (conj out o))
+            (push-path [(list) errs] (str i))))
+        [(apply list out) (list)]))))
 
 ;; ---------- bit_array fns overridden whole (sub-byte pattern matching) ----------
 

@@ -395,35 +395,7 @@
   (let [subject (<= times 0)]
     (if subject "" (repeat-loop times string ""))))
 
-(defn- join-loop
-  "join_loop(strings: List(String), separator: String, accumulator: String) -> String"
-  {:gleam/src "stdlib-src/src/gleam/string.gleam:464"}
-  ^java.lang.String [strings ^java.lang.String separator ^java.lang.String accumulator]
-  (if (empty? strings)
-    accumulator
-    (let [string (first strings) strings (rest strings)]
-      (recur strings separator (str accumulator separator string)))))
-
-(defn join
-  "join(strings: List(String), with separator: String) -> String
-
-   Joins many `String`s together with a given separator.
-
-   This function runs in linear time.
-
-   ## Examples
-
-   ```gleam
-   assert string.join([\"home\", \"evan\", \"Desktop\"], with: \"/\")
-   == \"home/evan/Desktop\"
-   ```"
-  {:malli/schema [:=> [:cat [:sequential :string] :string] :string]
-   :gleam/src "stdlib-src/src/gleam/string.gleam:457"}
-  ^java.lang.String [strings ^java.lang.String separator]
-  (if (empty? strings)
-    ""
-    (let [first' (first strings) rest' (rest strings)]
-      (join-loop rest' separator first'))))
+(def ^{:malli/schema [:=> [:cat [:sequential :string] :string] :string] :gleam/src "stdlib-src/src/gleam/string.gleam:457"} join gleam-ffi/str-join)
 
 (defn- padding
   "padding(size: Int, pad_string: String) -> String"
