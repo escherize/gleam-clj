@@ -327,23 +327,38 @@ pub fn emit_module(
         .flat_map(|t| t.constructors.iter().map(|c| c.name.as_str()))
         .collect();
     // Schema fns may forward-reference later types' schema fns and
-    // predicates (non-cyclic forward refs); declare them all up front.
-    if defs.custom_types.len() > 1 {
-        let mut names: Vec<String> = Vec::new();
-        for t in &defs.custom_types {
-            for c in &t.constructors {
-                names.push(format!("{}?", c.name));
-            }
-            let tn = t.name.as_str();
-            if !all_variant_names.contains(tn) && !JAVA_LANG.contains(&tn) {
-                names.push(format!("{tn}?"));
-            }
-            names.push(format!("{tn}-schema"));
+    // predicates (non-cyclic forward refs). Emit each type into its own
+    // buffer first, then declare exactly the names an earlier type's code
+    // references — usually none.
+    let type_blocks: Vec<String> = defs
+        .custom_types
+        .iter()
+        .map(|t| {
+            let mut b = String::new();
+            emit_custom_type(&ctx, &mut b, t, &am.path, &all_variant_names);
+            b
+        })
+        .collect();
+    let mut forward: Vec<String> = Vec::new();
+    for (i, t) in defs.custom_types.iter().enumerate() {
+        let mut names: Vec<String> =
+            t.constructors.iter().map(|c| format!("{}?", c.name)).collect();
+        let tn = t.name.as_str();
+        if !all_variant_names.contains(tn) && !JAVA_LANG.contains(&tn) {
+            names.push(format!("{tn}?"));
         }
-        let _ = writeln!(out, "\n(declare {})", names.join(" "));
+        names.push(format!("{tn}-schema"));
+        for n in names {
+            if type_blocks[..i].iter().any(|b| contains_clj_symbol(b, &n)) {
+                forward.push(n);
+            }
+        }
     }
-    for t in &defs.custom_types {
-        emit_custom_type(&ctx, &mut out, t, &am.path, &all_variant_names);
+    if !forward.is_empty() {
+        let _ = writeln!(out, "\n(declare {})", forward.join(" "));
+    }
+    for b in &type_blocks {
+        out.push_str(b);
     }
 
     // Definitions in call-dependency order (computed pre-analysis); a declare
@@ -707,6 +722,25 @@ fn type_var_id(t: &gleam_core::type_::Type) -> Option<u64> {
         },
         _ => None,
     }
+}
+
+/// Whole-symbol occurrence check on emitted Clojure text: `sym` counts only
+/// when not embedded in a longer symbol (so `Str?` does not match `AStr?`).
+fn contains_clj_symbol(hay: &str, sym: &str) -> bool {
+    let is_sym_char =
+        |c: char| c.is_alphanumeric() || "*+!-_'?<>=./#".contains(c);
+    let mut from = 0;
+    while let Some(pos) = hay[from..].find(sym) {
+        let p = from + pos;
+        let end = p + sym.len();
+        let before_ok = !hay[..p].chars().next_back().is_some_and(is_sym_char);
+        let after_ok = !hay[end..].chars().next().is_some_and(is_sym_char);
+        if before_ok && after_ok {
+            return true;
+        }
+        from = p + 1;
+    }
+    false
 }
 
 fn emit_custom_type(

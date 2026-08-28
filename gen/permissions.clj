@@ -6,8 +6,6 @@
    [gleam.string :as string])
   (:import (gleam.prelude Ok)))
 
-(declare UserId? UserId-schema Empty? NotANumber? OutOfRange? IdError? IdError-schema Viewer? Editor? Owner? Role? Role-schema CanEdit? CanEdit-schema Denied? Denied-schema DashboardId? DashboardId-schema CanEditDashboard? CanEditDashboard-schema)
-
 ;; type UserId
 (defprotocol IUserId)
 (defrecord UserId [value] IUserId)
