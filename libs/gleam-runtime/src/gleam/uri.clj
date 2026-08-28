@@ -1,4 +1,12 @@
 (ns gleam.uri
+  "Utilities for working with URIs
+   
+   This module provides functions for working with URIs (for example, parsing
+   URIs or encoding query strings). The functions in this module are implemented
+   according to [RFC 3986](https://tools.ietf.org/html/rfc3986).
+   
+   Query encoding (Form encoding) is defined in the
+   [W3C specification](https://www.w3.org/TR/html52/sec-forms.html#urlencoded-form-data)."
   (:refer-clojure :exclude [drop-last empty merge])
   (:require
    [gleam-ffi]
@@ -9,330 +17,524 @@
    [gleam.string :as string]))
 
 ;; type Uri
-(defrecord Uri [scheme userinfo host port path query fragment])
-(defn Uri? [v] (instance? Uri v))
+(defprotocol IUri)
+(defrecord Uri [scheme userinfo host port ^java.lang.String path query fragment] IUri)
+(defn Uri? "True if `v` is a Uri value." [v] (instance? Uri v))
+(defn Uri-schema
+  "Malli schema for Uri."
+  []
+  [:and [:fn Uri?] [:map [:scheme (option/Option-schema :string)] [:userinfo (option/Option-schema :string)] [:host (option/Option-schema :string)] [:port (option/Option-schema :int)] [:path :string] [:query (option/Option-schema :string)] [:fragment (option/Option-schema :string)]]])
 
 (def empty (->Uri (option/->None) (option/->None) (option/->None) (option/->None) "" (option/->None) (option/->None)))
 
-(def pop-codeunit gleam-ffi/pop-codeunit)
+(def ^{:gleam/src "stdlib-src/src/gleam/uri.gleam:514"} pop-codeunit gleam-ffi/pop-codeunit)
 
-(defn- parse-fragment [rest' pieces]
+(defn- parse-fragment
+  "parse_fragment(rest: String, pieces: Uri) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:503"}
+  [^java.lang.String rest' pieces]
   (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (option/->Some rest'))))
 
-(def codeunit-slice gleam-ffi/codeunit-slice)
+(def ^{:gleam/src "stdlib-src/src/gleam/uri.gleam:518"} codeunit-slice gleam-ffi/codeunit-slice)
 
-(defn- parse-query-with-question-mark-loop [original uri-string pieces size]
+(defn- parse-query-with-question-mark-loop
+  "parse_query_with_question_mark_loop(original: String, uri_string: String, pieces: Uri, size: Int) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:475"}
+  [^java.lang.String original ^java.lang.String uri-string pieces size]
   (cond
-    (and (.startsWith ^String uri-string "#") (= size 0)) (let [rest' (subs uri-string 1)]
-                                                            (parse-fragment rest'
-                                                                            pieces))
-    (.startsWith ^String uri-string "#") (let [rest' (subs uri-string 1) query (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (option/->Some query) (:fragment pieces))]
-                                           (parse-fragment rest' pieces))
-    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (option/->Some original) (:fragment pieces)))
-    :else (let [[_ rest'] (pop-codeunit uri-string)]
-            (recur original rest' pieces (+' size 1)))))
+    (and (.startsWith ^String uri-string "#") (= size 0))
+    (let [rest' (subs uri-string 1)]
+      (parse-fragment rest' pieces))
 
-(defn- parse-query-with-question-mark [uri-string pieces]
+    (.startsWith ^String uri-string "#")
+    (let [rest' (subs uri-string 1) query (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (option/->Some query) (:fragment pieces))]
+      (parse-fragment rest' pieces))
+
+    (= uri-string "")
+    (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (option/->Some original) (:fragment pieces)))
+
+    :else
+    (let [[_ rest'] (pop-codeunit uri-string)]
+      (recur original rest' pieces (+' size 1)))))
+
+(defn- parse-query-with-question-mark
+  "parse_query_with_question_mark(uri_string: String, pieces: Uri) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:468"}
+  [^java.lang.String uri-string pieces]
   (parse-query-with-question-mark-loop uri-string uri-string pieces 0))
 
-(defn- parse-path-loop [original uri-string pieces size]
+(defn- parse-path-loop
+  "parse_path_loop(original: String, uri_string: String, pieces: Uri, size: Int) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:434"}
+  [^java.lang.String original ^java.lang.String uri-string pieces size]
   (cond
-    (.startsWith ^String uri-string "?") (let [rest' (subs uri-string 1) path (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) path (:query pieces) (:fragment pieces))]
-                                           (parse-query-with-question-mark rest'
-                                                                           pieces))
-    (.startsWith ^String uri-string "#") (let [rest' (subs uri-string 1) path (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) path (:query pieces) (:fragment pieces))]
-                                           (parse-fragment rest' pieces))
-    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) original (:query pieces) (:fragment pieces)))
-    :else (let [[_ rest'] (pop-codeunit uri-string)]
-            (recur original rest' pieces (+' size 1)))))
+    (.startsWith ^String uri-string "?")
+    (let [rest' (subs uri-string 1) path (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) path (:query pieces) (:fragment pieces))]
+      (parse-query-with-question-mark rest' pieces))
 
-(defn- parse-path [uri-string pieces]
+    (.startsWith ^String uri-string "#")
+    (let [rest' (subs uri-string 1) path (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) path (:query pieces) (:fragment pieces))]
+      (parse-fragment rest' pieces))
+
+    (= uri-string "")
+    (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) original (:query pieces) (:fragment pieces)))
+
+    :else
+    (let [[_ rest'] (pop-codeunit uri-string)]
+      (recur original rest' pieces (+' size 1)))))
+
+(defn- parse-path
+  "parse_path(uri_string: String, pieces: Uri) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:430"}
+  [^java.lang.String uri-string pieces]
   (parse-path-loop uri-string uri-string pieces 0))
 
-(defn- parse-port-loop [uri-string pieces port]
+(defn- parse-port-loop
+  "parse_port_loop(uri_string: String, pieces: Uri, port: Int) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:385"}
+  [^java.lang.String uri-string pieces port]
   (cond
-    (.startsWith ^String uri-string "0") (let [rest' (subs uri-string 1)]
-                                           (recur rest' pieces (*' port 10)))
-    (.startsWith ^String uri-string "1") (let [rest' (subs uri-string 1)]
-                                           (recur rest' pieces (+' (*' port 10) 1)))
-    (.startsWith ^String uri-string "2") (let [rest' (subs uri-string 1)]
-                                           (recur rest' pieces (+' (*' port 10) 2)))
-    (.startsWith ^String uri-string "3") (let [rest' (subs uri-string 1)]
-                                           (recur rest' pieces (+' (*' port 10) 3)))
-    (.startsWith ^String uri-string "4") (let [rest' (subs uri-string 1)]
-                                           (recur rest' pieces (+' (*' port 10) 4)))
-    (.startsWith ^String uri-string "5") (let [rest' (subs uri-string 1)]
-                                           (recur rest' pieces (+' (*' port 10) 5)))
-    (.startsWith ^String uri-string "6") (let [rest' (subs uri-string 1)]
-                                           (recur rest' pieces (+' (*' port 10) 6)))
-    (.startsWith ^String uri-string "7") (let [rest' (subs uri-string 1)]
-                                           (recur rest' pieces (+' (*' port 10) 7)))
-    (.startsWith ^String uri-string "8") (let [rest' (subs uri-string 1)]
-                                           (recur rest' pieces (+' (*' port 10) 8)))
-    (.startsWith ^String uri-string "9") (let [rest' (subs uri-string 1)]
-                                           (recur rest' pieces (+' (*' port 10) 9)))
-    (.startsWith ^String uri-string "?") (let [rest' (subs uri-string 1) pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-query-with-question-mark rest'
-                                                                           pieces))
-    (.startsWith ^String uri-string "#") (let [rest' (subs uri-string 1) pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-fragment rest' pieces))
-    (.startsWith ^String uri-string "/") (let [pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-path uri-string pieces))
-    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces)))
-    :else (p/->Error nil)))
+    (.startsWith ^String uri-string "0")
+    (let [rest' (subs uri-string 1)]
+      (recur rest' pieces (*' port 10)))
 
-(defn- parse-port [uri-string pieces]
+    (.startsWith ^String uri-string "1")
+    (let [rest' (subs uri-string 1)]
+      (recur rest' pieces (+' (*' port 10) 1)))
+
+    (.startsWith ^String uri-string "2")
+    (let [rest' (subs uri-string 1)]
+      (recur rest' pieces (+' (*' port 10) 2)))
+
+    (.startsWith ^String uri-string "3")
+    (let [rest' (subs uri-string 1)]
+      (recur rest' pieces (+' (*' port 10) 3)))
+
+    (.startsWith ^String uri-string "4")
+    (let [rest' (subs uri-string 1)]
+      (recur rest' pieces (+' (*' port 10) 4)))
+
+    (.startsWith ^String uri-string "5")
+    (let [rest' (subs uri-string 1)]
+      (recur rest' pieces (+' (*' port 10) 5)))
+
+    (.startsWith ^String uri-string "6")
+    (let [rest' (subs uri-string 1)]
+      (recur rest' pieces (+' (*' port 10) 6)))
+
+    (.startsWith ^String uri-string "7")
+    (let [rest' (subs uri-string 1)]
+      (recur rest' pieces (+' (*' port 10) 7)))
+
+    (.startsWith ^String uri-string "8")
+    (let [rest' (subs uri-string 1)]
+      (recur rest' pieces (+' (*' port 10) 8)))
+
+    (.startsWith ^String uri-string "9")
+    (let [rest' (subs uri-string 1)]
+      (recur rest' pieces (+' (*' port 10) 9)))
+
+    (.startsWith ^String uri-string "?")
+    (let [rest' (subs uri-string 1) pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-query-with-question-mark rest' pieces))
+
+    (.startsWith ^String uri-string "#")
+    (let [rest' (subs uri-string 1) pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-fragment rest' pieces))
+
+    (.startsWith ^String uri-string "/")
+    (let [pieces (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-path uri-string pieces))
+
+    (= uri-string "")
+    (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (option/->Some port) (:path pieces) (:query pieces) (:fragment pieces)))
+
+    :else
+    (p/->Error nil)))
+
+(defn- parse-port
+  "parse_port(uri_string: String, pieces: Uri) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:350"}
+  [^java.lang.String uri-string pieces]
   (cond
-    (.startsWith ^String uri-string ":0") (let [rest' (subs uri-string 2)]
-                                            (parse-port-loop rest' pieces 0))
-    (.startsWith ^String uri-string ":1") (let [rest' (subs uri-string 2)]
-                                            (parse-port-loop rest' pieces 1))
-    (.startsWith ^String uri-string ":2") (let [rest' (subs uri-string 2)]
-                                            (parse-port-loop rest' pieces 2))
-    (.startsWith ^String uri-string ":3") (let [rest' (subs uri-string 2)]
-                                            (parse-port-loop rest' pieces 3))
-    (.startsWith ^String uri-string ":4") (let [rest' (subs uri-string 2)]
-                                            (parse-port-loop rest' pieces 4))
-    (.startsWith ^String uri-string ":5") (let [rest' (subs uri-string 2)]
-                                            (parse-port-loop rest' pieces 5))
-    (.startsWith ^String uri-string ":6") (let [rest' (subs uri-string 2)]
-                                            (parse-port-loop rest' pieces 6))
-    (.startsWith ^String uri-string ":7") (let [rest' (subs uri-string 2)]
-                                            (parse-port-loop rest' pieces 7))
-    (.startsWith ^String uri-string ":8") (let [rest' (subs uri-string 2)]
-                                            (parse-port-loop rest' pieces 8))
-    (.startsWith ^String uri-string ":9") (let [rest' (subs uri-string 2)]
-                                            (parse-port-loop rest' pieces 9))
-    (or (= uri-string ":") (= uri-string "")) (p/->Ok pieces)
-    (.startsWith ^String uri-string "?") (let [rest' (subs uri-string 1)]
-                                           (parse-query-with-question-mark rest'
-                                                                           pieces))
-    (.startsWith ^String uri-string ":?") (let [rest' (subs uri-string 2)]
-                                            (parse-query-with-question-mark rest'
-                                                                            pieces))
-    (.startsWith ^String uri-string "#") (let [rest' (subs uri-string 1)]
-                                           (parse-fragment rest' pieces))
-    (.startsWith ^String uri-string ":#") (let [rest' (subs uri-string 2)]
-                                            (parse-fragment rest' pieces))
-    (.startsWith ^String uri-string "/") (parse-path uri-string pieces)
-    (.startsWith ^String uri-string ":") (let [rest' (subs uri-string 1)]
-                                           (if (.startsWith ^String rest' "/")
-                                             (parse-path rest' pieces)
-                                             (p/->Error nil)))
-    :else (p/->Error nil)))
+    (.startsWith ^String uri-string ":0")
+    (let [rest' (subs uri-string 2)]
+      (parse-port-loop rest' pieces 0))
 
-(defn- parse-host-outside-of-brackets-loop [original uri-string pieces size]
+    (.startsWith ^String uri-string ":1")
+    (let [rest' (subs uri-string 2)]
+      (parse-port-loop rest' pieces 1))
+
+    (.startsWith ^String uri-string ":2")
+    (let [rest' (subs uri-string 2)]
+      (parse-port-loop rest' pieces 2))
+
+    (.startsWith ^String uri-string ":3")
+    (let [rest' (subs uri-string 2)]
+      (parse-port-loop rest' pieces 3))
+
+    (.startsWith ^String uri-string ":4")
+    (let [rest' (subs uri-string 2)]
+      (parse-port-loop rest' pieces 4))
+
+    (.startsWith ^String uri-string ":5")
+    (let [rest' (subs uri-string 2)]
+      (parse-port-loop rest' pieces 5))
+
+    (.startsWith ^String uri-string ":6")
+    (let [rest' (subs uri-string 2)]
+      (parse-port-loop rest' pieces 6))
+
+    (.startsWith ^String uri-string ":7")
+    (let [rest' (subs uri-string 2)]
+      (parse-port-loop rest' pieces 7))
+
+    (.startsWith ^String uri-string ":8")
+    (let [rest' (subs uri-string 2)]
+      (parse-port-loop rest' pieces 8))
+
+    (.startsWith ^String uri-string ":9")
+    (let [rest' (subs uri-string 2)]
+      (parse-port-loop rest' pieces 9))
+
+    (or (= uri-string ":") (= uri-string ""))
+    (p/->Ok pieces)
+
+    (.startsWith ^String uri-string "?")
+    (let [rest' (subs uri-string 1)]
+      (parse-query-with-question-mark rest' pieces))
+
+    (.startsWith ^String uri-string ":?")
+    (let [rest' (subs uri-string 2)]
+      (parse-query-with-question-mark rest' pieces))
+
+    (.startsWith ^String uri-string "#")
+    (let [rest' (subs uri-string 1)]
+      (parse-fragment rest' pieces))
+
+    (.startsWith ^String uri-string ":#")
+    (let [rest' (subs uri-string 2)]
+      (parse-fragment rest' pieces))
+
+    (.startsWith ^String uri-string "/")
+    (parse-path uri-string pieces)
+
+    (.startsWith ^String uri-string ":")
+    (let [rest' (subs uri-string 1)]
+      (if (.startsWith ^String rest' "/")
+        (parse-path rest' pieces)
+        (p/->Error nil)))
+
+    :else
+    (p/->Error nil)))
+
+(defn- parse-host-outside-of-brackets-loop
+  "parse_host_outside_of_brackets_loop(original: String, uri_string: String, pieces: Uri, size: Int) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:306"}
+  [^java.lang.String original ^java.lang.String uri-string pieces size]
   (cond
-    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some original) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
-    (.startsWith ^String uri-string ":") (let [host (codeunit-slice original
-                                                                    0
-                                                                    size)
-                                               pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-port uri-string pieces))
-    (.startsWith ^String uri-string "/") (let [host (codeunit-slice original
-                                                                    0
-                                                                    size)
-                                               pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-path uri-string pieces))
-    (.startsWith ^String uri-string "?") (let [rest' (subs uri-string 1) host (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-query-with-question-mark rest'
-                                                                           pieces))
-    (.startsWith ^String uri-string "#") (let [rest' (subs uri-string 1) host (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-fragment rest' pieces))
-    :else (let [[_ rest'] (pop-codeunit uri-string)]
-            (recur original rest' pieces (+' size 1)))))
+    (= uri-string "")
+    (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some original) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
 
-(defn- parse-host-outside-of-brackets [uri-string pieces]
+    (.startsWith ^String uri-string ":")
+    (let [host (codeunit-slice original 0 size)
+          pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-port uri-string pieces))
+
+    (.startsWith ^String uri-string "/")
+    (let [host (codeunit-slice original 0 size)
+          pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-path uri-string pieces))
+
+    (.startsWith ^String uri-string "?")
+    (let [rest' (subs uri-string 1) host (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-query-with-question-mark rest' pieces))
+
+    (.startsWith ^String uri-string "#")
+    (let [rest' (subs uri-string 1) host (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-fragment rest' pieces))
+
+    :else
+    (let [[_ rest'] (pop-codeunit uri-string)]
+      (recur original rest' pieces (+' size 1)))))
+
+(defn- parse-host-outside-of-brackets
+  "parse_host_outside_of_brackets(uri_string: String, pieces: Uri) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:299"}
+  [^java.lang.String uri-string pieces]
   (parse-host-outside-of-brackets-loop uri-string uri-string pieces 0))
 
-(defn- is-valid-host-within-brackets-char [char]
-  (or (or (or (or (and (>= 48 char) (<= char 57)) (and (>= 65 char) (<= char 90))) (and (>= 97 char) (<= char 122))) (= char 58)) (= char 46)))
+(defn- is-valid-host-within-brackets-char
+  "is_valid_host_within_brackets_char(char: Int) -> Bool"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:286"}
+  [char]
+  (or (and (>= 48 char) (<= char 57)) (and (>= 65 char) (<= char 90)) (and (>= 97 char) (<= char 122)) (= char 58) (= char 46)))
 
-(defn- parse-host-within-brackets-loop [original uri-string pieces size]
+(defn- parse-host-within-brackets-loop
+  "parse_host_within_brackets_loop(original: String, uri_string: String, pieces: Uri, size: Int) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:226"}
+  [^java.lang.String original ^java.lang.String uri-string pieces size]
   (cond
-    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some uri-string) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
-    (and (.startsWith ^String uri-string "]") (= size 0)) (let [rest' (subs uri-string 1)]
-                                                            (parse-port rest'
-                                                                        pieces))
-    (.startsWith ^String uri-string "]") (let [rest' (subs uri-string 1) host (codeunit-slice original 0 (+' size 1)) pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-port rest' pieces))
-    (and (.startsWith ^String uri-string "/") (= size 0)) (parse-path uri-string
-                                                                      pieces)
-    (.startsWith ^String uri-string "/") (let [host (codeunit-slice original
-                                                                    0
-                                                                    size)
-                                               pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-path uri-string pieces))
-    (and (.startsWith ^String uri-string "?") (= size 0)) (let [rest' (subs uri-string 1)]
-                                                            (parse-query-with-question-mark rest'
-                                                                                            pieces))
-    (.startsWith ^String uri-string "?") (let [rest' (subs uri-string 1) host (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-query-with-question-mark rest'
-                                                                           pieces))
-    (and (.startsWith ^String uri-string "#") (= size 0)) (let [rest' (subs uri-string 1)]
-                                                            (parse-fragment rest'
-                                                                            pieces))
-    (.startsWith ^String uri-string "#") (let [rest' (subs uri-string 1) host (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-fragment rest' pieces))
-    :else (let [[char rest'] (pop-codeunit uri-string) subject (is-valid-host-within-brackets-char char)]
-            (if subject
-              (recur original rest' pieces (+' size 1))
-              (parse-host-outside-of-brackets-loop original
-                                                   original
-                                                   pieces
-                                                   0)))))
+    (= uri-string "")
+    (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some uri-string) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
 
-(defn- parse-host-within-brackets [uri-string pieces]
+    (and (.startsWith ^String uri-string "]") (= size 0))
+    (let [rest' (subs uri-string 1)]
+      (parse-port rest' pieces))
+
+    (.startsWith ^String uri-string "]")
+    (let [rest' (subs uri-string 1) host (codeunit-slice original 0 (+' size 1)) pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-port rest' pieces))
+
+    (and (.startsWith ^String uri-string "/") (= size 0))
+    (parse-path uri-string pieces)
+
+    (.startsWith ^String uri-string "/")
+    (let [host (codeunit-slice original 0 size)
+          pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-path uri-string pieces))
+
+    (and (.startsWith ^String uri-string "?") (= size 0))
+    (let [rest' (subs uri-string 1)]
+      (parse-query-with-question-mark rest' pieces))
+
+    (.startsWith ^String uri-string "?")
+    (let [rest' (subs uri-string 1) host (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-query-with-question-mark rest' pieces))
+
+    (and (.startsWith ^String uri-string "#") (= size 0))
+    (let [rest' (subs uri-string 1)]
+      (parse-fragment rest' pieces))
+
+    (.startsWith ^String uri-string "#")
+    (let [rest' (subs uri-string 1) host (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some host) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-fragment rest' pieces))
+
+    :else
+    (let [[char rest'] (pop-codeunit uri-string) subject (is-valid-host-within-brackets-char char)]
+      (if subject
+        (recur original rest' pieces (+' size 1))
+        (parse-host-outside-of-brackets-loop original original pieces 0)))))
+
+(defn- parse-host-within-brackets
+  "parse_host_within_brackets(uri_string: String, pieces: Uri) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:219"}
+  [^java.lang.String uri-string pieces]
   (parse-host-within-brackets-loop uri-string uri-string pieces 0))
 
-(defn- parse-host [uri-string pieces]
+(defn- parse-host
+  "parse_host(uri_string: String, pieces: Uri) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:196"}
+  [^java.lang.String uri-string pieces]
   (cond
-    (.startsWith ^String uri-string "[") (parse-host-within-brackets uri-string
-                                                                     pieces)
-    (.startsWith ^String uri-string ":") (let [pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some "") (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-port uri-string pieces))
-    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some "") (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
-    :else (parse-host-outside-of-brackets uri-string pieces)))
+    (.startsWith ^String uri-string "[")
+    (parse-host-within-brackets uri-string pieces)
 
-(defn- parse-userinfo-loop [original uri-string pieces size]
+    (.startsWith ^String uri-string ":")
+    (let [pieces (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some "") (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-port uri-string pieces))
+
+    (= uri-string "")
+    (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some "") (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
+
+    :else
+    (parse-host-outside-of-brackets uri-string pieces)))
+
+(defn- parse-userinfo-loop
+  "parse_userinfo_loop(original: String, uri_string: String, pieces: Uri, size: Int) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:164"}
+  [^java.lang.String original ^java.lang.String uri-string pieces size]
   (cond
-    (and (.startsWith ^String uri-string "@") (= size 0)) (let [rest' (subs uri-string 1)]
-                                                            (parse-host rest'
-                                                                        pieces))
-    (.startsWith ^String uri-string "@") (let [rest' (subs uri-string 1) userinfo (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (option/->Some userinfo) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-host rest' pieces))
-    (or (= uri-string "") (.startsWith ^String uri-string "/") (.startsWith ^String uri-string "?") (.startsWith ^String uri-string "#")) (parse-host original
-                                                                                                                                                      pieces)
-    :else (let [[_ rest'] (pop-codeunit uri-string)]
-            (recur original rest' pieces (+' size 1)))))
+    (and (.startsWith ^String uri-string "@") (= size 0))
+    (let [rest' (subs uri-string 1)]
+      (parse-host rest' pieces))
 
-(defn- parse-authority-pieces [string pieces]
+    (.startsWith ^String uri-string "@")
+    (let [rest' (subs uri-string 1) userinfo (codeunit-slice original 0 size) pieces (->Uri (:scheme pieces) (option/->Some userinfo) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-host rest' pieces))
+
+    (or (= uri-string "") (.startsWith ^String uri-string "/") (.startsWith ^String uri-string "?") (.startsWith ^String uri-string "#"))
+    (parse-host original pieces)
+
+    :else
+    (let [[_ rest'] (pop-codeunit uri-string)]
+      (recur original rest' pieces (+' size 1)))))
+
+(defn- parse-authority-pieces
+  "parse_authority_pieces(string: String, pieces: Uri) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:160"}
+  [^java.lang.String string pieces]
   (parse-userinfo-loop string string pieces 0))
 
-(defn- parse-authority-with-slashes [uri-string pieces]
+(defn- parse-authority-with-slashes
+  "parse_authority_with_slashes(uri_string: String, pieces: Uri) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:147"}
+  [^java.lang.String uri-string pieces]
   (cond
-    (= uri-string "//") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some "") (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
-    (.startsWith ^String uri-string "//") (let [rest' (subs uri-string 2)]
-                                            (parse-authority-pieces rest'
-                                                                    pieces))
-    :else (parse-path uri-string pieces)))
+    (= uri-string "//")
+    (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (option/->Some "") (:port pieces) (:path pieces) (:query pieces) (:fragment pieces)))
 
-(defn- parse-scheme-loop [original uri-string pieces size]
+    (.startsWith ^String uri-string "//")
+    (let [rest' (subs uri-string 2)]
+      (parse-authority-pieces rest' pieces))
+
+    :else
+    (parse-path uri-string pieces)))
+
+(defn- parse-scheme-loop
+  "parse_scheme_loop(original: String, uri_string: String, pieces: Uri, size: Int) -> Result(Uri, Nil)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:88"}
+  [^java.lang.String original ^java.lang.String uri-string pieces size]
   (cond
-    (and (.startsWith ^String uri-string "/") (= size 0)) (parse-authority-with-slashes uri-string
-                                                                                        pieces)
-    (.startsWith ^String uri-string "/") (let [scheme (codeunit-slice original
-                                                                      0
-                                                                      size)
-                                               pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-authority-with-slashes uri-string
-                                                                         pieces))
-    (and (.startsWith ^String uri-string "?") (= size 0)) (let [rest' (subs uri-string 1)]
-                                                            (parse-query-with-question-mark rest'
-                                                                                            pieces))
-    (.startsWith ^String uri-string "?") (let [rest' (subs uri-string 1) scheme (codeunit-slice original 0 size) pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-query-with-question-mark rest'
-                                                                           pieces))
-    (and (.startsWith ^String uri-string "#") (= size 0)) (let [rest' (subs uri-string 1)]
-                                                            (parse-fragment rest'
-                                                                            pieces))
-    (.startsWith ^String uri-string "#") (let [rest' (subs uri-string 1) scheme (codeunit-slice original 0 size) pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-fragment rest' pieces))
-    (and (.startsWith ^String uri-string ":") (= size 0)) (p/->Error nil)
-    (.startsWith ^String uri-string ":") (let [rest' (subs uri-string 1) scheme (codeunit-slice original 0 size) pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
-                                           (parse-authority-with-slashes rest'
-                                                                         pieces))
-    (= uri-string "") (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) original (:query pieces) (:fragment pieces)))
-    :else (let [[_ rest'] (pop-codeunit uri-string)]
-            (recur original rest' pieces (+' size 1)))))
+    (and (.startsWith ^String uri-string "/") (= size 0))
+    (parse-authority-with-slashes uri-string pieces)
+
+    (.startsWith ^String uri-string "/")
+    (let [scheme (codeunit-slice original 0 size)
+          pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-authority-with-slashes uri-string pieces))
+
+    (and (.startsWith ^String uri-string "?") (= size 0))
+    (let [rest' (subs uri-string 1)]
+      (parse-query-with-question-mark rest' pieces))
+
+    (.startsWith ^String uri-string "?")
+    (let [rest' (subs uri-string 1) scheme (codeunit-slice original 0 size) pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-query-with-question-mark rest' pieces))
+
+    (and (.startsWith ^String uri-string "#") (= size 0))
+    (let [rest' (subs uri-string 1)]
+      (parse-fragment rest' pieces))
+
+    (.startsWith ^String uri-string "#")
+    (let [rest' (subs uri-string 1) scheme (codeunit-slice original 0 size) pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-fragment rest' pieces))
+
+    (and (.startsWith ^String uri-string ":") (= size 0))
+    (p/->Error nil)
+
+    (.startsWith ^String uri-string ":")
+    (let [rest' (subs uri-string 1) scheme (codeunit-slice original 0 size) pieces (->Uri (option/->Some (string/lowercase scheme)) (:userinfo pieces) (:host pieces) (:port pieces) (:path pieces) (:query pieces) (:fragment pieces))]
+      (parse-authority-with-slashes rest' pieces))
+
+    (= uri-string "")
+    (p/->Ok (->Uri (:scheme pieces) (:userinfo pieces) (:host pieces) (:port pieces) original (:query pieces) (:fragment pieces)))
+
+    :else
+    (let [[_ rest'] (pop-codeunit uri-string)]
+      (recur original rest' pieces (+' size 1)))))
 
 (defn parse
-  "Parses a compliant URI string into the `Uri` type.
-  If the string is not a valid URI string then an error is returned.
-  
-  The opposite operation is `uri.to_string`.
-  
-  ## Examples
-  
-  ```gleam
-  assert uri.parse(\"https://example.com:1234/a/b?query=true#fragment\")
-  == Ok(Uri(
-  scheme: Some(\"https\"),
-  userinfo: None,
-  host: Some(\"example.com\"),
-  port: Some(1234),
-  path: \"/a/b\",
-  query: Some(\"query=true\"),
-  fragment: Some(\"fragment\"),
-  ))
-  ```"
-  {:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]}
-  [uri-string]
+  "parse(uri_string: String) -> Result(Uri, Nil)
+
+   Parses a compliant URI string into the `Uri` type.
+   If the string is not a valid URI string then an error is returned.
+
+   The opposite operation is `uri.to_string`.
+
+   ## Examples
+
+   ```gleam
+   assert uri.parse(\"https://example.com:1234/a/b?query=true#fragment\")
+   == Ok(Uri(
+   scheme: Some(\"https\"),
+   userinfo: None,
+   host: Some(\"example.com\"),
+   port: Some(1234),
+   path: \"/a/b\",
+   query: Some(\"query=true\"),
+   fragment: Some(\"fragment\"),
+   ))
+   ```"
+  {:malli/schema [:=> [:cat :string] (p/result-of (Uri-schema) :nil)]
+   :gleam/src "stdlib-src/src/gleam/uri.gleam:78"}
+  [^java.lang.String uri-string]
   (parse-scheme-loop uri-string uri-string empty 0))
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]} parse-query gleam-ffi/parse-query)
+(def ^{:malli/schema [:=> [:cat :string] (p/result-of [:sequential [:tuple :string :string]] :nil)] :gleam/src "stdlib-src/src/gleam/uri.gleam:533"} parse-query gleam-ffi/parse-query)
 
-(def ^{:malli/schema [:=> [:cat :string] :string]} percent-encode gleam-ffi/percent-encode)
+(def ^{:malli/schema [:=> [:cat :string] :string] :gleam/src "stdlib-src/src/gleam/uri.gleam:570"} percent-encode gleam-ffi/percent-encode)
 
-(defn- percent-encode-query [part]
+(defn- percent-encode-query
+  "percent_encode_query(part: String) -> String"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:555"}
+  ^java.lang.String [^java.lang.String part]
   (-> (percent-encode part) (string/replace "+" "%2B")))
 
-(defn- query-pair [pair]
-  (str (str (percent-encode-query (nth pair 0)) "=") (percent-encode-query (nth pair 1))))
+(defn- query-pair
+  "query_pair(pair: #(String, String)) -> String"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:551"}
+  ^java.lang.String [pair]
+  (str (percent-encode-query (nth pair 0)) "=" (percent-encode-query (nth pair 1))))
 
 (defn query-to-string
-  "Encodes a list of key value pairs as a URI query string.
-  
-  The opposite operation is `uri.parse_query`.
-  
-  ## Examples
-  
-  ```gleam
-  assert uri.query_to_string([#(\"a\", \"1\"), #(\"b\", \"2\")]) == \"a=1&b=2\"
-  ```"
-  {:malli/schema [:=> [:cat [:sequential [:tuple :string :string]]] :string]}
-  [query]
+  "query_to_string(query: List(#(String, String))) -> String
+
+   Encodes a list of key value pairs as a URI query string.
+
+   The opposite operation is `uri.parse_query`.
+
+   ## Examples
+
+   ```gleam
+   assert uri.query_to_string([#(\"a\", \"1\"), #(\"b\", \"2\")]) == \"a=1&b=2\"
+   ```"
+  {:malli/schema [:=> [:cat [:sequential [:tuple :string :string]]] :string]
+   :gleam/src "stdlib-src/src/gleam/uri.gleam:545"}
+  ^java.lang.String [query]
   (-> query (list/map query-pair) (string/join "&")))
 
-(def ^{:malli/schema [:=> [:cat :string] [:or [:fn p/Ok?] [:fn p/Error?]]]} percent-decode gleam-ffi/percent-decode)
+(def ^{:malli/schema [:=> [:cat :string] (p/result-of :string :nil)] :gleam/src "stdlib-src/src/gleam/uri.gleam:582"} percent-decode gleam-ffi/percent-decode)
 
-(defn- remove-dot-segments-loop [input accumulator]
+(defn- remove-dot-segments-loop
+  "remove_dot_segments_loop(input: List(String), accumulator: List(String)) -> List(String)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:603"}
+  [input accumulator]
   (if (empty? input)
     (list/reverse accumulator)
-    (let [segment (first input) rest' (rest input) accumulator (cond (= segment "") (let [accumulator accumulator] accumulator) (= segment ".") (let [accumulator accumulator] accumulator) (and (= segment "..") (empty? accumulator)) (list) (and (= segment "..") (seq accumulator)) (let [accumulator (rest accumulator)] accumulator) :else (let [segment segment accumulator accumulator] (list* segment accumulator)))]
+    (let [segment (first input) rest' (rest input) accumulator (cond (= segment "") (let [accumulator accumulator] accumulator)  (= segment ".") (let [accumulator accumulator] accumulator)  (and (= segment "..") (empty? accumulator)) (list)  (and (= segment "..") (seq accumulator)) (let [accumulator (rest accumulator)] accumulator)  :else (let [segment segment accumulator accumulator] (list* segment accumulator)))]
       (recur rest' accumulator))))
 
-(defn- remove-dot-segments [input]
+(defn- remove-dot-segments
+  "remove_dot_segments(input: List(String)) -> List(String)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:599"}
+  [input]
   (remove-dot-segments-loop input (list)))
 
 (defn path-segments
-  "Splits the path section of a URI into its constituent segments.
-  
-  Removes empty segments and resolves dot-segments as specified in
-  [section 5.2](https://www.ietf.org/rfc/rfc3986.html#section-5.2) of the RFC.
-  
-  ## Examples
-  
-  ```gleam
-  assert uri.path_segments(\"/users/1\") == [\"users\", \"1\"]
-  ```"
-  {:malli/schema [:=> [:cat :string] [:sequential :string]]}
-  [path]
+  "path_segments(path: String) -> List(String)
+
+   Splits the path section of a URI into its constituent segments.
+
+   Removes empty segments and resolves dot-segments as specified in
+   [section 5.2](https://www.ietf.org/rfc/rfc3986.html#section-5.2) of the RFC.
+
+   ## Examples
+
+   ```gleam
+   assert uri.path_segments(\"/users/1\") == [\"users\", \"1\"]
+   ```"
+  {:malli/schema [:=> [:cat :string] [:sequential :string]]
+   :gleam/src "stdlib-src/src/gleam/uri.gleam:595"}
+  [^java.lang.String path]
   (remove-dot-segments (string/split path "/")))
 
 (defn to-string
-  "Encodes a `Uri` value as a URI string.
-  
-  The opposite operation is `uri.parse`.
-  
-  ## Examples
-  
-  ```gleam
-  let uri = Uri(..empty, scheme: Some(\"https\"), host: Some(\"example.com\"))
-  assert uri.to_string(uri) == \"https://example.com\"
-  ```"
-  {:malli/schema [:=> [:cat [:fn Uri?]] :string]}
-  [uri]
+  "to_string(uri: Uri) -> String
+
+   Encodes a `Uri` value as a URI string.
+
+   The opposite operation is `uri.parse`.
+
+   ## Examples
+
+   ```gleam
+   let uri = Uri(..empty, scheme: Some(\"https\"), host: Some(\"example.com\"))
+   assert uri.to_string(uri) == \"https://example.com\"
+   ```"
+  {:malli/schema [:=> [:cat (Uri-schema)] :string]
+   :gleam/src "stdlib-src/src/gleam/uri.gleam:633"}
+  ^java.lang.String [uri]
   (let [out (let [subject (:scheme uri)]
               (if (instance? gleam.option.Some subject)
                 (let [scheme (:value subject)]
@@ -341,64 +543,83 @@
         out (let [subject (:host uri)]
               (if (instance? gleam.option.None subject)
                 (str out (:path uri))
-                (let [host (:value subject) out (str out "//") out (let [subject (:userinfo uri)] (if (instance? gleam.option.Some subject) (let [userinfo (:value subject)] (str (str out userinfo) "@")) out)) out (str out host) out (let [subject (:port uri)] (if (instance? gleam.option.Some subject) (let [port (:value subject)] (str (str out ":") (int/to-string port))) out)) out (let [subject (:path uri)] (cond (= subject "") out (.startsWith ^String subject "/") (str out (:path uri)) :else (str (str out "/") (:path uri))))]
+                (let [host (:value subject) out (str out "//") out (let [subject (:userinfo uri)] (if (instance? gleam.option.Some subject) (let [userinfo (:value subject)] (str out userinfo "@")) out)) out (str out host) out (let [subject (:port uri)] (if (instance? gleam.option.Some subject) (let [port (:value subject)] (str out ":" (int/to-string port))) out)) out (let [subject (:path uri)] (cond (= subject "") out  (.startsWith ^String subject "/") (str out (:path uri))  :else (str out "/" (:path uri))))]
                   out)))
         out (let [subject (:query uri)]
               (if (instance? gleam.option.Some subject)
                 (let [query (:value subject)]
-                  (str (str out "?") query))
+                  (str out "?" query))
                 out))
         out (let [subject (:fragment uri)]
               (if (instance? gleam.option.Some subject)
                 (let [fragment (:value subject)]
-                  (str (str out "#") fragment))
+                  (str out "#" fragment))
                 out))]
     out))
 
 (defn origin
-  "Fetches the origin of a URI.
-  
-  Returns the origin of a uri as defined in
-  [RFC 6454](https://tools.ietf.org/html/rfc6454)
-  
-  The supported URI schemes are `http` and `https`.
-  URLs without a scheme will return `Error`.
-  
-  ## Examples
-  
-  ```gleam
-  let assert Ok(uri) = uri.parse(\"https://example.com/path?foo#bar\")
-  assert uri.origin(uri) == Ok(\"https://example.com\")
-  ```"
-  {:malli/schema [:=> [:cat [:fn Uri?]] [:or [:fn p/Ok?] [:fn p/Error?]]]}
+  "origin(uri: Uri) -> Result(String, Nil)
+
+   Fetches the origin of a URI.
+
+   Returns the origin of a uri as defined in
+   [RFC 6454](https://tools.ietf.org/html/rfc6454)
+
+   The supported URI schemes are `http` and `https`.
+   URLs without a scheme will return `Error`.
+
+   ## Examples
+
+   ```gleam
+   let assert Ok(uri) = uri.parse(\"https://example.com/path?foo#bar\")
+   assert uri.origin(uri) == Ok(\"https://example.com\")
+   ```"
+  {:malli/schema [:=> [:cat (Uri-schema)] (p/result-of :string :nil)]
+   :gleam/src "stdlib-src/src/gleam/uri.gleam:695"}
   [uri]
   (let [{scheme :scheme host :host port :port} uri]
     (cond
-      (and (instance? gleam.option.Some host) (instance? gleam.option.Some scheme) (= (:value scheme) "https") (= port (option/->Some 443))) (let [h (:value host)]
-                                                                                                                                               (p/->Ok (str "https://" h)))
-      (and (instance? gleam.option.Some host) (instance? gleam.option.Some scheme) (= (:value scheme) "http") (= port (option/->Some 80))) (let [h (:value host)]
-                                                                                                                                             (p/->Ok (str "http://" h)))
-      (and (instance? gleam.option.Some host) (instance? gleam.option.Some scheme) (or (= (:value scheme) "http") (= (:value scheme) "https"))) (let [h (:value host) s (:value scheme)]
-                                                                                                                                                  (if (instance? gleam.option.Some port)
-                                                                                                                                                    (let [p (:value port)]
-                                                                                                                                                      (p/->Ok (str (str (str (str s "://") h) ":") (int/to-string p))))
-                                                                                                                                                    (p/->Ok (str (str s "://") h))))
-      :else (p/->Error nil))))
+      (and (instance? gleam.option.Some host) (instance? gleam.option.Some scheme) (= (:value scheme) "https") (= port (option/->Some 443)))
+      (let [h (:value host)]
+        (p/->Ok (str "https://" h)))
 
-(defn- join-segments [segments]
+      (and (instance? gleam.option.Some host) (instance? gleam.option.Some scheme) (= (:value scheme) "http") (= port (option/->Some 80)))
+      (let [h (:value host)]
+        (p/->Ok (str "http://" h)))
+
+      (and (instance? gleam.option.Some host) (instance? gleam.option.Some scheme) (or (= (:value scheme) "http") (= (:value scheme) "https")))
+      (let [h (:value host) s (:value scheme)]
+        (if (instance? gleam.option.Some port)
+          (let [p (:value port)]
+            (p/->Ok (str s "://" h ":" (int/to-string p))))
+          (p/->Ok (str s "://" h))))
+
+      :else
+      (p/->Error nil))))
+
+(defn- join-segments
+  "join_segments(segments: List(String)) -> String"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:778"}
+  ^java.lang.String [segments]
   (string/join (list* "" segments) "/"))
 
-(defn- drop-last [elements]
+(defn- drop-last
+  "drop_last(elements: List(a)) -> List(a)"
+  {:gleam/src "stdlib-src/src/gleam/uri.gleam:774"}
+  [elements]
   (list/take elements (-' (list/length elements) 1)))
 
 (defn merge
-  "Resolves a URI with respect to the given base URI.
-  
-  The base URI must be an absolute URI or this function will return an error.
-  The algorithm for merging URIs is described in
-  [RFC 3986](https://tools.ietf.org/html/rfc3986#section-5.2)."
-  {:malli/schema [:=> [:cat [:fn Uri?] [:fn Uri?]]
-                      [:or [:fn p/Ok?] [:fn p/Error?]]]}
+  "merge(base: Uri, relative: Uri) -> Result(Uri, Nil)
+
+   Resolves a URI with respect to the given base URI.
+
+   The base URI must be an absolute URI or this function will return an error.
+   The algorithm for merging URIs is described in
+   [RFC 3986](https://tools.ietf.org/html/rfc3986#section-5.2)."
+  {:malli/schema [:=> [:cat (Uri-schema) (Uri-schema)]
+                      (p/result-of (Uri-schema) :nil)]
+   :gleam/src "stdlib-src/src/gleam/uri.gleam:716"}
   [base relative]
   (if (and (instance? Uri base) (instance? gleam.option.Some (:scheme base)) (instance? gleam.option.Some (:host base)))
     (if (and (instance? Uri relative) (instance? gleam.option.Some (:host relative)))

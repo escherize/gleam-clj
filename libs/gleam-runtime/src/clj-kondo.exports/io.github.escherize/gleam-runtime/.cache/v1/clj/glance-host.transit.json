@@ -1,1 +1,1 @@
-["^ ","~$parse",["^ ","~:row",6,"~:col",1,"~:fixed-arities",["~#set",[1]],"~:name","^0","~:ns","~$glance-host","~:top-ns","^7","~:type","~:fn"],"~:filename","src/glance_host.clj"]
+["^ ","~$parse",["^ ","~:row",6,"~:col",1,"~:fixed-arities",["~#set",[1]],"~:name","^0","~:ns","~$glance-host","~:top-ns","^7","~:arities",["^ ","~i1",["^ ","~:args",["~#list",["~:nilable/string"]]]],"~:type","~:fn"],"~:filename","src/glance_host.clj"]

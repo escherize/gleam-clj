@@ -12,6 +12,15 @@
 (defn Ok? [v] (instance? Ok v))
 (defn Error? [v] (instance? gleam.prelude.Error v))
 
+(defn result-of
+  "Malli schema for a Gleam Result(ok, err): the variant check plus the
+  payload schema on :value. Records validate as maps, so [:map ...] reaches
+  into the variant without unwrapping it."
+  [ok err]
+  [:or
+   [:and [:fn Ok?] [:map [:value ok]]]
+   [:and [:fn Error?] [:map [:value err]]]])
+
 (defn let-assert
   "Runtime check for Gleam's `let assert` with a literal pattern:
   throw unless actual equals expected; return actual."
@@ -23,8 +32,13 @@
    actual))
 
 (defn ba-int
-  "Big-endian bytes of an int segment of `bits` width."
+  "Big-endian bytes of an int segment of `bits` width. Byte-aligned only:
+  a width that is not a positive multiple of 8 would silently produce wrong
+  bytes, so it throws instead."
   [v bits]
+  (when (or (not (pos? bits)) (pos? (rem bits 8)))
+    (throw (ex-info "bit-array int segment width must be a positive multiple of 8"
+                    {:bits bits})))
   (mapv #(bit-and 255 (bit-shift-right v %)) (range (- bits 8) -1 -8)))
 
 (defn ba-utf8 [s]
@@ -34,6 +48,18 @@
   "A Gleam bit array as a vector of bytes (byte-aligned segments only)."
   [& segments]
   (vec (apply concat segments)))
+
+(defn ba-uint
+  "Big-endian unsigned int from `n` bytes of `v` starting at `off`."
+  [v off n]
+  (reduce (fn [acc i] (+' (*' acc 256) (nth v (+ off i)))) 0 (range n)))
+
+(defn ba-seg=
+  "True if the bytes of `v` at `off` equal the byte vector `lit`."
+  [v off lit]
+  (let [end (+ off (count lit))]
+    (and (<= end (count v))
+         (= (subvec v off end) lit))))
 
 (defmacro with-use
   "Gleam `use` sugar, flattened. Binding pairs are params-vector + call;
