@@ -718,6 +718,24 @@ clojure -M:repl</pre>
     <div class="note"><strong>The one soft spot:</strong> the FFI core is the only layer that can be silently wrong (everything else fails loud). That's precisely where every new real-world consumer, and every fuzzer, is aimed.</div>
   </section>
 
+  <section id="bench">
+    <div class="sec-tag">Benchmarks</div>
+    <h2>Honest numbers, both VMs timing themselves</h2>
+    <p class="lede">The benchmark project lives in <code>bench/</code>: the same Gleam runs on the BEAM via <code>gleam run</code> and on the JVM via this compiler, and each VM measures its own monotonic clock in-process, so startup is excluded. One warmup run, then three timed rounds; all rounds shown, no cherry-picking.</p>
+    <div class="cmp-wrap">
+    <table class="cmp">
+      <thead><tr><th>workload</th><th>BEAM (ms)</th><th class="jvm">JVM (ms)</th><th>ratio</th></tr></thead>
+      <tbody>
+        <tr><th>coin-change DP, amount 500k (dict-heavy, promoting int math)</th><td>271 · 273 · 239</td><td class="jvm">362 · 332 · 328</td><td>~1.3× slower</td></tr>
+        <tr><th>list + string pipeline, 2M elements (map, filter, to_string, join)</th><td>176 · 170 · 164</td><td class="jvm">564 · 508 · 497</td><td>~3× slower</td></tr>
+        <tr><th>glance parse, 5000 × a 40-line module (string slicing, pattern-heavy)</th><td>161 · 165 · 166</td><td class="jvm">2631 · 2626 · 2635</td><td>~16× slower</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>Read it plainly: dict-and-arithmetic code lands close to the BEAM, allocation-heavy list pipelines pay about 3×, and grapheme-level string slicing (glance's lexer) is where the JVM backend is weakest today. Writing this benchmark caught a real bug: <code>string.join</code> folded with <code>&lt;&gt;</code>, which BEAM's binary-append optimization makes linear and JVM string copying makes quadratic; it is now a StringBuilder-backed override, 9.5s → 9ms at 250k parts. That platform difference generalizes: a <code>&lt;&gt;</code> accumulation loop in your own code costs more here than on the BEAM.</p>
+    <p class="post-meta" style="font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-faint);">measured 2026-08-27 on an Apple M-series laptop, macOS 15, Temurin JDK, Erlang/OTP via homebrew · rerun with: gleam run -m bench (BEAM) and the compiled bench/out-clj (JVM)</p>
+  </section>
+
   <section id="libs">
     <div class="sec-tag">Packaging</div>
     <h2>Consume it as an ordinary Clojure library</h2>

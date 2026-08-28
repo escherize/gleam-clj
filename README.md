@@ -5,29 +5,55 @@
 A [Gleam](https://gleam.run) -> Clojure/JVM compiler. Not an official Gleam
 project.
 
-**Status: experimental.** Compiles from Gleam's own typed AST — every
+**Status: experimental.** Compiles from Gleam's own typed AST: every
 module runs through gleam-core's type checker (prelude-seeded, interfaces
 chained in import order) before emission, so name resolution, labelled
 arguments, and pipe semantics come from the checker, not heuristics.
 Everything unsupported fails loudly at build time; nothing is silently
 wrong on purpose. Verified by stdout-parity corpora against real
 `gleam run`: 54/54 runnable Rosetta Code tasks, 60/60 runnable language-tour
-lessons, gleam_stdlib self-hosted, real hex packages (snag, glance) running
-byte-identical on the JVM. CI re-proves this on every push — read any run's
-log for the method and the per-suite SUMMARY verdicts.
+lessons, gleam_stdlib self-hosted, and real hex packages running
+byte-identical on the JVM. Upstream test suites are part of the evidence:
+gleam_json (25), gleam_http (47), gleam_community_colour (30), and justin
+(5) pass their own gleeunit suites here, every count matching `gleam test`
+on the BEAM. CI re-proves the corpora on every push; read any run's log for
+the method and the per-suite SUMMARY verdicts.
 
 Known approximations: dict/set iteration is key-sorted (matches BEAM small
 maps), mutual recursion is JVM-stack-bounded (self tail calls become
 `recur`). Int arithmetic uses `+'`/`-'`/`*'` deliberately: Gleam ints are
-arbitrary precision on the BEAM, so unchecked long math would be wrong —
+arbitrary precision on the BEAM, so unchecked long math would be wrong;
 Clojure's promoting ops fast-path longs and promote on overflow, which is
-exactly Gleam's semantics.
+exactly Gleam's semantics. String building differs by platform: BEAM's
+binary-append optimization makes `<>` accumulation cheap, JVM string
+copying does not, so hot paths like `string.join` are overridden with
+StringBuilder-backed implementations and a `<>` fold in your own loop
+costs more here than on the BEAM.
+
+## What the checker's knowledge becomes
+
+The type checker's facts survive into the output instead of being
+discarded at emission:
+
+- every fn's docstring leads with its checked Gleam signature, so
+  `(doc min-coins)` shows real types in any REPL;
+- `:gleam/src "file.gleam:N"` metadata names the defining source line;
+- `Float` args, returns, and record fields get primitive `^double` hints,
+  `String` gets `^java.lang.String` (never `^long`: arbitrary-precision
+  ints would ClassCastException on promotion);
+- byte-aligned segmented bit-array patterns compile
+  (`<<"--", found:size(n)-bytes, rest:bits>>`), including runtime sizes;
+  non-byte-aligned or exotic segments refuse loudly.
 
 ## Malli schemas
 
 Every public fn is emitted with `{:malli/schema [:=> ...]}` metadata,
-derived from the checked Gleam types (custom types become `instance?`
-predicates over their variant records) — the standard
+derived from the checked Gleam types. Every custom type also gets a
+generated schema constructor (`Shape-schema`, with type parameters as fn
+parameters), and `Result(a, b)` emits `(p/result-of a b)`, so schemas
+compose the way the Gleam type expression composes and validation reaches
+the payloads, not just the outermost variant. Self-referential types
+degrade to an identity predicate at the cycle. This is the standard
 [malli function-schema metadata](https://github.com/metosin/malli/blob/master/docs/function-schemas.md#function-schema-metadata),
 so the whole malli toolchain just works:
 
@@ -44,7 +70,7 @@ The same metadata feeds clj-kondo's type linter: `mi/collect!` +
 `malli.clj-kondo/emit!` writes a type-mismatch config, after which a call
 like `(min-coins "not a list" :nope)` is a **static lint error** in your
 editor and CI (`Expected: sequential collection, received: string`).
-All generated code — stdlib included — lints clean: zero errors, zero
+All generated code, stdlib included, lints clean: zero errors, zero
 warnings, enforced by check.sh.
 
 ## Licences and provenance
@@ -72,20 +98,20 @@ cd gleam-to-clj && cargo build && cd ..
 clojure -A:gen -M -m coin-change
 ```
 
-Or drive it from a REPL — see "Load and run Gleam from a Clojure REPL"
+Or drive it from a REPL; see "Load and run Gleam from a Clojure REPL"
 below. Reference check: the same `.gleam` runs under real Gleam.
 
 ## Layout
 
-- `gleam-to-clj/` — the compiler (Rust). Analyses each module with
+- `gleam-to-clj/`: the compiler (Rust). Analyses each module with
   gleam-core's real type checker (`analysis.rs`), then emits Clojure from
   the typed AST (`emit.rs`).
-- `src/` — the runtime: `gleam.prelude`, the `gleam-ffi` native core, and
+- `src/`: the runtime: `gleam.prelude`, the `gleam-ffi` native core, and
   the FFI cores for vendored packages. On the classpath at run time.
-- `stdlib-clj/` — gleam_stdlib compiled by this compiler from `stdlib-src/`.
-- `libs/` — packaged consumable libraries (gleam-parser, mb-lib-parse,
+- `stdlib-clj/`: gleam_stdlib compiled by this compiler from `stdlib-src/`.
+- `libs/`: packaged consumable libraries (gleam-parser, mb-lib-parse,
   gleam-runtime); see [libs/README.md](libs/README.md) for which to use.
-- `gen/` — generated fixture output; regenerated by `check.sh`, never
+- `gen/`: generated fixture output; regenerated by `check.sh`, never
   hand-edited.
 
 ## Representation
@@ -109,7 +135,7 @@ are `ns-unmap`ped at definition and referenced fully qualified.
 
 Self-calls in tail position emit `recur` (constant stack, matches BEAM TCO);
 non-tail self-calls stay plain calls. Mutual recursion is stack-bounded on
-the JVM — deliberately not trampolined, since that would poison every return
+the JVM, deliberately not trampolined, since that would poison every return
 value at the interop boundary.
 
 ## Multi-module builds
@@ -122,7 +148,7 @@ would shadow clojure.core get `(:refer-clojure :exclude [...])`.
 
 Labelled call arguments are verified against a signature registry (local
 fns, project modules, and a table generated from gleam_stdlib) and
-reordered; calls whose labels cannot be verified fail the build loudly —
+reordered; calls whose labels cannot be verified fail the build loudly;
 nothing is silently assumed positional.
 
 ## Self-hosted stdlib
@@ -162,16 +188,34 @@ is free; pass `:reload true` to force recompilation.
 ## Dependencies and tests
 
 `build` walks `src/` and `test/`, then follows the import graph into the
-package sources `gleam build` vendors under `build/packages/*/src` — pure-
+package sources `gleam build` vendors under `build/packages/*/src`; pure-
 Gleam hex deps compile right along (verified: snag, byte-identical output).
 Dependency fns whose externals have no Gleam fallback body fail the build
-loudly with the module and fn named. gleeunit is shimmed: the compiled test
-module's `main` discovers and runs every `*-test` fn, nonzero exit on
-failure.
+loudly with the module and fn named. The repo ships JVM shims for common
+hex FFI (gleam_regexp over java.util.regex, gleam_json over a strict
+hand-rolled parser, glexer, splitter, filepath), each parity-tested against
+the BEAM reference; `stdlib-src/clojure-externals.txt` wires them into
+every build. gleeunit is shimmed at the root module (its pure submodules
+like `gleeunit/should` compile normally):
+`tools/run-package-tests.sh <project>` runs a package's own test suite on
+the JVM, nonzero exit on failure.
 
 `./check.sh` runs everything: emitter build, snapshot tests, fixtures, both
-corpora. Corpus runs enforce a ratchet — passing fewer tasks than the last
+corpora. Corpus runs enforce a ratchet: passing fewer tasks than the last
 full run fails.
+
+## Tools
+
+- `tools/package.sh <hex-package|project-dir> [out]` packages a hex package
+  (or local project) as a self-contained consumable Clojure library:
+  compiled modules, runtime snapshot, deps.edn, exported clj-kondo config,
+  and a load smoke test. `tools/package.sh snag` then `:local/root` it.
+- `tools/run-package-tests.sh <project-dir>` compiles a package plus its
+  `test/` directory and runs its gleeunit suite on the JVM.
+- `tools/wild-sweep.sh` fuzzes the compiler against 19 hex packages and a
+  few GitHub repos, classifying each OK / NEEDS-FFI / PANIC / GLEAM-ERR.
+- `bench/` is the cross-VM benchmark project; both VMs time themselves
+  in-process, so startup is excluded.
 
 ## Clojure FFI
 
