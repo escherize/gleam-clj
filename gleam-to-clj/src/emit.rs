@@ -480,8 +480,18 @@ pub fn emit_module(
     if !module_doc.is_empty() {
         let escaped = module_doc.replace('\\', "\\\\").replace('"', "\\\"");
         // Continuation lines align under the docstring's text column (one
-        // column past the opening quote at indent 2 => column 3).
-        let indented = escaped.replace('\n', "\n   ");
+        // column past the opening quote at indent 2 => column 3); blank
+        // lines stay empty, no trailing whitespace.
+        let indented = escaped
+            .split('\n')
+            .enumerate()
+            .map(|(i, l)| match (i, l.trim_end()) {
+                (0, l) => l.to_string(),
+                (_, "") => String::new(),
+                (_, l) => format!("   {l}"),
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
         let _ = writeln!(header, "  \"{indented}\"");
     }
     if !excludes.is_empty() {
