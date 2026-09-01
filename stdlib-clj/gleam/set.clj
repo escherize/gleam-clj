@@ -8,6 +8,8 @@
 ;; type Set
 (defprotocol ISet)
 (defrecord Set [dict] ISet)
+(alter-meta! #'->Set assoc :private true)
+(alter-meta! #'map->Set assoc :private true)
 (defn Set? "True if `v` is a Set value." [v] (instance? Set v))
 (defn Set-schema
   "Malli schema for Set(member)."

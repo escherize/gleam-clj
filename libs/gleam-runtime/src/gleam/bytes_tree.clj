@@ -5,19 +5,19 @@
    allocates a new node in the tree without copying any of the content. When
    writing to an output stream the tree is traversed and the content is sent
    directly rather than copying it into a single buffer beforehand.
-   
+
    If we append one bit array to another the bit arrays must be copied to a
    new location in memory so that they can sit together. This behaviour
    enables efficient reading of the data but copying can be expensive,
    especially if we want to join many bit arrays together.
-   
+
    BytesTree is different in that it can be joined together in constant
    time using minimal memory, and then can be efficiently converted to a
    bit array using the `to_bit_array` function.
-   
+
    Byte trees are always byte aligned, so that a number of bits that is not
    divisible by 8 will be padded with 0s.
-   
+
    On Erlang this type is compatible with Erlang's iolists."
   (:refer-clojure :exclude [concat])
   (:require
@@ -28,10 +28,16 @@
 ;; type BytesTree
 (defprotocol IBytesTree)
 (defrecord Bytes [value] IBytesTree)
+(alter-meta! #'->Bytes assoc :private true)
+(alter-meta! #'map->Bytes assoc :private true)
 (defn Bytes? "True if `v` is a Bytes value." [v] (instance? Bytes v))
 (defrecord Text [value] IBytesTree)
+(alter-meta! #'->Text assoc :private true)
+(alter-meta! #'map->Text assoc :private true)
 (defn Text? "True if `v` is a Text value." [v] (instance? Text v))
 (defrecord Many [value] IBytesTree)
+(alter-meta! #'->Many assoc :private true)
+(alter-meta! #'map->Many assoc :private true)
 (defn Many? "True if `v` is a Many value." [v] (instance? Many v))
 (defn BytesTree? "True if `v` is any BytesTree value." [v] (instance? gleam.bytes_tree.IBytesTree v))
 (defn BytesTree-schema

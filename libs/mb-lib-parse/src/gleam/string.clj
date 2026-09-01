@@ -1,15 +1,15 @@
 (ns gleam.string
   "Strings are Gleam's text type, written in code using double quotes,
    `\"like this\"`.
-   
+
    Two strings can be joined together using the concatenation operator: `<>`.
-   
+
    Strings use the native string type of the compilation target. On Erlang
    they are UTF8 encoded binary strings, and on JavaScript they are UTF16
    encoded strings.
-   
+
    Several escape sequences can be used in strings:
-   
+
    `\\\"` - Double quote
    `\\\\` - Backslash
    `\\f` - Form feed

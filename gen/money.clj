@@ -7,6 +7,8 @@
 ;; type Money
 (defprotocol IMoney)
 (defrecord Money [cents] IMoney)
+(alter-meta! #'->Money assoc :private true)
+(alter-meta! #'map->Money assoc :private true)
 (defn Money? "True if `v` is a Money value." [v] (instance? Money v))
 (defn Money-schema
   "Malli schema for Money(currency)."

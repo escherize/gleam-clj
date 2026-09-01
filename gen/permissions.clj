@@ -9,6 +9,8 @@
 ;; type UserId
 (defprotocol IUserId)
 (defrecord UserId [value] IUserId)
+(alter-meta! #'->UserId assoc :private true)
+(alter-meta! #'map->UserId assoc :private true)
 (defn UserId? "True if `v` is a UserId value." [v] (instance? UserId v))
 (defn UserId-schema
   "Malli schema for UserId."
@@ -52,6 +54,8 @@
 ;; type CanEdit
 (defprotocol ICanEdit)
 (defrecord CanEdit [value] ICanEdit)
+(alter-meta! #'->CanEdit assoc :private true)
+(alter-meta! #'map->CanEdit assoc :private true)
 (defn CanEdit? "True if `v` is a CanEdit value." [v] (instance? CanEdit v))
 (defn CanEdit-schema
   "Malli schema for CanEdit."
@@ -79,6 +83,8 @@
 ;; type CanEditDashboard
 (defprotocol ICanEditDashboard)
 (defrecord CanEditDashboard [user dash] ICanEditDashboard)
+(alter-meta! #'->CanEditDashboard assoc :private true)
+(alter-meta! #'map->CanEditDashboard assoc :private true)
 (defn CanEditDashboard? "True if `v` is a CanEditDashboard value." [v] (instance? CanEditDashboard v))
 (defn CanEditDashboard-schema
   "Malli schema for CanEditDashboard."

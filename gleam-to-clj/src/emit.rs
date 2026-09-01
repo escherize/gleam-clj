@@ -804,6 +804,18 @@ fn emit_custom_type(
             })
             .collect();
         let _ = writeln!(out, "(defrecord {} [{}] {proto})", c.name, fields.join(" "));
+        // Gleam opacity, kept as far as Clojure can keep it: the factory
+        // vars go :private, so cross-ns `(money/->Money 9)` is a compile
+        // error just like it is in Gleam. Reads, `instance?`, and the Java
+        // constructor stay open — privacy here is advisory, and `#'` is the
+        // conventional escape hatch.
+        if t.opaque {
+            let _ = writeln!(
+                out,
+                "(alter-meta! #'->{} assoc :private true)\n(alter-meta! #'map->{} assoc :private true)",
+                c.name, c.name
+            );
+        }
         let _ = writeln!(
             out,
             "(defn {}? \"True if `v` is a {} value.\" [v] (instance? {} v))",

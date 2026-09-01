@@ -6,8 +6,6 @@
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
 
-(declare Dict? Dict-schema TransientDict? TransientDict-schema)
-
 ;; type Dict
 (defprotocol IDict)
 (defn Dict? "True if `v` is any Dict value." [v] (instance? gleam.dict.IDict v))

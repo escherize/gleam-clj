@@ -1,20 +1,20 @@
 (ns gleam.list
   "Lists are an ordered sequence of elements and are one of the most common
    data types in Gleam.
-   
+
    New elements can be added and removed from the front of a list in
    constant time, while adding and removing from the end requires traversing
    and copying the whole list, so keep this in mind when designing your
    programs.
-   
+
    There is a dedicated syntax for prefixing to a list:
-   
+
    ```gleam
    let new_list = [1, 2, ..existing_list]
    ```
-   
+
    And a matching syntax for getting the first elements of a list:
-   
+
    ```gleam
    case list {
    [first_element, ..rest] -> first_element
@@ -29,8 +29,6 @@
    [gleam.order :as order]
    [gleam.prelude :as p])
   (:import (gleam.prelude Ok)))
-
-(declare Continue? Stop? ContinueOrStop? ContinueOrStop-schema Ascending? Descending? Sorting? Sorting-schema)
 
 ;; type ContinueOrStop
 (defprotocol IContinueOrStop)

@@ -17,6 +17,8 @@
 ;; type Lexer
 (defprotocol ILexer)
 (defrecord Lexer [^java.lang.String original-source ^java.lang.String source byte-offset preserve-whitespace preserve-comments mode newlines] ILexer)
+(alter-meta! #'->Lexer assoc :private true)
+(alter-meta! #'map->Lexer assoc :private true)
 (defn Lexer? "True if `v` is a Lexer value." [v] (instance? Lexer v))
 (defn Lexer-schema
   "Malli schema for Lexer."

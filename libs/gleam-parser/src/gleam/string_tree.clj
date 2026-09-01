@@ -4,8 +4,6 @@
    [gleam-ffi]
    [gleam.list :as list]))
 
-(declare StringTree? StringTree-schema All? Direction? Direction-schema)
-
 ;; type StringTree
 (defprotocol IStringTree)
 (defn StringTree? "True if `v` is any StringTree value." [v] (instance? gleam.string_tree.IStringTree v))

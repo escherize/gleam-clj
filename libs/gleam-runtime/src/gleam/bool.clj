@@ -1,7 +1,7 @@
 (ns gleam.bool
   "A type with two possible values, `True` and `False`. Used to indicate whether
    things are... true or false!
-   
+
    It is often clearer and offers more type safety to define a custom type
    than to use `Bool`. For example, rather than having a `is_teacher: Bool`
    field consider having a `role: SchoolRole` field where `SchoolRole` is a custom
