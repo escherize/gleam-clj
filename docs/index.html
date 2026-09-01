@@ -600,7 +600,7 @@ clojure -M:repl</pre>
   │                             ^^^^^^^^^^^^^^
 Expected type:  money.Money(money.Usd)
 Found type:     money.Money(money.Eur)</pre>
-    <p style="margin-top:16px">Note the phantom parameter surviving as <code>[_currency]</code> in <code>Money-schema</code>: type parameters become schema-fn parameters, and constructors that pin the currency (<code>usd</code>, <code>eur</code>) pin it in their schema too. This fixture runs in CI on both VMs.</p>
+    <p style="margin-top:16px">Note the phantom parameter surviving as <code>[_currency]</code> in <code>Money-schema</code>: type parameters become schema-fn parameters, and constructors that pin the currency (<code>usd</code>, <code>eur</code>) pin it in their schema too. Opacity survives as far as Clojure lets it: <code>Money</code>'s generated factory vars are <code>:private</code>, so <code>(money/-&gt;Money 999)</code> from another ns is a compile error — same rule as in Gleam, with <code>#'</code> as the conventional escape hatch. This fixture runs in CI on both VMs.</p>
     </div>
     <div data-panel="1" hidden>
     <div class="compile compile--stacked" style="margin-top:26px">
