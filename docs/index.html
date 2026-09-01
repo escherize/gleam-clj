@@ -179,6 +179,10 @@
   .compile--stacked .compile-grid { grid-template-columns: 1fr; }
   .compile--stacked .seam { writing-mode: horizontal-tb; padding: 8px; border-left: none; border-right: none; border-top: 1px solid var(--code-line); border-bottom: 1px solid var(--code-line); }
   .compile--stacked .seam .chip { writing-mode: horizontal-tb; }
+  .ex-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 4px; }
+  .ex-tabs button { font-family: var(--font-mono); font-size: 12.5px; padding: 7px 14px; background: var(--code-bg); color: var(--ink-faint); border: 1px solid var(--code-line); border-radius: 999px; cursor: pointer; }
+  .ex-tabs button:hover { color: var(--gleam-pink-lite); border-color: var(--gleam-pink-lite); }
+  .ex-tabs button[aria-selected="true"] { color: var(--gleam-pink-lite); border-color: var(--gleam-pink-lite); }
   .pane { padding: 0; min-width: 0; }
   .pane-head {
     display: flex; align-items: center; gap: 8px; padding: 12px 18px;
@@ -515,7 +519,13 @@ clojure -M:repl</pre>
   <section id="samples">
     <div class="sec-tag">Samples</div>
     <h2>A whole program, before and after</h2>
-    <p class="lede">The snippets above are excerpts. This is the real thing: a complete fixture from the repo's test corpus (dynamic-programming coin change, with pipes, guards, higher-order functions, and deliberate <code>echo</code> debugging) and the <strong>unedited compiler output</strong> next to it. CI regenerates and re-runs this file on every push.</p>
+    <p class="lede">The snippets above are excerpts. These are the real thing: complete fixtures from the repo's test corpus with the <strong>unedited compiler output</strong> next to each. CI regenerates and re-runs every one of them on every push. Pick an example:</p>
+    <div class="ex-tabs" role="tablist">
+      <button type="button" role="tab" aria-selected="true" data-panel="0">coin change: pipes, guards, echo</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="1">opaque types: proofs that survive</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="2">tail calls: recur</button>
+    </div>
+    <div data-panel="0">
     <div class="compile compile--stacked" style="margin-top:26px">
       <div class="compile-grid">
         <div class="pane pane--src">
@@ -635,7 +645,9 @@ clojure -M:repl</pre>
       <li><strong>Pipes become threading, guards become <code>cond</code></strong>, with the pattern order the checker verified, not a heuristic rewrite.</li>
       <li><strong>Int math uses <code>+'</code>/<code>-'</code></strong>, Clojure's promoting ops, because Gleam ints are arbitrary-precision. <code>Float</code> args would get primitive <code>^double</code> hints instead; see <a href="#runtime">the runtime model</a>.</li>
     </ul>
+    </div>
 
+    <div data-panel="1" hidden>
     <h3>Types that carry proof, and keep it through the compile</h3>
     <p>A bigger sample with <code>opaque</code> types: parse an untrusted user-id string once, mint a permission proof at the boundary, and let privileged functions demand the proof in their signature. The Gleam type checker makes unauthorized calls unrepresentable; the compiled Clojure keeps the discipline as <code>instance?</code> predicates and malli schemas:</p>
     <div class="compile compile--stacked" style="margin-top:18px">
@@ -698,6 +710,60 @@ clojure -M:repl</pre>
       </div>
     </div>
     <p style="margin-top:20px">The <code>^java.lang.String</code> hint comes from the checked argument type; the error variants each became a record you can dispatch on from Clojure. Note the return schema: <code>(p/result-of …)</code> carries the <em>payload</em> types, so an instrumented boundary rejects an <code>Ok</code> wrapping the wrong thing, not just a non-Result. The full walkthrough, with the compiler's verbatim refusals, is its own post: <a href="blog/parse-dont-validate.html"><strong>Permission checks are parsers →</strong></a></p>
+    </div>
+
+    <div data-panel="2" hidden>
+    <h3>Self tail calls become <code>recur</code></h3>
+    <p>The JVM has no tail-call elimination, so a naive translation of accumulator recursion would blow the stack. The compiler detects self tail calls and emits <code>recur</code>: constant stack, and the checked signature still leads the docstring.</p>
+    <div class="compile" style="margin-top:18px">
+      <div class="compile-grid">
+        <div class="pane pane--src">
+          <div class="pane-head"><img src="assets/gleam-lucy.svg" alt=""><span class="lang">sum_to.gleam</span></div>
+<pre><span class="cm">/// Sum 1..n with a tail-recursive
+/// accumulator.</span>
+<span class="k">fn</span> <span class="fn">sum_to</span>(n: <span class="ty">Int</span>, acc: <span class="ty">Int</span>) -> <span class="ty">Int</span> {
+  <span class="k">case</span> n {
+    <span class="pn">0</span> -> acc
+    _ -> <span class="fn">sum_to</span>(n - <span class="pn">1</span>, acc + n)
+  }
+}
+
+<span class="k">pub fn</span> <span class="fn">main</span>() {
+  <span class="k">let assert</span> <span class="pn">55</span> =
+    <span class="fn">sum_to</span>(<span class="pn">10</span>, <span class="pn">0</span>)
+  <span class="k">let assert</span> <span class="pn">500_000_500_000</span> =
+    <span class="fn">sum_to</span>(<span class="pn">1_000_000</span>, <span class="pn">0</span>)
+}</pre>
+        </div>
+        <div class="seam"><span class="chip">compiles to</span></div>
+        <div class="pane pane--out">
+          <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">sum_to.clj · unedited</span></div>
+<pre>(<span class="k">ns</span> <span class="fn">sum-to</span>
+  (:require
+   [gleam.prelude <span class="ty">:as</span> p]))
+
+(<span class="k">defn-</span> <span class="fn">sum-to</span>
+  <span class="st">"sum_to(n: Int, acc: Int) -> Int
+
+   Sum 1..n with a tail-recursive
+   accumulator."</span>
+  {<span class="ty">:gleam/src</span> <span class="st">"sum_to.gleam:2"</span>}
+  [n acc]
+  (<span class="k">if</span> (= n 0) acc (<span class="k">recur</span> (-' n 1) (+' acc n))))
+
+(<span class="k">defn</span> <span class="fn">main</span>
+  <span class="st">"main() -> Int"</span>
+  {<span class="ty">:malli/schema</span> [:=&gt; [:cat] :int]
+   <span class="ty">:gleam/src</span> <span class="st">"sum_to.gleam:9"</span>}
+  []
+  (p/<span class="fn">let-assert</span> 55 (<span class="fn">sum-to</span> 10 0))
+  (p/<span class="fn">let-assert</span> 500000500000
+    (<span class="fn">sum-to</span> 1000000 0)))</pre>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:16px">Only <em>self</em> tail calls get this treatment; mutual recursion stays JVM-stack-bounded, and the docs say so out loud in <a href="#limits">status &amp; honest limits</a>. The promoting <code>+'</code> means the millionth accumulation would promote past <code>Long.MAX_VALUE</code> instead of overflowing, exactly like the BEAM.</p>
+    </div>
   </section>
 
   <section id="verify">
@@ -805,6 +871,17 @@ clojure -M:repl</pre>
     });
   }, { rootMargin: '-40% 0px -55% 0px' });
   document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+
+  // samples: the tab row switches which example panel is visible
+  document.querySelectorAll('.ex-tabs').forEach(tabs => {
+    const panels = tabs.closest('section').querySelectorAll('div[data-panel]');
+    tabs.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      tabs.querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+      panels.forEach(p => p.hidden = p.dataset.panel !== b.dataset.panel);
+    });
+  });
 </script>
 
 </body>
