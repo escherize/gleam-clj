@@ -8,7 +8,7 @@ use std::process::Command;
 #[test]
 fn snapshots() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf();
-    for fixture in ["coin_change", "shapes", "sum_to", "jellyfish", "ffi_demo", "permissions", "regressions", "bit_patterns", "dynamics"] {
+    for fixture in ["coin_change", "shapes", "sum_to", "jellyfish", "ffi_demo", "permissions", "regressions", "bit_patterns", "dynamics", "money"] {
         let input = root.join("gleam-src").join(format!("{fixture}.gleam"));
         let expected_path = root.join("gen").join(format!("{fixture}.clj"));
         let expected = std::fs::read_to_string(&expected_path)

@@ -521,11 +521,88 @@ clojure -M:repl</pre>
     <h2>A whole program, before and after</h2>
     <p class="lede">The snippets above are excerpts. These are the real thing: complete fixtures from the repo's test corpus with the <strong>unedited compiler output</strong> next to each. CI regenerates and re-runs every one of them on every push. Pick an example:</p>
     <div class="ex-tabs" role="tablist">
-      <button type="button" role="tab" aria-selected="true" data-panel="0">coin change: pipes, guards, echo</button>
-      <button type="button" role="tab" aria-selected="false" data-panel="1">opaque types: proofs that survive</button>
-      <button type="button" role="tab" aria-selected="false" data-panel="2">tail calls: recur</button>
+      <button type="button" role="tab" aria-selected="true" data-panel="0">money: phantom currencies</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="1">coin change: pipes, guards, echo</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="2">opaque types: proofs that survive</button>
+      <button type="button" role="tab" aria-selected="false" data-panel="3">tail calls: recur</button>
     </div>
     <div data-panel="0">
+    <h3>Currencies that cannot mix, for free</h3>
+    <p>Twenty lines: money tagged with a <em>phantom</em> currency type. The parameter exists only in the checker — the record at runtime is just <code>{:cents n}</code> — but adding dollars to euros is now a compile error, and the generated malli schemas keep the tag.</p>
+    <div class="compile" style="margin-top:18px">
+      <div class="compile-grid">
+        <div class="pane pane--src">
+          <div class="pane-head"><img src="assets/gleam-lucy.svg" alt=""><span class="lang">money.gleam</span></div>
+<pre><span class="cm">/// Money tagged with a phantom currency.
+/// No runtime cost: the parameter exists
+/// only in the type checker.</span>
+<span class="k">pub opaque type</span> <span class="ty">Money</span>(currency) {
+  <span class="ty">Money</span>(cents: <span class="ty">Int</span>)
+}
+
+<span class="k">pub type</span> <span class="ty">Usd</span>
+
+<span class="k">pub type</span> <span class="ty">Eur</span>
+
+<span class="k">pub fn</span> <span class="fn">usd</span>(cents: <span class="ty">Int</span>) -> <span class="ty">Money</span>(<span class="ty">Usd</span>) {
+  <span class="ty">Money</span>(cents)
+}
+
+<span class="k">pub fn</span> <span class="fn">eur</span>(cents: <span class="ty">Int</span>) -> <span class="ty">Money</span>(<span class="ty">Eur</span>) {
+  <span class="ty">Money</span>(cents)
+}
+
+<span class="cm">/// Same-currency arithmetic only:
+/// `add(usd(1), eur(1))` refuses to compile.</span>
+<span class="k">pub fn</span> <span class="fn">add</span>(a: <span class="ty">Money</span>(c), b: <span class="ty">Money</span>(c))
+  -> <span class="ty">Money</span>(c) {
+  <span class="ty">Money</span>(a.cents + b.cents)
+}</pre>
+        </div>
+        <div class="seam"><span class="chip">compiles to</span></div>
+        <div class="pane pane--out">
+          <div class="pane-head"><img src="assets/clojure.svg" alt=""><span class="lang">money.clj · excerpt, unedited</span></div>
+<pre><span class="cm">;; type Money</span>
+(<span class="k">defprotocol</span> <span class="ty">IMoney</span>)
+(<span class="k">defrecord</span> <span class="ty">Money</span> [cents] <span class="ty">IMoney</span>)
+(<span class="k">defn</span> <span class="fn">Money-schema</span>
+  <span class="st">"Malli schema for Money(currency)."</span>
+  [_currency]
+  [:and [:fn <span class="fn">Money?</span>] [:map [:cents :int]]])
+
+(<span class="k">defn</span> <span class="fn">usd</span>
+  <span class="st">"usd(cents: Int) -> Money(Usd)"</span>
+  {<span class="ty">:malli/schema</span>
+     [:=&gt; [:cat :int]
+          (<span class="fn">Money-schema</span> (<span class="fn">Usd-schema</span>))]
+   <span class="ty">:gleam/src</span> <span class="st">"money.gleam:14"</span>}
+  [cents]
+  (-&gt;<span class="ty">Money</span> cents))
+
+(<span class="k">defn</span> <span class="fn">add</span>
+  <span class="st">"add(a: Money(a), b: Money(a)) -> Money(a)
+
+   Same-currency arithmetic only:
+   `add(usd(1), eur(1))` refuses to compile."</span>
+  {<span class="ty">:malli/schema</span>
+     [:=&gt; [:cat (<span class="fn">Money-schema</span> :any)
+                (<span class="fn">Money-schema</span> :any)]
+          (<span class="fn">Money-schema</span> :any)]
+   <span class="ty">:gleam/src</span> <span class="st">"money.gleam:24"</span>}
+  [a b]
+  (-&gt;<span class="ty">Money</span> (+' (:cents a) (:cents b))))</pre>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:16px">And the part no Clojure library gives you — mixing currencies fails <em>before anything runs</em>, with Gleam's own diagnostic, verbatim from this compiler:</p>
+<pre class="block"><span class="cmt">error: Type mismatch</span>
+4 │   money.add(money.usd(100), money.eur(100))
+  │                             ^^^^^^^^^^^^^^
+Expected type:  money.Money(money.Usd)
+Found type:     money.Money(money.Eur)</pre>
+    <p style="margin-top:16px">Note the phantom parameter surviving as <code>[_currency]</code> in <code>Money-schema</code>: type parameters become schema-fn parameters, and constructors that pin the currency (<code>usd</code>, <code>eur</code>) pin it in their schema too. This fixture runs in CI on both VMs.</p>
+    </div>
+    <div data-panel="1" hidden>
     <div class="compile compile--stacked" style="margin-top:26px">
       <div class="compile-grid">
         <div class="pane pane--src">
@@ -647,7 +724,7 @@ clojure -M:repl</pre>
     </ul>
     </div>
 
-    <div data-panel="1" hidden>
+    <div data-panel="2" hidden>
     <h3>Types that carry proof, and keep it through the compile</h3>
     <p>A bigger sample with <code>opaque</code> types: parse an untrusted user-id string once, mint a permission proof at the boundary, and let privileged functions demand the proof in their signature. The Gleam type checker makes unauthorized calls unrepresentable; the compiled Clojure keeps the discipline as <code>instance?</code> predicates and malli schemas:</p>
     <div class="compile compile--stacked" style="margin-top:18px">
@@ -712,7 +789,7 @@ clojure -M:repl</pre>
     <p style="margin-top:20px">The <code>^java.lang.String</code> hint comes from the checked argument type; the error variants each became a record you can dispatch on from Clojure. Note the return schema: <code>(p/result-of …)</code> carries the <em>payload</em> types, so an instrumented boundary rejects an <code>Ok</code> wrapping the wrong thing, not just a non-Result. The full walkthrough, with the compiler's verbatim refusals, is its own post: <a href="blog/parse-dont-validate.html"><strong>Permission checks are parsers →</strong></a></p>
     </div>
 
-    <div data-panel="2" hidden>
+    <div data-panel="3" hidden>
     <h3>Self tail calls become <code>recur</code></h3>
     <p>The JVM has no tail-call elimination, so a naive translation of accumulator recursion would blow the stack. The compiler detects self tail calls and emits <code>recur</code>: constant stack, and the checked signature still leads the docstring.</p>
     <div class="compile" style="margin-top:18px">
